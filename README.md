@@ -77,7 +77,7 @@ Read the linked `README.md` inside each folder before you start coding there.
 
 **Put here:**
 
-- Public website (`website/`)
+- Public landing (`landing/`) and, when it scales, full public website (`website/`)
 - Internal admin / backoffice (`backoffice/`)
 - Customer portals, loyalty apps, Streamlit/Gradio tools, dashboards with a UI
 

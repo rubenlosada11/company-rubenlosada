@@ -77,7 +77,7 @@ Lee el `README.md` enlazado dentro de cada carpeta antes de empezar a programar 
 
 **Pon aquí:**
 
-- Sitio web público (`website/`)
+- Landing pública (`landing/`) y, cuando escale, web pública completa (`website/`)
 - Admin interno / backoffice (`backoffice/`)
 - Portales de clientes, apps de fidelización, herramientas Streamlit/Gradio, dashboards con UI
 
