@@ -49,13 +49,17 @@ Estás construyendo **una sola empresa** a lo largo de muchos hitos y proyectos.
 
 ---
 
-## Estado actual de la plantilla
+## Estado actual del proyecto
 
-> 💡 Actualmente el repositorio ofrece solo una **estructura base de carpetas y documentación**. Todavía no incluye aplicaciones ejecutables ni scripts globales en la raíz.
+> 💡 Empresa asignada: **TrackFlow** (última milla y gestión de almacenes, US + España). Contexto en [`CONTEXT.es.md`](./CONTEXT.es.md), con el detalle específico de cada hito en [`CONTEXT-trackflow.es.md`](./CONTEXT-trackflow.es.md).
 >
-> - `CONTEXT.md` es un placeholder y debe sustituirse por el contexto de la empresa asignada.
+> Hitos completados hasta ahora (ver [`docs/hitos.md`](./docs/hitos.md) para el detalle completo):
+>
+> - **Hito 1 — Sitio Web Público**: landing comercial + formulario de captación en [`uis/landing/`](./uis/landing/). Demo: [landingtrackflow.rubenlosada.com](https://landingtrackflow.rubenlosada.com/)
+> - **Hito 2 — Scripts de automatización y procesamiento de datos**: utilidades TypeScript de dominio en [`packages/shared/`](./packages/shared/) (tipos, colecciones, búsqueda, agregaciones, validaciones) con interfaz de prueba manual en [`uis/script-automatizacion/`](./uis/script-automatizacion/). Demo: [scriptsautotrackflow.rubenlosada.com](https://scriptsautotrackflow.rubenlosada.com/)
+>
 > - No existe todavía un `AGENTS.md` en la raíz.
-> - Existe metadata del paquete compartido en `packages/shared/package.json` (`@repo/shared-types`), pero aún no hay runner de workspace en raíz.
+> - `packages/shared/package.json` (`@repo/shared-types`) ya tiene scripts propios (`build`, `typecheck`, `demo`); aún no hay un runner de workspace único en la raíz que orqueste todos los paquetes.
 
 ---
 
