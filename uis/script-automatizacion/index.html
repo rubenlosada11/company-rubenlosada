@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TrackFlow | Utilidades de procesamiento de datos</title>
+  <meta name="description" content="Panel interno de TrackFlow Tech para probar las utilidades de filtrado, ordenamiento, búsqueda y validación sobre envíos, transportistas, devoluciones y clientes." />
+  <link rel="icon" type="image/png" href="../landing/icon/TrackFlow_Favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=Manrope:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            heading: ["Archivo", "sans-serif"],
+            body: ["Manrope", "sans-serif"],
+          },
+        },
+      },
+    };
+  </script>
+</head>
+<body class="font-body text-slate-900 antialiased bg-slate-50 selection:bg-blue-200">
+
+  <header class="sticky top-0 z-20 border-b border-slate-200/80 bg-white/80 backdrop-blur-md">
+    <div class="mx-auto flex min-h-[74px] w-[min(1120px,92vw)] items-center justify-between gap-4">
+      <a href="../landing/index.html" class="inline-flex items-center gap-3 font-heading font-bold" aria-label="TrackFlow inicio">
+        <img
+          src="../landing/logo/TrackFlow_Logo1_Full.png"
+          alt="Logo de TrackFlow"
+          width="1190"
+          height="264"
+          loading="eager"
+          decoding="async"
+          class="h-8 w-auto max-w-[180px] object-contain sm:h-9 sm:max-w-[210px] md:h-10 md:max-w-[250px]"
+        />
+      </a>
+      <p class="hidden text-sm font-semibold text-slate-500 sm:block">Panel interno · TrackFlow Tech</p>
+      <a class="rounded-full bg-blue-700 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-900/20 transition hover:-translate-y-0.5 hover:bg-blue-800" href="../landing/index.html">← Volver a la web</a>
+    </div>
+  </header>
+
+  <div class="mx-auto w-[min(1120px,92vw)] py-10">
+    <p class="mb-3 text-xs font-bold uppercase tracking-[0.17em] text-blue-800">TrackFlow Tech · Uso interno</p>
+    <h1 class="font-heading text-3xl leading-tight tracking-tight text-slate-900 sm:text-4xl">Utilidades de procesamiento de datos</h1>
+    <p class="mt-3 max-w-2xl text-slate-600">
+      Interfaz de prueba manual para las utilidades de colecciones, búsqueda, agregación y validación construidas
+      sobre las entidades de envíos, transportistas, devoluciones y clientes de TrackFlow.
+    </p>
+  </div>
+
+  <main class="mx-auto w-[min(1120px,92vw)] pb-16 space-y-10">
+
+    <nav class="flex flex-wrap gap-3 text-sm" aria-label="Secciones de la demo">
+      <a href="#datos" class="rounded-full border border-slate-300 bg-white/70 px-4 py-2 font-semibold text-slate-700 transition hover:bg-white">Datos de ejemplo</a>
+      <a href="#filtrado" class="rounded-full border border-slate-300 bg-white/70 px-4 py-2 font-semibold text-slate-700 transition hover:bg-white">Filtrado</a>
+      <a href="#ordenamiento" class="rounded-full border border-slate-300 bg-white/70 px-4 py-2 font-semibold text-slate-700 transition hover:bg-white">Ordenamiento</a>
+      <a href="#busqueda-lineal" class="rounded-full border border-slate-300 bg-white/70 px-4 py-2 font-semibold text-slate-700 transition hover:bg-white">Búsqueda lineal</a>
+      <a href="#busqueda-binaria" class="rounded-full border border-slate-300 bg-white/70 px-4 py-2 font-semibold text-slate-700 transition hover:bg-white">Búsqueda binaria</a>
+      <a href="#agregaciones" class="rounded-full border border-slate-300 bg-white/70 px-4 py-2 font-semibold text-slate-700 transition hover:bg-white">Agregaciones</a>
+      <a href="#validaciones" class="rounded-full border border-slate-300 bg-white/70 px-4 py-2 font-semibold text-slate-700 transition hover:bg-white">Validaciones</a>
+    </nav>
+
+    <!-- Datos de ejemplo -->
+    <section id="datos" class="space-y-4">
+      <h2 class="font-heading text-xl font-bold text-slate-900">Datos de ejemplo</h2>
+      <p class="text-sm text-slate-600">
+        11 envíos (uno inválido a propósito), 8 transportistas, 5 clientes (uno con fechas de contrato incoherentes)
+        y 6 devoluciones (una con fecha de resolución anterior a la solicitud).
+      </p>
+
+      <div>
+        <h3 class="font-medium mb-2">Envíos</h3>
+        <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white p-2" id="sample-shipments"></div>
+      </div>
+      <div>
+        <h3 class="font-medium mb-2">Transportistas</h3>
+        <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white p-2" id="sample-carriers"></div>
+      </div>
+      <div>
+        <h3 class="font-medium mb-2">Clientes</h3>
+        <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white p-2" id="sample-clients"></div>
+      </div>
+      <div>
+        <h3 class="font-medium mb-2">Devoluciones</h3>
+        <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white p-2" id="sample-returns"></div>
+      </div>
+    </section>
+
+    <!-- Filtrado -->
+    <section id="filtrado" class="space-y-4">
+      <h2 class="font-heading text-xl font-bold text-slate-900">Filtrado</h2>
+      <p class="text-sm text-slate-600">Combina varios criterios a la vez. Deja un campo vacío para ignorarlo.</p>
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-white border border-slate-200 rounded-lg p-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1" for="filter-status">Estado</label>
+          <select id="filter-status" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm">
+            <option value="">Cualquiera</option>
+            <option value="pending">pending</option>
+            <option value="in_transit">in_transit</option>
+            <option value="delivered">delivered</option>
+            <option value="delayed">delayed</option>
+            <option value="lost">lost</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1" for="filter-carrier">Transportista</label>
+          <select id="filter-carrier" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm">
+            <option value="">Cualquiera</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1" for="filter-country">País destino</label>
+          <select id="filter-country" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm">
+            <option value="">Cualquiera</option>
+            <option value="US">US</option>
+            <option value="ES">ES</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1" for="filter-min-weight">Peso mín. (kg)</label>
+          <input id="filter-min-weight" type="number" step="0.1" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1" for="filter-max-weight">Peso máx. (kg)</label>
+          <input id="filter-max-weight" type="number" step="0.1" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm" />
+        </div>
+      </div>
+      <button id="filter-run" class="px-4 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800">Filtrar</button>
+      <p id="filter-count" class="text-sm text-slate-600"></p>
+      <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white p-2" id="filter-results"></div>
+    </section>
+
+    <!-- Ordenamiento -->
+    <section id="ordenamiento" class="space-y-4">
+      <h2 class="font-heading text-xl font-bold text-slate-900">Ordenamiento</h2>
+      <div class="flex flex-wrap gap-3 items-end bg-white border border-slate-200 rounded-lg p-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1" for="sort-field">Campo</label>
+          <select id="sort-field" class="border border-slate-300 rounded-md px-2 py-1.5 text-sm">
+            <option value="weightKg">Peso (weightKg)</option>
+            <option value="costEur">Coste (costEur)</option>
+            <option value="trackingNumber">Tracking</option>
+            <option value="createdAt">Fecha de creación</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1" for="sort-direction">Dirección</label>
+          <select id="sort-direction" class="border border-slate-300 rounded-md px-2 py-1.5 text-sm">
+            <option value="asc">Ascendente</option>
+            <option value="desc">Descendente</option>
+          </select>
+        </div>
+        <button id="sort-run" class="px-4 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800">Ordenar</button>
+      </div>
+      <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white p-2" id="sort-results"></div>
+    </section>
+
+    <!-- Búsqueda lineal -->
+    <section id="busqueda-lineal" class="space-y-4">
+      <h2 class="font-heading text-xl font-bold text-slate-900">Búsqueda lineal</h2>
+      <p class="text-sm text-slate-600">Funciona sobre el array de envíos sin ordenar. Prueba "TF-ES-00003" (existe) o "TF-ZZ-00000" (no existe).</p>
+      <div class="flex flex-wrap gap-3 items-end bg-white border border-slate-200 rounded-lg p-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1" for="linear-search-input">Número de seguimiento</label>
+          <input id="linear-search-input" type="text" placeholder="TF-ES-00003" class="border border-slate-300 rounded-md px-2 py-1.5 text-sm" />
+        </div>
+        <button id="linear-search-run" class="px-4 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800">Buscar</button>
+      </div>
+      <p id="linear-search-result" class="text-sm font-medium"></p>
+    </section>
+
+    <!-- Búsqueda binaria -->
+    <section id="busqueda-binaria" class="space-y-4">
+      <h2 class="font-heading text-xl font-bold text-slate-900">Búsqueda binaria</h2>
+      <p class="text-sm text-slate-600">
+        Precondición: el array debe estar ordenado por el mismo criterio que se busca. Aquí se ordena primero por
+        número de seguimiento y luego se aplica el algoritmo de búsqueda binaria real (división del rango a la mitad).
+      </p>
+      <div class="flex flex-wrap gap-3 items-end bg-white border border-slate-200 rounded-lg p-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1" for="binary-search-input">Número de seguimiento</label>
+          <input id="binary-search-input" type="text" placeholder="TF-US-00005" class="border border-slate-300 rounded-md px-2 py-1.5 text-sm" />
+        </div>
+        <button id="binary-search-run" class="px-4 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800">Buscar</button>
+      </div>
+      <p id="binary-search-result" class="text-sm font-medium"></p>
+      <div>
+        <h3 class="font-medium mb-2 text-sm text-slate-600">Array ordenado usado para la búsqueda</h3>
+        <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white p-2" id="binary-search-sorted"></div>
+      </div>
+    </section>
+
+    <!-- Agregaciones -->
+    <section id="agregaciones" class="space-y-4">
+      <h2 class="font-heading text-xl font-bold text-slate-900">Agregaciones / reportes</h2>
+      <button id="aggregations-run" class="px-4 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800">Calcular reportes</button>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div class="bg-white border border-slate-200 rounded-lg p-4">
+          <h3 class="font-medium mb-2">Envíos por transportista</h3>
+          <div id="agg-count-by-carrier"></div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-lg p-4">
+          <h3 class="font-medium mb-2">Coste medio por kg y transportista</h3>
+          <div id="agg-cost-per-kg"></div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-lg p-4">
+          <h3 class="font-medium mb-2">Tasa de entrega a tiempo por transportista</h3>
+          <div id="agg-on-time-rate"></div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-lg p-4">
+          <h3 class="font-medium mb-2">Devoluciones por motivo</h3>
+          <div id="agg-returns-by-reason"></div>
+        </div>
+      </div>
+      <p id="agg-return-rate" class="text-sm font-medium"></p>
+      <div class="bg-white border border-slate-200 rounded-lg p-4">
+        <h3 class="font-medium mb-2">Clientes con contrato a renovar en 90 días</h3>
+        <p id="agg-near-renewal" class="text-sm"></p>
+      </div>
+    </section>
+
+    <!-- Validaciones -->
+    <section id="validaciones" class="space-y-4 pb-16">
+      <h2 class="font-heading text-xl font-bold text-slate-900">Validaciones</h2>
+      <div>
+        <button id="validation-run" class="px-4 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800">
+          Validar todos los datos de ejemplo
+        </button>
+        <div id="validation-results" class="mt-3 bg-white border border-slate-200 rounded-lg p-4"></div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+        <h3 class="font-medium">Probar un envío manualmente</h3>
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1" for="custom-tracking">Tracking</label>
+            <input id="custom-tracking" type="text" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1" for="custom-weight">Peso (kg)</label>
+            <input id="custom-weight" type="number" step="0.1" value="1" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1" for="custom-cost">Coste (€)</label>
+            <input id="custom-cost" type="number" step="0.1" value="5" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1" for="custom-status">Estado</label>
+            <select id="custom-status" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm">
+              <option value="pending">pending</option>
+              <option value="in_transit">in_transit</option>
+              <option value="delivered">delivered</option>
+              <option value="delayed">delayed</option>
+              <option value="lost">lost</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1" for="custom-country">País destino</label>
+            <select id="custom-country" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm">
+              <option value="US">US</option>
+              <option value="ES">ES</option>
+            </select>
+          </div>
+        </div>
+        <input type="hidden" id="custom-warehouse" value="Los Angeles" />
+        <button id="custom-validate-run" class="px-4 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800">
+          Validar
+        </button>
+        <div id="custom-validation-result"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="border-t border-blue-900/60 bg-blue-950 text-blue-200">
+    <div class="mx-auto w-[min(1120px,92vw)] py-8 text-center text-sm">
+      <p class="font-medium text-blue-100">TrackFlow Tech · Panel interno de utilidades de datos</p>
+      <p class="mt-1 text-xs text-blue-300">No expuesto públicamente — uso exclusivo del equipo de tecnología.</p>
+    </div>
+  </footer>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
