@@ -18,6 +18,7 @@ Organiza `uis/` por **distintas áreas de la compañía** — cada subcarpeta ag
 
 - `landing/`: landing page de TrackFlow con Tailwind compilado localmente (`tailwind.css`), navegacion, hero, beneficios, CTA de contacto y footer.
 - `formulario/`: formulario de aplicacion/registro de TrackFlow conectado desde la landing.
+- `script-automatizacion/`: interfaz de prueba manual para las utilidades de procesamiento de datos de `packages/shared` (filtrado, ordenamiento, búsqueda lineal/binaria, agregaciones y validaciones sobre envíos, transportistas, devoluciones y clientes). Ver [`script-automatizacion/README.md`](./script-automatizacion/README.md).
 
 ### Ejecutar la landing localmente
 
@@ -30,3 +31,13 @@ npx serve . -l 8080
 Luego abre `http://localhost:8080/landing/`.
 
 Para ir al formulario directamente: `http://localhost:8080/formulario/application.html`.
+
+### Ejecutar la demo de scripts de automatización
+
+Desde la raíz del repo:
+
+```bash
+npx http-server . -p 3000
+```
+
+Luego abre `http://localhost:3000/uis/script-automatizacion/`.

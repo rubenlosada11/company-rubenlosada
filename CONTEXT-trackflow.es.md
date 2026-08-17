@@ -216,3 +216,75 @@ Implementa el siguiente marcado Schema.org en tu landing page:
   ]
 }
 ```
+
+---
+
+## Hito 2: Scripts de automatización y procesamiento de datos — Implementado
+
+> Extensión de este hito con la primera capa de lógica interna de datos: utilidades TypeScript reutilizables
+> (modelado, colecciones, búsqueda, agregación y validación) sobre las entidades de negocio de TrackFlow, más una
+> interfaz de prueba manual. No sustituye el contexto del Hito 1 (web pública) — lo complementa.
+
+### Ubicación en el repo
+
+| Qué | Ruta |
+| --- | --- |
+| Tipos de dominio | [`packages/shared/types/models.ts`](./packages/shared/types/models.ts) |
+| Utilidades de colecciones (filtrar, ordenar) | [`packages/shared/utils/collections.ts`](./packages/shared/utils/collections.ts) |
+| Búsqueda lineal y binaria | [`packages/shared/utils/search.ts`](./packages/shared/utils/search.ts) |
+| Agregaciones y transformaciones | [`packages/shared/utils/transformations.ts`](./packages/shared/utils/transformations.ts) |
+| Validaciones de negocio | [`packages/shared/utils/validations.ts`](./packages/shared/utils/validations.ts) |
+| Datos de ejemplo (con casos límite inválidos) | [`packages/shared/data/sample-data.ts`](./packages/shared/data/sample-data.ts) |
+| Demo por consola | [`packages/shared/demo.ts`](./packages/shared/demo.ts) |
+| Interfaz de prueba manual (web) | [`uis/script-automatizacion/`](./uis/script-automatizacion/) |
+
+### Entidades modeladas
+
+Basadas en los datos concretos de este documento (transportistas, última milla, logística inversa y comercial):
+
+- **`Carrier`** — uno de los 8 transportistas (UPS, FedEx, DHL US, QuickShip Local en EE. UU.; MRW, SEUR, DHL ES,
+  LocalExpress en España), con `costPerKgEur` y `onTimeDeliveryRate`.
+- **`Shipment`** — un envío desde un almacén (Los Ángeles / Zaragoza) hasta un país de destino, con peso, coste,
+  estado (`pending`/`in_transit`/`delivered`/`delayed`/`lost`) y fechas estimada/real de entrega.
+- **`ReturnRequest`** — una devolución asociada a un envío, con motivo y estado de resolución.
+- **`Client`** — una marca cliente con tipo de producto (mismas categorías que el formulario del Hito 1: moda,
+  electrónica, cosmética, alimentación, otro), volumen mensual de envíos y fechas de contrato.
+
+### Funcionalidades
+
+- **Filtrado** multicriterio (`filterShipments`, `filterReturns`, `filterClients`) por estado, transportista, país,
+  rango de peso, rango de fechas, etc.
+- **Ordenamiento** inmutable (`sortBy`, `sortByMultiple`) ascendente/descendente por cualquier campo.
+- **Búsqueda lineal** (`linearSearch`) sobre arrays sin ordenar.
+- **Búsqueda binaria** (`binarySearchBy`) real (no `.find()`), con precondición explícita de array ya ordenado por
+  el mismo criterio.
+- **Agregaciones**: envíos por transportista, coste medio por kg y transportista, tasa de entrega a tiempo por
+  transportista, devoluciones por motivo, tasa de devoluciones, y clientes con contrato a renovar en 90 días — estas
+  últimas responden directamente a las necesidades descritas en las secciones de "Última milla" y "Comercial" de
+  `CONTEXT.es.md`.
+- **Validaciones de negocio** (`{ valid, errors[] }`) para las 4 entidades: campos obligatorios, rangos numéricos,
+  estados permitidos y coherencia de fechas (p. ej. fin de contrato posterior a inicio, entrega no anterior a
+  creación).
+
+### Cómo ejecutarlo
+
+```bash
+# Compilar y probar las utilidades por consola
+cd packages/shared
+npm install
+npm run build
+npm run demo
+
+# Servir la interfaz de prueba manual (desde la raíz del repo)
+npx http-server . -p 3000
+# abrir http://localhost:3000/uis/script-automatizacion/
+```
+
+### Validación técnica realizada
+
+- `npx tsc --noEmit` sin errores en `packages/shared` y en `uis/script-automatizacion`.
+- `node dist/demo.js` ejecutado, cubriendo casos límite (array vacío, un solo elemento, encontrado/no encontrado,
+  datos inválidos).
+- Interfaz probada en navegador real (Chromium headless vía Playwright): las 4 tablas de datos de ejemplo cargan,
+  y filtrado, ordenamiento, ambas búsquedas, agregaciones y validaciones responden correctamente sin errores de
+  consola.
