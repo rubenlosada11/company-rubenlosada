@@ -19,6 +19,7 @@ Organize `uis/` by **different concerns** — each subfolder covers a distinct a
 - `landing/`: TrackFlow landing page built with locally compiled Tailwind CSS (`tailwind.css`), navigation, hero section, key benefits, contact CTA, and professional footer.
 - `formulario/`: TrackFlow application/registration form linked from the landing page.
 - `script-automatizacion/`: manual test interface for the `packages/shared` data-processing utilities (filtering, sorting, linear/binary search, aggregations and validations over shipments, carriers, returns and clients). See [`script-automatizacion/README.md`](./script-automatizacion/README.md).
+- `talent-pipeline-tracker/`: internal Next.js app for TrackFlow's People & Talent team to manage the candidate pipeline (filterable/searchable list, detail view, status/stage changes, notes, create and edit), backed by the public Talent Tracker API. See [`talent-pipeline-tracker/README.md`](./talent-pipeline-tracker/README.md).
 
 ### Run The Landing Page Locally
 
@@ -41,3 +42,14 @@ npx http-server . -p 3000
 ```
 
 Then open `http://localhost:3000/uis/script-automatizacion/`.
+
+### Run The Talent Pipeline Tracker Locally
+
+From `uis/talent-pipeline-tracker/`:
+
+```bash
+npm install
+npm run dev
+```
+
+Then open `http://localhost:3000`. More detail in [`talent-pipeline-tracker/README.md`](./talent-pipeline-tracker/README.md).
