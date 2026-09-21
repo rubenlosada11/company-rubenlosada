@@ -19,7 +19,7 @@
 | `uis/website` | ✅ Implementado y validado (`http://localhost:3001`) |
 | `uis/backoffice` | ✅ Implementado y validado (`http://localhost:3002`) |
 | `services/` | ➖ No necesario (decisión documentada en `techContext.md`) |
-| Pull Request a `main` | ⏳ Pendiente |
+| Pull Request `feature/agent-memory-bank` → `main` | 🔍 Abierta con el commit final; pendiente de revisión, capturas y merge por el desarrollador |
 
 ## Estado inicial (antes del Hito 4, `main` @ `50b77bd`)
 
@@ -91,8 +91,23 @@
   sin nombre de CEO; 1 `h1`; `meta robots noindex`; sin desborde horizontal en 1440 px y 390 px; móvil con nav
   superior de 4 enlaces y sidebar oculta; 0 errores de consola/red. Inspección visual de la primera pantalla.
 
+- Documentación: `docs/hitos.md` (entrada del Hito 4) y estado del `README.es.md` raíz (ya existe `AGENTS.md`;
+  se añaden los Hitos 3 y 4 al bloque de estado).
+
+**Validaciones (commit 4 — verificación final sobre lo commiteado en `b4ba3b6`)**
+
+- Checkout limpio: `git archive` de `uis/website` y `uis/backoffice` → carpeta vacía (sin `node_modules`,
+  `.next` ni `next-env.d.ts`) → `npm ci` (exit 0) → `npm run lint` (0) → `npm run typecheck` sin build previo (0)
+  → `npm run build` (0), en ambas apps. Demuestra que los lockfiles y el script `typecheck` funcionan en un clon
+  nuevo.
+- Aviso no bloqueante de npm 11: `npm warn allow-scripts` (scripts de instalación de dependencias no aprobados).
+  No afectó a lint, typecheck ni build. No se ha modificado la configuración de npm.
+
 **Problemas encontrados**
 
+- Mi primer arnés de verificación en checkout limpio falló (tubería binaria `git archive | tar` en PowerShell 5.1)
+  y ejecutó comandos en la raíz: sin efectos (no hay `package.json` raíz; `git status` intacto). Rehecho con
+  `git archive -o` y fail-fast.
 - Falsos positivos de mi QA (no del código): (a) texto interpolado en SSR aparece con `<!-- -->` entre fragmentos,
   por lo que no se usa en `--expect` del check de ruta; (b) el logo de móvil oculto en escritorio (`display:none`,
   `loading=lazy`) contaba como “imagen rota”; ahora solo se cuentan imágenes visibles.
@@ -113,8 +128,37 @@
 
 ## Trabajo pendiente
 
-Se completa al cerrar el hito.
+**Manual del desarrollador (no se puede automatizar ni simular)**
+
+- Añadir las dos capturas a la PR (website y backoffice; pantallas y tamaños en la descripción de la PR).
+- Revisar y fusionar la PR `feature/agent-memory-bank` → `main`. Al fusionar: pasar el Hito 4 a `delivered` en
+  `uis/backoffice/lib/data/milestones.ts` y actualizar la fila “Demo pública” de `docs/hitos.md` si se despliega.
+- Configurar `user.name`/`user.email` de Git en la máquina (los commits del Hito 4 usan la identidad `noreply`
+  de GitHub pasada por `-c`, sin tocar la configuración).
+
+**Decisiones abiertas (requieren confirmación; ver `projectbrief.md`)**
+
+- Nombre real del CEO (el CONTEXT dice Thomas Harry y Daniel Espinoza) → hoy no se muestra en ninguna UI.
+- Revisión de Miguel Torres del copy “inventario en tiempo real” / “tecnología propia para visibilidad total” del
+  website frente a la realidad descrita en `CONTEXT.es.md`.
+- Publicar (o no) la facturación anual en el website (hoy solo aparece en el backoffice).
+- Despliegue público y dominio de website/backoffice (infra/DNS: requiere confirmación).
+
+**Deuda técnica conocida**
+
+- Sin tests automatizados ni CI en todo el repo; las validaciones dependen del flujo de `AGENTS.md` y de la skill.
+- Backoffice sin autenticación (lleva `noindex`, pero no debe publicarse abierto).
+- Logo, favicon e imagen duplicados por app (patrón ya usado por el tracker). Si crece, valorar `packages/`
+  (requiere confirmación).
+- El `README.es.md` raíz sigue nombrando `CONTEXT.md` en varios sitios (plantilla); el fichero real es
+  `CONTEXT.es.md`.
+- Sin workspace raíz: cada app se instala y valida por separado.
 
 ## Siguientes pasos
 
-Se completa al cerrar el hito.
+1. Fusionar la PR y actualizar el estado del Hito 4 (ver arriba).
+2. Siguientes hitos del curso (README raíz: Backend, Telemetría, RAG, Agentes, Workflows, Tiempo real): cada uno
+   debe arrancar leyendo este memory bank y cerrar actualizando `progress.md`.
+3. Cuando se cree `services/` (API FastAPI centralizada, según su README), conectar el backoffice a datos reales
+   y sustituir los “datos de partida” estáticos de `lib/data/`.
+4. Valorar añadir un runner de tests y CI (requiere confirmación) y automatizar `validate-delivery` en CI.
