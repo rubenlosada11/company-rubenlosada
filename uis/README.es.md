@@ -21,6 +21,8 @@ Organiza `uis/` por **distintas áreas de la compañía** — cada subcarpeta ag
 - `script-automatizacion/`: interfaz de prueba manual para las utilidades de procesamiento de datos de `packages/shared` (filtrado, ordenamiento, búsqueda lineal/binaria, agregaciones y validaciones sobre envíos, transportistas, devoluciones y clientes). Ver [`script-automatizacion/README.md`](./script-automatizacion/README.md).
 - `talent-pipeline-tracker/`: aplicación Next.js interna de People & Talent para gestionar el pipeline de candidaturas de TrackFlow (listado con filtros/búsqueda, detalle, cambio de estado/etapa, notas, creación y edición), consumiendo la API pública de Talent Tracker. Ver [`talent-pipeline-tracker/README.md`](./talent-pipeline-tracker/README.md).
 
+- `website/`: sitio web corporativo público de TrackFlow (Next.js + Tailwind): hero, servicios, flujo de entrega, cobertura EE. UU./España, beneficios, público objetivo y contacto, con marcado Schema.org. Su contenido sale de `CONTEXT.es.md` y su CTA apunta al formulario existente en `landing/formulario/`. Ver [`website/README.md`](./website/README.md).
+
 ### Ejecutar la landing localmente
 
 Desde `uis/`:
@@ -42,6 +44,17 @@ npx http-server . -p 3000
 ```
 
 Luego abre `http://localhost:3000/uis/script-automatizacion/`.
+
+### Ejecutar el website
+
+Desde `uis/website/`:
+
+```bash
+npm install
+npm run dev
+```
+
+Luego abre `http://localhost:3001`. Más detalle en [`website/README.md`](./website/README.md).
 
 ### Ejecutar el Talent Pipeline Tracker
 

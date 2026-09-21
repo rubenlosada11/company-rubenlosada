@@ -6,7 +6,9 @@
 //
 // - Reintenta cada segundo hasta `--timeout` (por defecto 60 s): sirve para esperar a que arranque el servidor.
 // - --expect: subcadena que DEBE aparecer en el HTML (repetible).
-// - --forbid: subcadena que NO debe aparecer (repetible). Se añaden por defecto las páginas de error de Next.js.
+// - --forbid: subcadena que NO debe aparecer en el HTML visible, es decir, sin contar bloques <script> (repetible).
+//   Se añaden por defecto las páginas de error de Next.js. Los <script> se excluyen porque el payload RSC de Next.js
+//   incluye siempre el texto del boundary "not-found" por defecto aunque la página se sirva correctamente.
 // Código de salida: 0 = OK, 1 = fallo, 2 = uso incorrecto.
 
 const DEFAULT_FORBIDDEN = [
@@ -52,13 +54,16 @@ async function attempt() {
   for (const text of expected) {
     if (!body.includes(text)) problems.push(`no aparece el texto esperado: "${text}"`);
   }
+  const visibleHtml = body.replace(/<script[\s\S]*?<\/script>/gi, "");
   for (const text of forbidden) {
-    if (body.includes(text)) problems.push(`aparece un texto prohibido: "${text}"`);
+    if (visibleHtml.includes(text)) problems.push(`aparece un texto prohibido: "${text}"`);
   }
 
   return { problems, summary: `${res.status} (${type || "sin content-type"}, ${body.length} bytes)` };
 }
 
+// Se usa process.exitCode (no process.exit) para que Node cierre las conexiones de fetch por sí solo: en Windows,
+// process.exit() con handles aún cerrándose provoca "Assertion failed: UV_HANDLE_CLOSING" y un código de salida erróneo.
 const deadline = Date.now() + timeoutSeconds * 1000;
 let last = "sin respuesta";
 
@@ -67,7 +72,8 @@ while (true) {
     const { problems, summary } = await attempt();
     if (problems.length === 0) {
       console.log(`OK   ${url} -> ${summary}; esperados encontrados: ${expected.length}/${expected.length}`);
-      process.exit(0);
+      process.exitCode = 0;
+      break;
     }
     last = `${summary}: ${problems.join("; ")}`;
   } catch (error) {
@@ -76,7 +82,8 @@ while (true) {
 
   if (Date.now() >= deadline) {
     console.error(`FAIL ${url} -> ${last}`);
-    process.exit(1);
+    process.exitCode = 1;
+    break;
   }
   await new Promise((resolve) => setTimeout(resolve, 1000));
 }

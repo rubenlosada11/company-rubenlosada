@@ -21,6 +21,8 @@ Organize `uis/` by **different concerns** — each subfolder covers a distinct a
 - `script-automatizacion/`: manual test interface for the `packages/shared` data-processing utilities (filtering, sorting, linear/binary search, aggregations and validations over shipments, carriers, returns and clients). See [`script-automatizacion/README.md`](./script-automatizacion/README.md).
 - `talent-pipeline-tracker/`: internal Next.js app for TrackFlow's People & Talent team to manage the candidate pipeline (filterable/searchable list, detail view, status/stage changes, notes, create and edit), backed by the public Talent Tracker API. See [`talent-pipeline-tracker/README.md`](./talent-pipeline-tracker/README.md).
 
+- `website/`: TrackFlow's public corporate website (Next.js + Tailwind): hero, services, delivery flow, US/Spain coverage, benefits, target audience and contact, with Schema.org markup. Its content comes from `CONTEXT.es.md` and its CTA points to the existing lead form in `landing/formulario/`. See [`website/README.md`](./website/README.md).
+
 ### Run The Landing Page Locally
 
 From `uis/`:
@@ -42,6 +44,17 @@ npx http-server . -p 3000
 ```
 
 Then open `http://localhost:3000/uis/script-automatizacion/`.
+
+### Run The Website Locally
+
+From `uis/website/`:
+
+```bash
+npm install
+npm run dev
+```
+
+Then open `http://localhost:3001`. More detail in [`website/README.md`](./website/README.md).
 
 ### Run The Talent Pipeline Tracker Locally
 
