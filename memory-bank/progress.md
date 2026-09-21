@@ -8,8 +8,8 @@
 
 - **Rama de trabajo:** `feature/hito-4-cierre` (desde `main` @ `8152f13`, que ya incluye la PR #3).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado. PR #3 (`feature/agent-memory-bank`) fusionada en `main` el
-  2026-09-21. PR #4 (`feature/hito-4-capturas`): solo las dos capturas. Esta rama (`feature/hito-4-cierre`) recoge
-  los cambios posteriores (ver “2026-09-22 — cierre”).
+  2026-09-21. PR #4 (`feature/hito-4-capturas`, solo las dos capturas) fusionada el 2026-09-22. Esta rama
+  (`feature/hito-4-cierre`, PR #5) recoge los cambios posteriores (ver “2026-09-22 — cierre”).
 - **Última actualización:** 2026-09-22.
 
 | Componente | Estado |
@@ -22,7 +22,8 @@
 | `uis/backoffice` | ✅ Implementado y validado (`http://localhost:3002`) |
 | `services/` | ➖ No necesario (decisión documentada en `techContext.md`) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
-| PR #4 `feature/hito-4-capturas` → `main` | 🔍 Abierta: solo las dos capturas (website y backoffice) |
+| PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
+| PR #5 `feature/hito-4-cierre` → `main` | 🔍 Abierta: Hito 4 “Entregado”, CEO y facturación en el website |
 
 ## Estado inicial (antes del Hito 4, `main` @ `50b77bd`)
 
@@ -175,7 +176,7 @@
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
 
-- Fusionar la PR #4 (capturas) y la PR del cierre. Opcional: rehacer la captura del website
+- Fusionar la PR #5 (cierre). Opcional: rehacer la captura del website
   (`uis/website/screenshots/screenshot website.png`) una vez fusionado el cierre, para que muestre los 5 datos.
 - Configurar `user.name`/`user.email` de Git en la máquina (los commits del Hito 4 usan la identidad `noreply`
   de GitHub pasada por `-c`, sin tocar la configuración).
@@ -199,7 +200,7 @@
 
 ## Siguientes pasos
 
-1. Fusionar las PR pendientes (capturas y cierre).
+1. Fusionar la PR #5 (cierre).
 2. Siguientes hitos del curso (README raíz: Backend, Telemetría, RAG, Agentes, Workflows, Tiempo real): cada uno
    debe arrancar leyendo este memory bank y cerrar actualizando `progress.md`.
 3. Cuando se cree `services/` (API FastAPI centralizada, según su README), conectar el backoffice a datos reales
