@@ -1,14 +1,16 @@
 # Progress
 
 > Registro vivo del estado del proyecto. **Actualizar antes de cada commit** en que cambie el estado, una
-> decisión o el trabajo pendiente (ver `AGENTS.md`). Añadir entradas nuevas al principio de “Historial”; no
-> reescribir el historial anterior.
+> decisión o el trabajo pendiente (ver `AGENTS.md`). Añadir entradas nuevas al final de “Historial” (orden
+> cronológico); no reescribir el historial anterior.
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/agent-memory-bank` (desde `main` @ `50b77bd`).
-- **Hito en curso:** Hito 4 — Ingeniería impulsada por IA.
-- **Última actualización:** 2026-09-21.
+- **Rama de trabajo:** `feature/hito-4-cierre` (desde `main` @ `8152f13`, que ya incluye la PR #3).
+- **Hito 4 — Ingeniería impulsada por IA:** entregado. PR #3 (`feature/agent-memory-bank`) fusionada en `main` el
+  2026-09-21. PR #4 (`feature/hito-4-capturas`): solo las dos capturas. Esta rama (`feature/hito-4-cierre`) recoge
+  los cambios posteriores (ver “2026-09-22 — cierre”).
+- **Última actualización:** 2026-09-22.
 
 | Componente | Estado |
 | --- | --- |
@@ -19,7 +21,8 @@
 | `uis/website` | ✅ Implementado y validado (`http://localhost:3001`) |
 | `uis/backoffice` | ✅ Implementado y validado (`http://localhost:3002`) |
 | `services/` | ➖ No necesario (decisión documentada en `techContext.md`) |
-| Pull Request `feature/agent-memory-bank` → `main` | 🔍 Abierta con el commit final; pendiente de revisión, capturas y merge por el desarrollador |
+| PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
+| PR #4 `feature/hito-4-capturas` → `main` | 🔍 Abierta: solo las dos capturas (website y backoffice) |
 
 ## Estado inicial (antes del Hito 4, `main` @ `50b77bd`)
 
@@ -131,25 +134,58 @@
 - El desarrollador no pudo arrancar las apps para las capturas: las instrucciones entregadas usaban `&&`, que
   Windows PowerShell 5.1 no admite. Corregidos los READMEs de `website` y `backoffice` y la skill
   `validate-delivery` (un comando por línea, sin `\`), y anotada la restricción en `techContext.md` y `AGENTS.md`.
-  Solo documentación; sin cambios de código en las apps.
+  Solo documentación; sin cambios de código en las apps. Incluido en la PR #3 (commit `cf11628`).
+
+### 2026-09-22 — cierre del Hito 4 (rama `feature/hito-4-cierre`)
+
+**Contexto:** el desarrollador fusionó la PR #3 (`8152f13`) y añadió las capturas (`uis/website/screenshots/` y
+`uis/backoffice/screenshots/`), que se subieron aparte en la PR #4 a petición suya.
+
+**Decisiones del desarrollador**
+
+- **CEO = Thomas Harry** (`CONTEXT.es.md` también cita a Daniel Espinoza; el CONTEXT no se modifica).
+- **Facturación anual (~9 M€) se publica en el website** para dar credibilidad ante posibles clientes.
+- **No hace falta revisión del copy con Miguel Torres**: es un ejercicio ficticio de bootcamp.
+- Sin autenticación en el backoffice: no publicarlo abierto (sin cambios).
+
+**Trabajo realizado**
+
+- Hito 4 pasa a `delivered` en `uis/backoffice/lib/data/milestones.ts` (condición: PR #3 fusionada).
+- Backoffice: Dirección ejecutiva muestra “Thomas Harry · Fundador y CEO” (antes sin nombre).
+- Website: nueva cifra “~9 M€ · Facturación anual” en la franja de datos del hero (ahora 5 datos; rejilla
+  `lg:grid-cols-5`, en 2 columnas el último ocupa el ancho completo; valores alineados arriba con `justify-end`).
+- Documentación actualizada: `projectbrief.md`, `project-conventions.md` y los READMEs de ambas apps.
+
+**Validaciones (worktree limpio desde `origin/main`, `npm ci` en ambas apps)**
+
+- `lint`, `typecheck` y `build` de website y backoffice → exit 0.
+- `check-route.mjs`: website `/` → OK 200 (3/3 textos, incl. “Facturación anual”); backoffice `/` → OK 200 (3/3,
+  incl. “Thomas Harry”).
+- Navegador real (Edge headless): 5 datos en la franja; en 1440 px en una sola fila; en 820 y 390 px el 5.º ocupa
+  el ancho completo; sin desborde horizontal; CEO visible y sin “Daniel Espinoza”; hitos: 4 “Entregado”, 0 “En
+  curso”; filtro del backoffice intacto (33 de 33); 0 errores de consola/red.
+
+**Problemas encontrados y resueltos**
+
+- Con 5 datos, los valores “2” y “8” quedaban desalineados por las etiquetas de dos líneas → corregido con
+  `justify-end` en la celda (verificado visualmente).
+- La captura del website de la PR #4 se hizo con 4 datos; queda desactualizada respecto a este cierre (ver pendiente).
 
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
 
-- Añadir las dos capturas a la PR (website y backoffice; pantallas y tamaños en la descripción de la PR).
-- Revisar y fusionar la PR `feature/agent-memory-bank` → `main`. Al fusionar: pasar el Hito 4 a `delivered` en
-  `uis/backoffice/lib/data/milestones.ts` y actualizar la fila “Demo pública” de `docs/hitos.md` si se despliega.
+- Fusionar la PR #4 (capturas) y la PR del cierre. Opcional: rehacer la captura del website
+  (`uis/website/screenshots/screenshot website.png`) una vez fusionado el cierre, para que muestre los 5 datos.
 - Configurar `user.name`/`user.email` de Git en la máquina (los commits del Hito 4 usan la identidad `noreply`
   de GitHub pasada por `-c`, sin tocar la configuración).
+- Tras fusionar, actualizar la rama local: `git checkout main` y `git pull` (si quedan copias locales sin versionar
+  de las capturas, borrarlas antes: ya estarán en `main`).
 
 **Decisiones abiertas (requieren confirmación; ver `projectbrief.md`)**
 
-- Nombre real del CEO (el CONTEXT dice Thomas Harry y Daniel Espinoza) → hoy no se muestra en ninguna UI.
-- Revisión de Miguel Torres del copy “inventario en tiempo real” / “tecnología propia para visibilidad total” del
-  website frente a la realidad descrita en `CONTEXT.es.md`.
-- Publicar (o no) la facturación anual en el website (hoy solo aparece en el backoffice).
-- Despliegue público y dominio de website/backoffice (infra/DNS: requiere confirmación).
+- Despliegue público y dominio de website/backoffice (infra/DNS: requiere confirmación). Las demos anteriores
+  cuelgan de subdominios de `rubenlosada.com`.
 
 **Deuda técnica conocida**
 
@@ -163,7 +199,7 @@
 
 ## Siguientes pasos
 
-1. Fusionar la PR y actualizar el estado del Hito 4 (ver arriba).
+1. Fusionar las PR pendientes (capturas y cierre).
 2. Siguientes hitos del curso (README raíz: Backend, Telemetría, RAG, Agentes, Workflows, Tiempo real): cada uno
    debe arrancar leyendo este memory bank y cerrar actualizando `progress.md`.
 3. Cuando se cree `services/` (API FastAPI centralizada, según su README), conectar el backoffice a datos reales

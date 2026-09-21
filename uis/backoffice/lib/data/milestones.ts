@@ -1,6 +1,6 @@
 import type { Milestone } from "@/types";
 
-/** Fuente: docs/hitos.md. El Hito 4 se marca “en curso” hasta que se fusione su Pull Request. */
+/** Fuente: docs/hitos.md. Un hito se marca “entregado” cuando su Pull Request se fusiona en `main`. */
 export const MILESTONES: readonly Milestone[] = [
   {
     number: 1,
@@ -31,7 +31,7 @@ export const MILESTONES: readonly Milestone[] = [
   {
     number: 4,
     name: "Ingeniería impulsada por IA",
-    status: "in-progress",
+    status: "delivered", // PR #3 fusionada en main el 2026-09-21
     summary:
       "Memory bank, AGENTS.md, reglas y skill para agentes; web corporativa y backoffice sobre el contexto de empresa.",
     paths: ["memory-bank/", "AGENTS.md", ".agents/", "uis/website/", "uis/backoffice/"],

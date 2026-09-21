@@ -11,7 +11,7 @@ export type AreaId =
 export interface BusinessArea {
   id: AreaId;
   name: string;
-  /** Responsable. `null` cuando el CONTEXT es contradictorio (Dirección Ejecutiva: ver memory-bank/projectbrief.md). */
+  /** Responsable. `null` si el CONTEXT no lo identifica (ver memory-bank/projectbrief.md para el caso del CEO). */
   owner: string | null;
   role: string;
   team: string;

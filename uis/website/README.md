@@ -18,9 +18,11 @@ No hay clientes, logos, cifras, premios ni certificaciones inventados. Los datos
 - **CTA “Solicitar información”:** enlaza al formulario ya existente de la landing
   (`https://landingtrackflow.rubenlosada.com/formulario/application.html`, ver
   [`../landing/README.md`](../landing/README.md)). No se duplica el formulario.
-- **Ingresos anuales (~9 M€):** existen en el CONTEXT pero se decidió no publicarlos en la web.
-- **Copy a revisar con Miguel Torres:** “Inventario en tiempo real” y “Tecnología propia para visibilidad total”
-  proceden del briefing del Hito 1, aunque `CONTEXT.es.md` indica que hoy los dos almacenes no comparten inventario.
+- **Facturación anual (~9 M€):** figura en el CONTEXT y se publica en la franja de datos del hero, por decisión del
+  desarrollador, para dar credibilidad ante posibles clientes.
+- **Copy del briefing:** “Inventario en tiempo real” y “Tecnología propia para visibilidad total” proceden del
+  briefing del Hito 1. `CONTEXT.es.md` indica que hoy los dos almacenes no comparten inventario, pero al tratarse
+  de un ejercicio ficticio de bootcamp se mantiene el copy tal cual y no requiere revisión.
 
 ## Estructura
 

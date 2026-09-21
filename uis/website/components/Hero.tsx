@@ -40,9 +40,15 @@ export function Hero() {
       </Container>
 
       <Container className="mt-12">
-        <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-200 shadow-lg shadow-slate-900/5 md:grid-cols-4">
-          {FACTS.map((fact) => (
-            <div key={fact.label} className="flex flex-col-reverse bg-white/90 p-5">
+        <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-200 shadow-lg shadow-slate-900/5 lg:grid-cols-5">
+          {FACTS.map((fact, index) => (
+            <div
+              key={fact.label}
+              className={`flex flex-col-reverse justify-end bg-white/90 p-5 ${
+                // Con un número impar de datos, el último ocupa el ancho completo en la rejilla de 2 columnas.
+                FACTS.length % 2 === 1 && index === FACTS.length - 1 ? "col-span-2 lg:col-span-1" : ""
+              }`}
+            >
               <dt className="mt-1 text-sm text-slate-600">{fact.label}</dt>
               <dd className="font-heading text-3xl text-blue-800">{fact.value}</dd>
             </div>
