@@ -52,6 +52,25 @@ El `.gitignore` raíz solo contiene `node_modules/`; cada app Next.js tiene el s
 
 Se fijan puertos distintos para poder arrancar `website` y `backoffice` a la vez (validación y capturas).
 
+## URLs de producción
+
+Cada uis desplegada lleva un `LINK_PRODUCCION.md` y una sección “Demo pública” en su README; el registro global está
+en `docs/hitos.md`. Todas cuelgan de subdominios de `rubenlosada.com` (website y backoffice responden con la
+cabecera `server: cloudflare`).
+
+| App | URL |
+| --- | --- |
+| `uis/landing` | https://landingtrackflow.rubenlosada.com/ |
+| `uis/script-automatizacion` | https://scriptsautotrackflow.rubenlosada.com/ |
+| `uis/talent-pipeline-tracker` | https://talent-pipeline-tracker.rubenlosada.com/ |
+| `uis/website` | https://websitetrackflow.rubenlosada.com/ |
+| `uis/backoffice` | https://backofficetrackflow.rubenlosada.com/ (**sin autenticación**, con `noindex`) |
+
+Método de despliegue indicado al agente del servidor para website y backoffice: extraer exactamente `uis/website` y
+`uis/backoffice` del tarball de GitHub (`codeload.github.com/rubenlosada11/company-rubenlosada/tar.gz/main`) en la
+carpeta de cada sitio y ejecutar `npm ci --include=dev` y `npm run build` (necesita Node ≥ 20.9). Al añadir una nueva
+uis desplegada: `LINK_PRODUCCION.md`, sección en su README y fila en `docs/hitos.md`.
+
 ## Comandos
 
 Ejecutar **desde la carpeta de cada app** (`cd uis/<app>`):

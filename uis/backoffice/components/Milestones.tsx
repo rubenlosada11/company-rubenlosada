@@ -25,16 +25,17 @@ export function Milestones() {
               <span>
                 Ubicación: <span className="font-mono text-slate-700">{milestone.paths.join(" · ")}</span>
               </span>
-              {milestone.demoUrl ? (
+              {milestone.demos?.map((demo) => (
                 <a
-                  href={milestone.demoUrl}
+                  key={demo.url}
+                  href={demo.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-semibold text-blue-700 underline-offset-2 hover:underline"
                 >
-                  Demo pública
+                  {demo.label}
                 </a>
-              ) : null}
+              ))}
             </p>
           </li>
         ))}
