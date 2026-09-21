@@ -29,3 +29,12 @@ negocio completo en [`CONTEXT.es.md`](../CONTEXT.es.md) y [`CONTEXT-trackflow.es
 | Descripción | Aplicación Next.js (App Router, TypeScript, Tailwind, sin librerías de estado externas) para People & Talent: listado de candidaturas con filtros por estado/etapa (query params) y búsqueda en cliente, detalle con cambio de estado/etapa y gestión de notas (crear/eliminar), y formularios de creación y edición. Consume directamente la API pública de [Talent Tracker](https://playground.4geeks.com/tracker/api/v1/docs) (`GET/POST/PUT/PATCH/DELETE /records`, notas). |
 | Demo pública | [talent-pipeline-tracker.rubenlosada.com](https://talent-pipeline-tracker.rubenlosada.com/) |
 | Detalle | [`uis/talent-pipeline-tracker/README.md`](../uis/talent-pipeline-tracker/README.md) |
+
+## Hito 4 — Ingeniería impulsada por IA
+
+| | |
+| --- | --- |
+| Carpetas | [`memory-bank/`](../memory-bank/), [`AGENTS.md`](../AGENTS.md), [`.agents/`](../.agents/), [`uis/website/`](../uis/website/), [`uis/backoffice/`](../uis/backoffice/) |
+| Descripción | Infraestructura para agentes de programación: memory bank (`projectbrief`, `techContext`, `progress`), protocolo `AGENTS.md` (lectura inicial, flujo previo a cada commit, áreas que requieren confirmación), regla `project-conventions` (`scope: always`) y skill `validate-delivery` con dos scripts de comprobación. Además, dos aplicaciones Next.js independientes derivadas de `CONTEXT.es.md`: web corporativa pública (`website`, puerto 3001) y aplicación interna (`backoffice`, puerto 3002). Sin backend. |
+| Demo pública | Pendiente (solo local por ahora). |
+| Detalle | [`memory-bank/progress.md`](../memory-bank/progress.md), [`uis/website/README.md`](../uis/website/README.md), [`uis/backoffice/README.md`](../uis/backoffice/README.md) |
