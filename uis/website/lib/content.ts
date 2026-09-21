@@ -42,6 +42,9 @@ export interface Fact {
 export const FACTS: readonly Fact[] = [
   { value: "2009", label: "Año de fundación" },
   { value: "+130", label: "Profesionales" },
+  // "Alrededor de 9 millones de euros anuales" (CONTEXT.es.md). Publicada a propósito en la web (decisión del
+  // desarrollador, 2026-09-22) para reforzar la credibilidad ante posibles clientes.
+  { value: "~9 M€", label: "Facturación anual" },
   { value: "2", label: "Almacenes: Los Ángeles y Zaragoza" },
   { value: "8", label: "Transportistas en ambos países" },
 ];

@@ -59,8 +59,10 @@ export const AREAS: readonly BusinessArea[] = [
   {
     id: "executive",
     name: "Dirección ejecutiva",
-    owner: null,
-    role: "CEO",
+    // CONTEXT.es.md nombra al CEO también como “Daniel Espinoza”; el desarrollador decidió (2026-09-22) usar
+    // “Thomas Harry, fundador y CEO”. Ver memory-bank/projectbrief.md antes de cambiarlo.
+    owner: "Thomas Harry",
+    role: "Fundador y CEO",
     team: "Directores de área",
     situation:
       "El informe consolidado semanal lo preparan a mano los directores (3-4 horas cada uno) y llega con hasta dos días de antigüedad. No hay una visión unificada del negocio por país.",

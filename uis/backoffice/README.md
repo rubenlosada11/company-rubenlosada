@@ -19,9 +19,9 @@ Next.js (App Router) + React + TypeScript + Tailwind CSS, con las mismas version
 | Iniciativas | 33 necesidades de las áreas (“Qué necesitan”) con filtros por área y estado, contador y estado vacío. Estados: *Necesidad identificada* / *Base técnica disponible* (3 iniciativas que ya tienen base en `packages/shared`, Hito 2). | `CONTEXT.es.md` + `packages/shared` |
 | Hitos del proyecto | Hitos 1–4 con ubicación en el monorepo y demo pública. | `docs/hitos.md` |
 
-**No hay métricas en vivo ni datos inventados.** Las cifras son las del briefing, etiquetadas como tal. El nombre
-del CEO no se muestra porque `CONTEXT.es.md` lo cita de dos formas distintas (ver
-[`memory-bank/projectbrief.md`](../../memory-bank/projectbrief.md)).
+**No hay métricas en vivo ni datos inventados.** Las cifras son las del briefing, etiquetadas como tal. Como CEO
+figura Thomas Harry (fundador y CEO), por decisión del desarrollador: `CONTEXT.es.md` también cita a Daniel Espinoza
+(ver [`memory-bank/projectbrief.md`](../../memory-bank/projectbrief.md)).
 
 ## Estructura
 

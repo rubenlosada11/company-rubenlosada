@@ -21,7 +21,8 @@ Aplica a **todas** las tareas, en cualquier carpeta del repo. Protocolo completo
 - Prohibido inventar: clientes, logos, cifras, métricas, certificaciones, premios, precios, plazos, nombres de
   personas o de transportistas, tecnologías internas.
 - Si falta un dato: usa contenido estructurado no numérico o **pregunta**.
-- El CEO aparece con dos nombres distintos en el CONTEXT → no lo nombres en ninguna UI (ver `projectbrief.md`).
+- El CEO es **Thomas Harry** (decisión del desarrollador, 2026-09-22). `CONTEXT.es.md` también cita a Daniel Espinoza:
+  no lo uses ni edites el CONTEXT sin confirmación (ver `projectbrief.md`).
 
 ## 3. Respetar la estructura del monorepo
 
