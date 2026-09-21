@@ -45,7 +45,15 @@ npm install
 npm run dev      # http://localhost:3001
 ```
 
-Producción local: `npm run build && npm run start` (también en el puerto 3001).
+Producción local (también en el puerto 3001), un comando por línea:
+
+```bash
+npm run build
+npm run start
+```
+
+> En Windows PowerShell 5.1 no uses `&&` para encadenar comandos (no lo admite): ejecútalos uno a uno o
+> separados por `;`.
 
 ## Validación
 

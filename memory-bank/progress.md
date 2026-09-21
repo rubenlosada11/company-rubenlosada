@@ -126,6 +126,13 @@
   caído → 1.
 - Los tres últimos puntos de “Problemas encontrados” quedan mitigados (ver decisiones en `techContext.md`).
 
+### 2026-09-22 — Hito 4 (corrección posterior a la PR)
+
+- El desarrollador no pudo arrancar las apps para las capturas: las instrucciones entregadas usaban `&&`, que
+  Windows PowerShell 5.1 no admite. Corregidos los READMEs de `website` y `backoffice` y la skill
+  `validate-delivery` (un comando por línea, sin `\`), y anotada la restricción en `techContext.md` y `AGENTS.md`.
+  Solo documentación; sin cambios de código en las apps.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**

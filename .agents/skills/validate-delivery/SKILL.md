@@ -49,14 +49,14 @@ Ejecuta los pasos en orden. Ante el primer fallo, **detente**, informa y no cont
 
 5. **Arranque y rutas.** Para cada app web afectada, *tras el build*, arranca el servidor de producción en segundo
    plano y comprueba `/`:
+   Un comando por línea, sin `&&` ni `\`: así funcionan igual en Windows PowerShell 5.1 y en bash.
    ```bash
    # terminal A (segundo plano) — desde uis/<app>
    npm run start
-   # terminal B — desde la raíz del repo
-   node .agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3001/ \
-     --expect "TrackFlow" --expect "Solicitar información"           # website
-   node .agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/ \
-     --expect "Backoffice" --expect "Áreas de negocio"               # backoffice
+   # terminal B — desde la raíz del repo: website
+   node .agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3001/ --expect "TrackFlow" --expect "Solicitar información"
+   # terminal B — desde la raíz del repo: backoffice
+   node .agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/ --expect "Backoffice" --expect "Áreas de negocio"
    ```
    Revisa también la salida del servidor: no debe contener `Error`/`⨯`/`unhandled`. **Detén el servidor** al
    terminar (no dejes procesos en segundo plano). Si añadiste rutas nuevas, comprueba también cada una.

@@ -90,7 +90,9 @@ Ante duda: pregunta. Un “no sé si me dejan” es un “detente”.
 
 ## 6. Comandos de referencia
 
-Desde la carpeta de la app (`cd uis/<app>`); detalle y puertos en `memory-bank/techContext.md`.
+Desde la carpeta de la app (`cd uis/<app>`); detalle y puertos en `memory-bank/techContext.md`. El desarrollador
+usa **Windows PowerShell 5.1**: no encadenes comandos con `&&` ni `\` al escribirle instrucciones; un comando por
+línea.
 
 ```bash
 npm install          # dependencias (npm + package-lock.json por proyecto)

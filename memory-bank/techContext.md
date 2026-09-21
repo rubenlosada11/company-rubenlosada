@@ -66,6 +66,11 @@ Ejecutar **desde la carpeta de cada app** (`cd uis/<app>`):
 | Producción local | `npm run start` | tracker, website, backoffice |
 | Demo de utilidades | `npm run demo` (en `packages/shared`) | `packages/shared` |
 
+**Shell del desarrollador: Windows PowerShell 5.1.** No admite `&&`/`||` ni la continuación de línea `\`.
+En documentación y comandos que se le den al desarrollador: **un comando por línea** (o separados por `;`) y
+`cd uis\website` (rutas relativas desde la raíz del repo). Los `&&` dentro de los `scripts` de `package.json` sí
+funcionan (npm los ejecuta con `cmd.exe`).
+
 `talent-pipeline-tracker` no tiene script `typecheck` (el tipado se comprueba en `next build`); no se ha tocado.
 **Tests:** no hay ninguno en el repo (ni runner instalado). Está fuera del alcance introducir uno sin acordarlo.
 
