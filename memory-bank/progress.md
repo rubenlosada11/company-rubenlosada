@@ -17,7 +17,7 @@
 | `.agents/rules/project-conventions.md` | ✅ Creado (`scope: always`) |
 | `.agents/skills/validate-delivery/` | ✅ Creada (`SKILL.md` + `check-route.mjs` + `check-hygiene.mjs`) |
 | `uis/website` | ✅ Implementado y validado (`http://localhost:3001`) |
-| `uis/backoffice` | ⏳ Pendiente |
+| `uis/backoffice` | ✅ Implementado y validado (`http://localhost:3002`) |
 | `services/` | ➖ No necesario (decisión documentada en `techContext.md`) |
 | Pull Request a `main` | ⏳ Pendiente |
 
@@ -71,8 +71,31 @@
   imágenes con `alt`, menú móvil abre/cierra con los 4 enlaces + CTA. Inspección visual de la captura completa.
 - No hay tests automatizados en el repo (no aplica).
 
+- `uis/backoffice` (misma base técnica que el website, puerto 3002). Layout propio (sidebar + barra superior,
+  `noindex`) y ruta `/` con: Resumen (datos de partida del briefing + resumen del backlog calculado), Áreas de
+  negocio (7), Iniciativas (33, filtros por área y estado, contador, estado vacío) e Hitos (1–4). Datos tipados
+  en `lib/data/`, lógica pura en `lib/initiatives.ts`, único componente cliente: `Explorer`.
+- 3 iniciativas marcadas “Base técnica disponible” (dashboard de transportistas, dashboard de devoluciones,
+  alertas de vencimiento) porque `packages/shared` (Hito 2) ya tiene el cálculo; se verificó en el código que
+  `clientsNearContractRenewal` admite umbral configurable pero no envía alertas.
+- Sin nombre de CEO en la UI (inconsistencia del CONTEXT).
+
+**Validaciones (commit 3 — `uis/backoffice`)**
+
+- `npm run lint` → exit 0. `npm run typecheck` → exit 0. `npm run build` → OK, `/` estática.
+- `npm run start` (3002) + `check-route.mjs http://localhost:3002/` con 6 textos esperados → `OK 200`, 6/6, exit 0.
+  Salida del servidor sin errores.
+- Navegador real (Edge headless, 24 comprobaciones): contador inicial 33/33; filtro por área (almacén → 4);
+  filtro por estado (base técnica → 3); combinación sin resultados → estado vacío; botón de tarjeta de área
+  (CX → 6) sincroniza el select y `aria-pressed`; segundo clic desactiva el filtro; responsables y datos visibles;
+  sin nombre de CEO; 1 `h1`; `meta robots noindex`; sin desborde horizontal en 1440 px y 390 px; móvil con nav
+  superior de 4 enlaces y sidebar oculta; 0 errores de consola/red. Inspección visual de la primera pantalla.
+
 **Problemas encontrados**
 
+- Falsos positivos de mi QA (no del código): (a) texto interpolado en SSR aparece con `<!-- -->` entre fragmentos,
+  por lo que no se usa en `--expect` del check de ruta; (b) el logo de móvil oculto en escritorio (`display:none`,
+  `loading=lazy`) contaba como “imagen rota”; ahora solo se cuentan imágenes visibles.
 - `check-route.mjs` daba un falso positivo: “This page could not be found” aparece siempre dentro del payload RSC
   (`<script>`) de Next.js aunque la página sea 200.
 - `check-route.mjs` terminaba con `Assertion failed: UV_HANDLE_CLOSING` (exit -1073740791) en Windows al usar

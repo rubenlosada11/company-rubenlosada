@@ -23,6 +23,8 @@ Organize `uis/` by **different concerns** — each subfolder covers a distinct a
 
 - `website/`: TrackFlow's public corporate website (Next.js + Tailwind): hero, services, delivery flow, US/Spain coverage, benefits, target audience and contact, with Schema.org markup. Its content comes from `CONTEXT.es.md` and its CTA points to the existing lead form in `landing/formulario/`. See [`website/README.md`](./website/README.md).
 
+- `backoffice/`: internal TrackFlow Tech application (Next.js + Tailwind) with its own layout: business-area overview, backlog of initiatives with area/status filters, and project milestones, all derived from `CONTEXT.es.md` (no live data, no authentication yet). See [`backoffice/README.md`](./backoffice/README.md).
+
 ### Run The Landing Page Locally
 
 From `uis/`:
@@ -55,6 +57,17 @@ npm run dev
 ```
 
 Then open `http://localhost:3001`. More detail in [`website/README.md`](./website/README.md).
+
+### Run The Backoffice Locally
+
+From `uis/backoffice/`:
+
+```bash
+npm install
+npm run dev
+```
+
+Then open `http://localhost:3002`. More detail in [`backoffice/README.md`](./backoffice/README.md).
 
 ### Run The Talent Pipeline Tracker Locally
 

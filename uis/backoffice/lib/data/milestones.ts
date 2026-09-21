@@ -1,0 +1,39 @@
+import type { Milestone } from "@/types";
+
+/** Fuente: docs/hitos.md. El Hito 4 se marca “en curso” hasta que se fusione su Pull Request. */
+export const MILESTONES: readonly Milestone[] = [
+  {
+    number: 1,
+    name: "Sitio web público",
+    status: "delivered",
+    summary: "Landing comercial y formulario de captación de leads con validación completa.",
+    paths: ["uis/landing/"],
+    demoUrl: "https://landingtrackflow.rubenlosada.com/",
+  },
+  {
+    number: 2,
+    name: "Scripts de automatización y procesamiento de datos",
+    status: "delivered",
+    summary:
+      "Modelos de dominio y utilidades TypeScript (filtrado, ordenamiento, búsqueda, agregaciones y validaciones) con interfaz de prueba manual.",
+    paths: ["packages/shared/", "uis/script-automatizacion/"],
+    demoUrl: "https://scriptsautotrackflow.rubenlosada.com/",
+  },
+  {
+    number: 3,
+    name: "Talent Pipeline Tracker",
+    status: "delivered",
+    summary:
+      "Aplicación Next.js de People & Talent para gestionar el pipeline de candidaturas sobre la API pública de Talent Tracker.",
+    paths: ["uis/talent-pipeline-tracker/"],
+    demoUrl: "https://talent-pipeline-tracker.rubenlosada.com/",
+  },
+  {
+    number: 4,
+    name: "Ingeniería impulsada por IA",
+    status: "in-progress",
+    summary:
+      "Memory bank, AGENTS.md, reglas y skill para agentes; web corporativa y backoffice sobre el contexto de empresa.",
+    paths: ["memory-bank/", "AGENTS.md", ".agents/", "uis/website/", "uis/backoffice/"],
+  },
+];
