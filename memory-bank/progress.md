@@ -6,10 +6,10 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/hito-4-cierre` (desde `main` @ `8152f13`, que ya incluye la PR #3).
-- **Hito 4 — Ingeniería impulsada por IA:** entregado. PR #3 (`feature/agent-memory-bank`) fusionada en `main` el
-  2026-09-21. PR #4 (`feature/hito-4-capturas`, solo las dos capturas) fusionada el 2026-09-22. Esta rama
-  (`feature/hito-4-cierre`, PR #5) recoge los cambios posteriores (ver “2026-09-22 — cierre”).
+- **Rama de trabajo:** `feature/hito-4-demos-produccion` (desde `main` @ `fb735b1`, que ya incluye las PR #3–#5).
+- **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado. PR #3 (`feature/agent-memory-bank`), PR #4
+  (`feature/hito-4-capturas`) y PR #5 (`feature/hito-4-cierre`) fusionadas en `main` el 2026-09-22 (hora local). Esta
+  rama registra las demos de producción (ver “2026-09-22 — demos de producción”).
 - **Última actualización:** 2026-09-22.
 
 | Componente | Estado |
@@ -18,12 +18,13 @@
 | `AGENTS.md` | ✅ Creado |
 | `.agents/rules/project-conventions.md` | ✅ Creado (`scope: always`) |
 | `.agents/skills/validate-delivery/` | ✅ Creada (`SKILL.md` + `check-route.mjs` + `check-hygiene.mjs`) |
-| `uis/website` | ✅ Implementado y validado (`http://localhost:3001`) |
-| `uis/backoffice` | ✅ Implementado y validado (`http://localhost:3002`) |
+| `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
+| `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
 | `services/` | ➖ No necesario (decisión documentada en `techContext.md`) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
-| PR #5 `feature/hito-4-cierre` → `main` | 🔍 Abierta: Hito 4 “Entregado”, CEO y facturación en el website |
+| PR #5 `feature/hito-4-cierre` → `main` | ✅ Fusionada: Hito 4 “Entregado”, CEO y facturación en el website |
+| PR `feature/hito-4-demos-produccion` → `main` | 🔍 Abierta: enlaces de producción de website y backoffice |
 
 ## Estado inicial (antes del Hito 4, `main` @ `50b77bd`)
 
@@ -172,12 +173,44 @@
   `justify-end` en la celda (verificado visualmente).
 - La captura del website de la PR #4 se hizo con 4 datos; queda desactualizada respecto a este cierre (ver pendiente).
 
+### 2026-09-22 — demos de producción (rama `feature/hito-4-demos-produccion`)
+
+**Contexto:** el desarrollador publicó ambas apps (un agente del servidor las extrajo desde GitHub) y pidió
+registrar las demos “igual que en las demás uis”. Las PR #3, #4 y #5 ya estaban fusionadas.
+
+**Demos de producción (verificadas en vivo el 2026-09-22)**
+
+| App | URL | Verificación |
+| --- | --- | --- |
+| website | https://websitetrackflow.rubenlosada.com/ | 200; `check-route.mjs` 3/3 (“Facturación anual”, “Solicitar información”, JSON-LD) |
+| backoffice | https://backofficetrackflow.rubenlosada.com/ | 200 **sin autenticación**; `check-route.mjs` 3/3 (“Thomas Harry · Fundador y CEO”, “Áreas de negocio”, `noindex`) |
+
+**Trabajo realizado**
+
+- `LINK_PRODUCCION.md` en `uis/website` y `uis/backoffice`, con el mismo formato que las demás uis, y sección
+  “Demo pública” en sus READMEs.
+- `docs/hitos.md` (Hito 4, ya con demos) y bloque de estado del `README.es.md` raíz.
+- Backoffice: la lista de hitos muestra ahora las demos de todos los hitos. El tipo `Milestone` pasa de `demoUrl`
+  (una) a `demos` (varias), porque el Hito 4 tiene dos (website y backoffice).
+- `techContext.md`: nueva sección “URLs de producción” con el método de despliegue.
+- README del backoffice: el aviso “no publicar abierto” pasa a “hoy está publicado abierto; protegerlo antes de
+  mostrar datos reales”.
+
+**Validaciones (worktree limpio desde `origin/main`, `npm ci` en backoffice)**
+
+- Backoffice: `lint`, `typecheck` y `build` → exit 0; `check-route.mjs` sobre `/` → OK 200 (4/4 textos).
+- Navegador real (Edge headless): Hitos 1–3 con “Demo pública” y su URL, Hito 4 con “Demo website” y “Demo
+  backoffice”; 5 enlaces en total, todos con `target=_blank` y `rel=noopener`; 4 hitos “Entregado”; 0 errores de
+  consola.
+- Website: solo cambian `README.md` y `LINK_PRODUCCION.md` (sin código): no requiere build.
+- Ambas producciones comprobadas con `check-route.mjs` antes de enlazarlas.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
 
-- Fusionar la PR #5 (cierre). Opcional: rehacer la captura del website
-  (`uis/website/screenshots/screenshot website.png`) una vez fusionado el cierre, para que muestre los 5 datos.
+- Fusionar la PR de enlaces de producción. Opcional: rehacer la captura del website
+  (`uis/website/screenshots/screenshot website.png`), que se hizo con 4 datos y hoy el hero muestra 5.
 - Configurar `user.name`/`user.email` de Git en la máquina (los commits del Hito 4 usan la identidad `noreply`
   de GitHub pasada por `-c`, sin tocar la configuración).
 - Tras fusionar, actualizar la rama local: `git checkout main` y `git pull` (si quedan copias locales sin versionar
@@ -185,13 +218,14 @@
 
 **Decisiones abiertas (requieren confirmación; ver `projectbrief.md`)**
 
-- Despliegue público y dominio de website/backoffice (infra/DNS: requiere confirmación). Las demos anteriores
-  cuelgan de subdominios de `rubenlosada.com`.
+- Ninguna abierta. El despliegue y los dominios de website y backoffice están resueltos (ver `techContext.md`,
+  “URLs de producción”).
 
 **Deuda técnica conocida**
 
 - Sin tests automatizados ni CI en todo el repo; las validaciones dependen del flujo de `AGENTS.md` y de la skill.
-- Backoffice sin autenticación (lleva `noindex`, pero no debe publicarse abierto).
+- Backoffice publicado **sin autenticación** (`noindex`; los datos son ficticios). Protegerlo (Basic Auth en el
+  proxy o login en la app) antes de mostrar datos reales.
 - Logo, favicon e imagen duplicados por app (patrón ya usado por el tracker). Si crece, valorar `packages/`
   (requiere confirmación).
 - El `README.es.md` raíz sigue nombrando `CONTEXT.md` en varios sitios (plantilla); el fichero real es
@@ -200,7 +234,7 @@
 
 ## Siguientes pasos
 
-1. Fusionar la PR #5 (cierre).
+1. Fusionar la PR de enlaces de producción.
 2. Siguientes hitos del curso (README raíz: Backend, Telemetría, RAG, Agentes, Workflows, Tiempo real): cada uno
    debe arrancar leyendo este memory bank y cerrar actualizando `progress.md`.
 3. Cuando se cree `services/` (API FastAPI centralizada, según su README), conectar el backoffice a datos reales

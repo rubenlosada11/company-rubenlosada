@@ -36,5 +36,5 @@ negocio completo en [`CONTEXT.es.md`](../CONTEXT.es.md) y [`CONTEXT-trackflow.es
 | --- | --- |
 | Carpetas | [`memory-bank/`](../memory-bank/), [`AGENTS.md`](../AGENTS.md), [`.agents/`](../.agents/), [`uis/website/`](../uis/website/), [`uis/backoffice/`](../uis/backoffice/) |
 | Descripción | Infraestructura para agentes de programación: memory bank (`projectbrief`, `techContext`, `progress`), protocolo `AGENTS.md` (lectura inicial, flujo previo a cada commit, áreas que requieren confirmación), regla `project-conventions` (`scope: always`) y skill `validate-delivery` con dos scripts de comprobación. Además, dos aplicaciones Next.js independientes derivadas de `CONTEXT.es.md`: web corporativa pública (`website`, puerto 3001) y aplicación interna (`backoffice`, puerto 3002). Sin backend. |
-| Demo pública | Pendiente (solo local por ahora). |
+| Demo pública | Website: [websitetrackflow.rubenlosada.com](https://websitetrackflow.rubenlosada.com/) · Backoffice: [backofficetrackflow.rubenlosada.com](https://backofficetrackflow.rubenlosada.com/) |
 | Detalle | [`memory-bank/progress.md`](../memory-bank/progress.md), [`uis/website/README.md`](../uis/website/README.md), [`uis/backoffice/README.md`](../uis/backoffice/README.md) |

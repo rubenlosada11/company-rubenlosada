@@ -39,6 +39,12 @@ export interface Initiative {
 
 export type MilestoneStatus = "delivered" | "in-progress";
 
+/** Demo pública en producción de un hito (un hito puede tener varias, p. ej. website y backoffice). */
+export interface Demo {
+  label: string;
+  url: string;
+}
+
 /** Hito del proyecto transversal (fuente: docs/hitos.md y README raíz). */
 export interface Milestone {
   number: number;
@@ -46,7 +52,7 @@ export interface Milestone {
   status: MilestoneStatus;
   summary: string;
   paths: readonly string[];
-  demoUrl?: string;
+  demos?: readonly Demo[];
 }
 
 /** Dato de partida documentado en el CONTEXT (no es una métrica en vivo). */

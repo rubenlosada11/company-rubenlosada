@@ -10,6 +10,12 @@ Next.js (App Router) + React + TypeScript + Tailwind CSS, con las mismas version
 > Este proyecto es independiente de [`../website`](../website/README.md): layout, estilos y datos propios; no
 > comparten código.
 
+## Demo pública
+
+- URL: https://backofficetrackflow.rubenlosada.com/
+- Publicada **sin autenticación**: solo muestra datos del briefing (ficticios, ejercicio de bootcamp) y lleva
+  `noindex`. Ver “Pendiente / fuera de alcance”.
+
 ## Qué muestra la ruta `/`
 
 | Sección | Contenido | Fuente |
@@ -76,8 +82,9 @@ node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://local
 
 ## Pendiente / fuera de alcance
 
-- **Sin autenticación:** solo muestra información del briefing, pero no debe publicarse abiertamente hasta
-  que exista un control de acceso (el layout ya lleva `noindex`).
+- **Sin autenticación:** hoy está publicada abierta (https://backofficetrackflow.rubenlosada.com/). Solo muestra
+  información del briefing, que es ficticia, y el layout lleva `noindex`. Antes de mostrar datos reales hay que
+  protegerla (p. ej. Basic Auth en el proxy o un login en la app).
 - Sin conexión a datos reales (inventario, envíos, devoluciones…): llegará con `services/` y los pipelines de
   `data/` cuando existan.
 - Mantener `lib/data/` sincronizado con `CONTEXT.es.md` y `docs/hitos.md` cuando cambien.
