@@ -10,7 +10,7 @@
   PR #3–#6).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): documento
-  [`docs/ARCHITECTURE_PROPOSAL.md`](../docs/ARCHITECTURE_PROPOSAL.md) terminado; pendiente de PR y de revisión.
+  [`docs/ARCHITECTURE_PROPOSAL.md`](../docs/ARCHITECTURE_PROPOSAL.md) terminado; PR #7 abierta, pendiente de revisión y fusión.
   Solo documentación: **el backend no está implementado**.
 - **Última actualización:** 2026-09-25.
 
@@ -28,7 +28,7 @@
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
 | PR #5 `feature/hito-4-cierre` → `main` | ✅ Fusionada: Hito 4 “Entregado”, CEO y facturación en el website |
 | PR #6 `feature/hito-4-demos-produccion` → `main` | ✅ Fusionada (`f11ee15`): enlaces de producción de website y backoffice |
-| PR `feature/propuesta-arquitectura-backend` → `main` | ⏳ Por abrir |
+| PR #7 `feature/propuesta-arquitectura-backend` → `main` | 🔍 Abierta: https://github.com/rubenlosada11/company-rubenlosada/pull/7 |
 
 ## Estado inicial (antes del Hito 4, `main` @ `50b77bd`)
 
@@ -255,7 +255,7 @@ pidió expresamente no implementar el backend, no instalar dependencias y no toc
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
 
-- Abrir y fusionar la PR `feature/propuesta-arquitectura-backend` → `main` (propuesta de arquitectura de backend).
+- Revisar y fusionar la PR #7 (`feature/propuesta-arquitectura-backend` → `main`).
 - Opcional: rehacer la captura del website (`uis/website/screenshots/screenshot website.png`), que se hizo con 4
   datos y hoy el hero muestra 5.
 - Configurar `user.name`/`user.email` de Git en la máquina (los commits usan la identidad `noreply` de GitHub
@@ -280,7 +280,7 @@ pidió expresamente no implementar el backend, no instalar dependencias y no toc
 
 ## Siguientes pasos
 
-1. Abrir y fusionar la PR de la propuesta de arquitectura de backend.
+1. Fusionar la PR #7 (propuesta de arquitectura de backend).
 2. Validar con el desarrollador los supuestos del documento y, tras su aprobación, crear el esqueleto de la fase 1
    en `services/api/` (core, `/health`, `commercial`, `last_mile`, `reverse_logistics`), según
    `docs/ARCHITECTURE_PROPOSAL.md` §15.
