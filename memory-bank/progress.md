@@ -6,11 +6,13 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/hito-4-demos-produccion` (desde `main` @ `fb735b1`, que ya incluye las PR #3–#5).
-- **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado. PR #3 (`feature/agent-memory-bank`), PR #4
-  (`feature/hito-4-capturas`) y PR #5 (`feature/hito-4-cierre`) fusionadas en `main` el 2026-09-22 (hora local). Esta
-  rama registra las demos de producción (ver “2026-09-22 — demos de producción”).
-- **Última actualización:** 2026-09-22.
+- **Rama de trabajo:** `feature/propuesta-arquitectura-backend` (desde `main` @ `f11ee15`, que ya incluye las
+  PR #3–#6).
+- **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
+- **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): documento
+  [`docs/ARCHITECTURE_PROPOSAL.md`](../docs/ARCHITECTURE_PROPOSAL.md) terminado; pendiente de PR y de revisión.
+  Solo documentación: **el backend no está implementado**.
+- **Última actualización:** 2026-09-25.
 
 | Componente | Estado |
 | --- | --- |
@@ -20,11 +22,13 @@
 | `.agents/skills/validate-delivery/` | ✅ Creada (`SKILL.md` + `check-route.mjs` + `check-hygiene.mjs`) |
 | `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
-| `services/` | ➖ No necesario (decisión documentada en `techContext.md`) |
+| `services/` | 📝 Propuesta documentada (`docs/ARCHITECTURE_PROPOSAL.md`: `services/api/`, FastAPI); sin código |
+| `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
 | PR #5 `feature/hito-4-cierre` → `main` | ✅ Fusionada: Hito 4 “Entregado”, CEO y facturación en el website |
-| PR `feature/hito-4-demos-produccion` → `main` | 🔍 Abierta: enlaces de producción de website y backoffice |
+| PR #6 `feature/hito-4-demos-produccion` → `main` | ✅ Fusionada (`f11ee15`): enlaces de producción de website y backoffice |
+| PR `feature/propuesta-arquitectura-backend` → `main` | ⏳ Por abrir |
 
 ## Estado inicial (antes del Hito 4, `main` @ `50b77bd`)
 
@@ -205,21 +209,63 @@ registrar las demos “igual que en las demás uis”. Las PR #3, #4 y #5 ya est
 - Website: solo cambian `README.md` y `LINK_PRODUCCION.md` (sin código): no requiere build.
 - Ambas producciones comprobadas con `check-route.mjs` antes de enlazarlas.
 
+### 2026-09-25 — Propuesta de arquitectura de backend (rama `feature/propuesta-arquitectura-backend`)
+
+**Objetivo:** entregable “Propuesta de Arquitectura de Backend” (4Geeks). **Solo documentación**: el desarrollador
+pidió expresamente no implementar el backend, no instalar dependencias y no tocar los frontends.
+
+**Trabajo realizado**
+
+- Inspección del repo (CONTEXT, memory bank, `packages/shared`, apps de `uis/`, READMEs de carpetas) para basar la
+  propuesta en hechos, e investigación de la documentación oficial de FastAPI (Bigger Applications, Dependencies,
+  Settings, SQL Databases, Extra Models, Handling Errors, Testing, CORS, Metadata, Security, Background Tasks,
+  Full Stack FastAPI Template), MDN (CORS), Next.js (variables de entorno), Twelve-Factor (Config) y Fowler
+  (MonolithFirst).
+- `docs/ARCHITECTURE_PROPOSAL.md` (commit `d0f9bb6`): **monolito modular por dominios** en `services/api/` (no
+  `backend/`, por la convención del `README.es.md`), capas router → servicio → repositorio dentro de cada dominio y
+  capa `integrations/` (transportistas, SGA, ERP). Dominios: `commercial`, `last_mile`, `reverse_logistics`,
+  `warehouse`, `customer_service`, `reporting`, `identity`. API versionada en `/api/v1`, un `APIRouter` por recurso,
+  tracking público en router propio. 6 riesgos con mitigación, trade-offs y evolución por fases.
+- Índice de `docs/README.md` y `docs/README.es.md` actualizado.
+
+**Validaciones**
+
+- Solo documentación: lint, typecheck, build y arranque no aplican (ninguna app afectada).
+- `check-hygiene.mjs --allow docs` → OK (exit 0). Todos los enlaces relativos del documento apuntan a ficheros
+  existentes (comprobado con script).
+- Revisión manual contra los 10 requisitos de la rúbrica del hito.
+
+**Supuestos abiertos del documento (requieren confirmación antes de implementar)**
+
+- Base de datos PostgreSQL; `docker-compose.yml` para desarrollo local (área de infraestructura protegida).
+- Dominio de producción de la API (DNS de `rubenlosada.com`, área protegida) y existencia de un entorno de staging.
+- Mecanismo de autenticación (OAuth2/Bearer con `fastapi.security` o proveedor externo).
+- Moneda de las operaciones de EE. UU. (hoy `packages/shared` solo usa EUR) y zona horaria del informe semanal.
+- Conectar el formulario de `uis/landing` a `POST /api/v1/leads` exigiría modificar una app de hito anterior.
+
+**Problemas encontrados**
+
+- `progress.md` indicaba la PR de demos de producción como abierta; `git log` muestra que se fusionó como PR #6
+  (`f11ee15`). Corregido en el resumen de estado.
+- Los commits se etiquetaron primero como “Hito 5”. El desarrollador aclaró que **no es un hito**: faltan varias
+  entregas del proyecto antes del Hito 5. Se corrigieron los mensajes antes del push. No añadir esta propuesta a
+  `docs/hitos.md`.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
 
-- Fusionar la PR de enlaces de producción. Opcional: rehacer la captura del website
-  (`uis/website/screenshots/screenshot website.png`), que se hizo con 4 datos y hoy el hero muestra 5.
-- Configurar `user.name`/`user.email` de Git en la máquina (los commits del Hito 4 usan la identidad `noreply`
-  de GitHub pasada por `-c`, sin tocar la configuración).
-- Tras fusionar, actualizar la rama local: `git checkout main` y `git pull` (si quedan copias locales sin versionar
-  de las capturas, borrarlas antes: ya estarán en `main`).
+- Abrir y fusionar la PR `feature/propuesta-arquitectura-backend` → `main` (propuesta de arquitectura de backend).
+- Opcional: rehacer la captura del website (`uis/website/screenshots/screenshot website.png`), que se hizo con 4
+  datos y hoy el hero muestra 5.
+- Configurar `user.name`/`user.email` de Git en la máquina (los commits usan la identidad `noreply` de GitHub
+  pasada por `-c`, sin tocar la configuración).
+- Tras fusionar, actualizar la rama local: `git checkout main` y `git pull`.
 
 **Decisiones abiertas (requieren confirmación; ver `projectbrief.md`)**
 
-- Ninguna abierta. El despliegue y los dominios de website y backoffice están resueltos (ver `techContext.md`,
-  “URLs de producción”).
+- Supuestos de `docs/ARCHITECTURE_PROPOSAL.md` (base de datos, dominio de la API, staging, autenticación, moneda):
+  validarlos antes de crear `services/api/`.
 
 **Deuda técnica conocida**
 
@@ -234,9 +280,12 @@ registrar las demos “igual que en las demás uis”. Las PR #3, #4 y #5 ya est
 
 ## Siguientes pasos
 
-1. Fusionar la PR de enlaces de producción.
-2. Siguientes hitos del curso (README raíz: Backend, Telemetría, RAG, Agentes, Workflows, Tiempo real): cada uno
-   debe arrancar leyendo este memory bank y cerrar actualizando `progress.md`.
-3. Cuando se cree `services/` (API FastAPI centralizada, según su README), conectar el backoffice a datos reales
-   y sustituir los “datos de partida” estáticos de `lib/data/`.
-4. Valorar añadir un runner de tests y CI (requiere confirmación) y automatizar `validate-delivery` en CI.
+1. Abrir y fusionar la PR de la propuesta de arquitectura de backend.
+2. Validar con el desarrollador los supuestos del documento y, tras su aprobación, crear el esqueleto de la fase 1
+   en `services/api/` (core, `/health`, `commercial`, `last_mile`, `reverse_logistics`), según
+   `docs/ARCHITECTURE_PROPOSAL.md` §15.
+3. Siguientes hitos del curso (README raíz: Telemetría, RAG, Agentes, Workflows, Tiempo real): cada uno debe
+   arrancar leyendo este memory bank y cerrar actualizando `progress.md`.
+4. Conectar el backoffice a la API **solo después** de añadir autenticación (riesgo R5 del documento) y sustituir
+   los “datos de partida” estáticos de `lib/data/`.
+5. Valorar añadir un runner de tests y CI (requiere confirmación) y automatizar `validate-delivery` en CI.
