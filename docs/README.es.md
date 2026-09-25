@@ -8,3 +8,5 @@ Esta carpeta contiene la **documentación transversal** del monorepo: guías de 
 ## Documentos existentes
 
 - [`hitos.md`](./hitos.md) — registro de los hitos completados, sus carpetas y sus demos públicas.
+- [`ARCHITECTURE_PROPOSAL.md`](./ARCHITECTURE_PROPOSAL.md) — propuesta de arquitectura de backend (monolito
+  modular FastAPI por dominios de negocio) para `services/api/`; aún no implementada.

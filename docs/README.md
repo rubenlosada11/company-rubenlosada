@@ -10,3 +10,5 @@ This folder holds **cross-cutting documentation** for the monorepo: architecture
 ## Existing documents
 
 - [`hitos.md`](./hitos.md) — record of completed milestones, their folders, and their public demos (in Spanish).
+- [`ARCHITECTURE_PROPOSAL.md`](./ARCHITECTURE_PROPOSAL.md) — backend architecture proposal (FastAPI modular monolith
+  by business domain) for `services/api/`; not implemented yet (in Spanish).

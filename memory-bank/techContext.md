@@ -17,9 +17,9 @@ JS es autónomo, con su propio `package.json` y `package-lock.json`, y se opera 
 | `uis/website/` | Hito 4. Web corporativa pública (Next.js). |
 | `uis/backoffice/` | Hito 4. Aplicación interna (Next.js). |
 | `packages/shared/` | `@repo/shared-types`: tipos de dominio (`Carrier`, `Shipment`, `ReturnRequest`, `Client`) y utilidades TS puras. `dist/` está versionado. |
-| `services/` | **Solo README.** No existe backend en el repo. |
+| `services/` | **Solo README.** No existe backend en el repo. Arquitectura propuesta (no implementada) en `docs/ARCHITECTURE_PROPOSAL.md`. |
 | `agents/`, `skills/`, `mcps/`, `workflows/`, `data/`, `infra/`, `scripts/`, `internal/`, `shared/` | Solo README/plantillas (`agents/_template`, `skills/_template`). |
-| `docs/` | `hitos.md` (registro de hitos) + READMEs. |
+| `docs/` | `hitos.md` (registro de hitos), `ARCHITECTURE_PROPOSAL.md` (propuesta de backend; no es un hito) + READMEs. |
 | `memory-bank/`, `AGENTS.md`, `.agents/` | Infraestructura para agentes (Hito 4). |
 
 No existen: `docker-compose.yml`, CI/CD (`.github/`), tests automatizados, `Dockerfile`, base de datos.
@@ -35,6 +35,13 @@ El `.gitignore` raíz solo contiene `node_modules/`; cada app Next.js tiene el s
   externas: hooks de React. Fuentes vía `next/font/google`.
 - **Backend:** ninguno. La única API consumida es la pública de Talent Tracker
   (`https://playground.4geeks.com/tracker/api/v1`, solo la usa `talent-pipeline-tracker`).
+- **Backend propuesto (pendiente de aprobación, sin código):** una única app **FastAPI** en
+  `services/api/` como **monolito modular por dominios** (`commercial`, `last_mile`, `reverse_logistics`,
+  `warehouse`, `customer_service`, `reporting`, `identity`), capas router → servicio → repositorio, capa
+  `integrations/` para transportistas/SGA/ERP, API en `/api/v1`, configuración con `pydantic-settings`, CORS con
+  orígenes explícitos (`CORS_ALLOWED_ORIGINS`) y frontends con `NEXT_PUBLIC_API_BASE_URL`/`API_BASE_URL`. Detalle,
+  supuestos y riesgos en [`docs/ARCHITECTURE_PROPOSAL.md`](../docs/ARCHITECTURE_PROPOSAL.md). Crearlo sigue
+  requiriendo confirmación (ver “Restricciones”).
 - **Diseño (identidad ya establecida en landing y tracker):** fuentes **Archivo** (títulos, `font-heading`) y
   **Manrope** (cuerpo, `font-body`); primario `blue-700`, neutros `slate`, pie `blue-950`; contenedor
   `w-[min(1120px,92vw)]`; eyebrow `text-xs font-bold uppercase tracking-[0.17em] text-blue-800`; botones
