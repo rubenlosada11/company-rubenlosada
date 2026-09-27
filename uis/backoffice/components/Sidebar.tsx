@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { NAV_ITEMS } from "@/lib/nav";
+import { NavLink } from "./NavLink";
 
 export function Sidebar() {
   return (
@@ -20,19 +21,22 @@ export function Sidebar() {
         <ul className="space-y-1">
           {NAV_ITEMS.map((item) => (
             <li key={item.href}>
-              <a
+              <NavLink
                 href={item.href}
-                className="block rounded-lg px-3 py-2.5 text-sm font-semibold text-blue-100 transition hover:bg-blue-900 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                className="block rounded-lg px-3 py-2.5 text-sm font-semibold transition hover:bg-blue-900 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                inactiveClassName="text-blue-100"
+                activeClassName="bg-blue-900 text-white"
               >
                 {item.label}
-              </a>
+              </NavLink>
             </li>
           ))}
         </ul>
       </nav>
 
       <p className="mt-auto px-3 text-xs leading-relaxed text-blue-300">
-        TrackFlow Tech · Uso interno. Los datos proceden de CONTEXT.es.md; no hay conexión con sistemas reales.
+        TrackFlow Tech · Uso interno. El resumen procede de CONTEXT.es.md; el directorio de proveedores usa la API
+        local de proveedores.
       </p>
     </aside>
   );

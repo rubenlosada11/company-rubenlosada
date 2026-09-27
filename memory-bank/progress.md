@@ -11,8 +11,8 @@
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (sin número de hito todavía; contexto en
   [`CONTEXT-directorio.md`](../CONTEXT-directorio.md)): en curso en `services/api/` (FastAPI + Pydantic + TinyDB).
-  Hecho: entorno `uv`, modelos Pydantic, persistencia TinyDB, seeder (`uv run seed`) y los 6 endpoints, con 116
-  tests. Falta: backoffice, E2E, documentación final, PR.
+  Hecho: API completa (FastAPI + TinyDB, seeder, 6 endpoints, 116 tests) y página `/proveedores` en el backoffice,
+  con E2E en navegador (47/47). Falta: revisión de entrega, seguridad, documentación final, capturas, PR.
 - **Última actualización:** 2026-09-28.
 
 | Componente | Estado |
@@ -23,7 +23,8 @@
 | `.agents/skills/validate-delivery/` | ✅ Creada (`SKILL.md` + `check-route.mjs` + `check-hygiene.mjs`) |
 | `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
-| `services/api/` | 🚧 Directorio de proveedores: API completa (6 endpoints) + seeder, 116 tests OK; falta el backoffice |
+| `services/api/` | 🚧 Directorio de proveedores: API completa (6 endpoints) + seeder, 116 tests OK; solo local |
+| `uis/backoffice/proveedores` | 🚧 Implementado y validado en local (E2E 47/47); pendiente de PR |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
@@ -345,6 +346,37 @@ en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT
 - TinyDB reutiliza el `id` más alto si se borra ese proveedor (siguiente = máximo + 1). Se documenta como limitación:
   el briefing pide que TinyDB asigne el id y la UI no borra.
 
+**Commit 5 — backoffice: página `/proveedores`**
+
+- Ruta `app/proveedores/page.tsx` + componentes cliente `SupplierDirectory` (filtros → `GET /suppliers?…` con
+  `AbortController`; “cargando” derivado de la clave de la petición por la regla `react-hooks/set-state-in-effect`),
+  `SupplierForm` (alta, validación en cliente, moneda derivada del país, errores 422 de FastAPI por campo) y
+  `SupplierRow` (tarifa editable en la fila y suspender/reactivar, con carga y error por fila; badges emerald/ámbar).
+  `lib/http.ts` (patrón del tracker; `ApiError.fieldErrors`), `lib/suppliers.ts`, `lib/data/suppliers.ts` (enums del
+  CONTEXT + etiquetas en español), tipos `Supplier*` en `types/index.ts`, `.env.example`
+  (`NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`). Sin botón de eliminar.
+- Menú: `lib/nav.ts` pasa a `/#resumen`… + `/proveedores`; `NavLink` (cliente) marca `aria-current` y en móvil
+  desplaza el chip activo a la vista (`scroll-px-*` en el `nav`). Pie del sidebar actualizado.
+- Si falta `NEXT_PUBLIC_API_BASE_URL` **no se lanza al importar** (rompería `next build` en producción): la página
+  muestra un aviso. Build sin la variable → OK y aviso visible (simula la demo pública).
+- Validaciones: `npm ci` (aviso `allow-scripts` ya conocido), `lint` 0, `typecheck` 0, `build` 0 (con y sin la
+  variable). `check-route`: `/` 200 (3/3, incl. Thomas Harry) y `/proveedores` 200. E2E Edge headless
+  (playwright-core fuera del repo, API sobre una copia de la base): **47/47** — menú y `aria-current`, 15 filas,
+  filtros país/categoría/combinado/vacío con la petición exacta y 0 navegaciones, alta (4 errores de cliente sin
+  petición, email, 422 real de FastAPI mostrado en alerta y en el campo, 201 id 16, cuerpo sin `id`/`updated_at`,
+  guardado en TinyDB), tarifa (0 en cliente sin PATCH, “Guardando…”, 7,99 al momento, `updated_at` renovado en
+  TinyDB y en la fila, error 422 en la fila), estado (badges, TinyDB, `updated_at` intacto, contador), sin botón de
+  borrar, 390 px sin desborde, API caída → aviso + Reintentar, 0 errores de consola. Regresión de `/`: anclas desde
+  `/proveedores`, filtro de iniciativas 33/33. Logs de API y backoffice sin errores ni 500. Base real intacta.
+
+**Problemas encontrados y resueltos**
+
+- Clases de color activas e inactivas a la vez (`bg-white` + `bg-blue-700`) dependían del orden del CSS → `NavLink`
+  separa `inactiveClassName`/`activeClassName`.
+- En móvil el chip “Proveedores” quedaba fuera de la vista → `scrollIntoView` + `scroll-padding`; comprobado a 390 px.
+- Fallos de selectores de mis scripts E2E (`role=alert` del anunciador de rutas de Next, `aria-label="Categorías"`
+  de las filas), no de la app.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -374,7 +406,7 @@ en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT
 
 ## Siguientes pasos
 
-1. Directorio de proveedores: página en el backoffice → E2E → documentación (incl. `AGENTS.md`, que aún dice que `services/` está vacío y que
+1. Directorio de proveedores: matriz de entrega → seguridad → documentación (incl. `AGENTS.md`, que aún dice que `services/` está vacío y que
    no hay tests) → PR.
 2. Validar con el desarrollador los supuestos del documento y, tras su aprobación, crear el esqueleto de la fase 1
    en `services/api/` (core, `/health`, `commercial`, `last_mile`, `reverse_logistics`), según

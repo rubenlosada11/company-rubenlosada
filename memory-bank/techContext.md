@@ -156,6 +156,9 @@ funcionan (npm los ejecuta con `cmd.exe`).
 | API sin prefijo `/api/v1` (`/suppliers`) | Rutas exactas del briefing del directorio; el versionado de la propuesta queda para cuando crezca. |
 | `POST` 201, `DELETE` 204, filtros como enums (422 si no existen) | Convenciones HTTP de FastAPI; un filtro con un país/categoría inexistente es un error del cliente. |
 | CORS por `CORS_ALLOWED_ORIGINS` (por defecto el backoffice `:3002`) | Patrón de `docs/ARCHITECTURE_PROPOSAL.md` §11.4, con orígenes explícitos. |
+| Backoffice → API desde el navegador (componentes cliente) con `NEXT_PUBLIC_API_BASE_URL` | Filtros sin recarga contra la API real; patrón del tracker. Requiere CORS. La variable se incrusta en `next build`. |
+| Sin la variable, `lib/http.ts` no lanza al importar: error en la UI | Un `throw` en módulo rompería `next build` en el servidor de producción (sin `.env.local`). |
+| Backoffice: tests E2E fuera del repo (Edge + playwright-core en el scratchpad) | Sin runner de tests JS en el repo (no acordado); mismo método que el Hito 4. |
 | Seeder `app/seed.py` → `[project.scripts] seed = "app.seed:main"` | Requisito `uv run seed`. Clave natural `(name casefold, country)`; no modifica existentes; valida con `SupplierCreate`; `stdout` en UTF-8 (en tuberías Windows usa cp1252). |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
