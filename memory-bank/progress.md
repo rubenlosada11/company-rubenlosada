@@ -11,8 +11,8 @@
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (sin número de hito todavía; contexto en
   [`CONTEXT-directorio.md`](../CONTEXT-directorio.md)): en curso en `services/api/` (FastAPI + Pydantic + TinyDB).
-  Hecho: entorno `uv`, modelos Pydantic, persistencia TinyDB y seeder (`uv run seed`), con tests. Falta: endpoints,
-  backoffice, documentación, PR.
+  Hecho: entorno `uv`, modelos Pydantic, persistencia TinyDB, seeder (`uv run seed`) y los 6 endpoints, con 116
+  tests. Falta: backoffice, E2E, documentación final, PR.
 - **Última actualización:** 2026-09-28.
 
 | Componente | Estado |
@@ -23,7 +23,7 @@
 | `.agents/skills/validate-delivery/` | ✅ Creada (`SKILL.md` + `check-route.mjs` + `check-hygiene.mjs`) |
 | `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
-| `services/api/` | 🚧 Directorio de proveedores: modelos + TinyDB + seeder (54 tests OK); sin endpoints aún |
+| `services/api/` | 🚧 Directorio de proveedores: API completa (6 endpoints) + seeder, 116 tests OK; falta el backoffice |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
@@ -317,6 +317,34 @@ en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT
   (suspendidos: Laser Ship, SAP WM Cloud); 9 USA / 6 Spain.
 - Limitación documentada: el candado no cubre otros procesos → ejecutar el seeder con la API parada o sin ediciones.
 
+**Commit 4 — API de proveedores y tests**
+
+- `app/routes/suppliers.py`: `POST` (201), `GET` con filtros `country`/`category` (enums → 422 si no existen;
+  `category` = pertenece a `categories`; combinables con AND), `GET /{id}`, `PATCH /{id}/rate` (renueva
+  `updated_at`), `PATCH /{id}/status` (no toca `updated_at`), `DELETE /{id}` (204). 404 con
+  `"Proveedor {id} no encontrado"`. Acceso a TinyDB por la dependencia `get_suppliers_table`; helpers `to_supplier`
+  y `get_or_404`. `app/main.py`: router + CORS (`CORS_ALLOWED_ORIGINS`, por defecto `localhost:3002` y
+  `127.0.0.1:3002`; métodos GET/POST/PATCH/DELETE; cabecera `Content-Type`).
+- `tests/test_api.py` + fixtures `client`/`seeded_client`: POST (201, id, timestamp, ignora id/updated_at del cliente,
+  422 por cada regla, campos obligatorios), GET (todos, país, categoría, multicategoría, combinado, 422 de filtros,
+  404, id no numérico), PATCH tarifa (valor, `updated_at` más reciente y persistido, 0/negativo/texto/bool/null →
+  422 sin cambios, 404), PATCH estado (válido, no toca `updated_at`, inválidos → 422, 404), DELETE (204 y 404),
+  persistencia en otro proceso, CORS.
+- Validaciones: `uv run pytest -q -W error::DeprecationWarning` → 116 passed. Mutaciones (quitar `updated_at` del
+  PATCH, ignorar el filtro de categoría, quitar el 404) → 1, 7 y 7 tests fallan; restaurado → 116 passed.
+  HTTP real con uvicorn sobre una copia de la base: filtros (Spain 6, reverse_logistics 2, Spain+carrier_last_mile
+  4, carrier_international 2), POST 201 / 422 (8 casos), PATCH tarifa 7.45→7.99 con `updated_at` nuevo, PATCH
+  estado, DELETE 204→404, reinicio del servidor conserva la tarifa, preflight CORS OK solo para `:3002`. Logs sin
+  errores ni 500. La base real `db/` sigue intacta (15, UPS 7.45).
+
+**Problemas encontrados**
+
+- `curl` con el JSON como argumento en Windows envía los acentos en cp1252 → la API responde 400 (cuerpo no UTF-8).
+  Es de la herramienta de prueba: con fichero UTF-8 o `urllib` funciona. En la documentación, usar Swagger UI o
+  `--data-binary @fichero.json`.
+- TinyDB reutiliza el `id` más alto si se borra ese proveedor (siguiente = máximo + 1). Se documenta como limitación:
+  el briefing pide que TinyDB asigne el id y la UI no borra.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -346,8 +374,7 @@ en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT
 
 ## Siguientes pasos
 
-1. Directorio de proveedores: endpoints → tests completos →
-   página en el backoffice → E2E → documentación (incl. `AGENTS.md`, que aún dice que `services/` está vacío y que
+1. Directorio de proveedores: página en el backoffice → E2E → documentación (incl. `AGENTS.md`, que aún dice que `services/` está vacío y que
    no hay tests) → PR.
 2. Validar con el desarrollador los supuestos del documento y, tras su aprobación, crear el esqueleto de la fase 1
    en `services/api/` (core, `/health`, `commercial`, `last_mile`, `reverse_logistics`), según

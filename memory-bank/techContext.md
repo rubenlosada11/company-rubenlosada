@@ -153,6 +153,9 @@ funcionan (npm los ejecuta con `cmd.exe`).
 | Email con regex básica | Decisión del desarrollador: sin `email-validator`. |
 | Base en `services/api/db/suppliers.json` (ignorada), `SUPPLIERS_DB_PATH` para cambiarla | Datos locales fuera de git; tests aislados en ficheros temporales. |
 | TinyDB se abre/cierra en cada uso + `threading.Lock` | TinyDB no es thread-safe y FastAPI usa un pool de hilos; sin candado el JSON se corrompe (comprobado). El candado no cubre otros procesos (seeder). |
+| API sin prefijo `/api/v1` (`/suppliers`) | Rutas exactas del briefing del directorio; el versionado de la propuesta queda para cuando crezca. |
+| `POST` 201, `DELETE` 204, filtros como enums (422 si no existen) | Convenciones HTTP de FastAPI; un filtro con un país/categoría inexistente es un error del cliente. |
+| CORS por `CORS_ALLOWED_ORIGINS` (por defecto el backoffice `:3002`) | Patrón de `docs/ARCHITECTURE_PROPOSAL.md` §11.4, con orígenes explícitos. |
 | Seeder `app/seed.py` → `[project.scripts] seed = "app.seed:main"` | Requisito `uv run seed`. Clave natural `(name casefold, country)`; no modifica existentes; valida con `SupplierCreate`; `stdout` en UTF-8 (en tuberías Windows usa cp1252). |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
