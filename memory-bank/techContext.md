@@ -150,6 +150,8 @@ funcionan (npm los ejecuta con `cmd.exe`).
 | Tarifa `strict` (`> 0`, finita) | En modo laxo Pydantic convertía `true` en `1.0`. |
 | `updated_at` solo lo pone el servidor (UTC) y solo cambia con la tarifa | El CONTEXT lo define como “última actualización de tarifa”. |
 | Email con regex básica | Decisión del desarrollador: sin `email-validator`. |
+| Base en `services/api/db/suppliers.json` (ignorada), `SUPPLIERS_DB_PATH` para cambiarla | Datos locales fuera de git; tests aislados en ficheros temporales. |
+| TinyDB se abre/cierra en cada uso + `threading.Lock` | TinyDB no es thread-safe y FastAPI usa un pool de hilos; sin candado el JSON se corrompe (comprobado). |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 

@@ -11,7 +11,8 @@
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (sin número de hito todavía; contexto en
   [`CONTEXT-directorio.md`](../CONTEXT-directorio.md)): en curso en `services/api/` (FastAPI + Pydantic + TinyDB).
-  Hecho: entorno `uv` y modelos Pydantic con tests. Falta: TinyDB, seeder, endpoints, backoffice, documentación, PR.
+  Hecho: entorno `uv`, modelos Pydantic y persistencia TinyDB, con tests. Falta: seeder, endpoints, backoffice,
+  documentación, PR.
 - **Última actualización:** 2026-09-28.
 
 | Componente | Estado |
@@ -22,7 +23,7 @@
 | `.agents/skills/validate-delivery/` | ✅ Creada (`SKILL.md` + `check-route.mjs` + `check-hygiene.mjs`) |
 | `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
-| `services/api/` | 🚧 Directorio de proveedores: entorno `uv` + modelos Pydantic (38 tests OK); sin endpoints aún |
+| `services/api/` | 🚧 Directorio de proveedores: entorno `uv` + modelos Pydantic + TinyDB (45 tests OK); sin endpoints aún |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
@@ -285,6 +286,22 @@ en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT
 - En modo laxo Pydantic aceptaba `true` como tarifa (`1.0`) y `"7.45"` como texto → campo `strict=True`.
 - Starlette 1.7 marca como obsoleto `TestClient` con `httpx` → dependencia de desarrollo cambiada a `httpx2`.
 - `git config` local tiene ahora un email personal; se mantiene la identidad `noreply` de GitHub pasada por `-c`.
+- `check-route.mjs` exige `text/html`: da FAIL con endpoints JSON aunque respondan 200. Para la API se usa `curl`.
+
+**Commit 2 — persistencia TinyDB**
+
+- `app/database.py`: `suppliers_table()` (context manager) y `get_suppliers_table()` (dependencia de FastAPI).
+  Fichero `services/api/db/suppliers.json` (ignorado en git; `git check-ignore` lo confirma), configurable con
+  `SUPPLIERS_DB_PATH`; UTF-8 legible (`ensure_ascii=False`, `indent=2`). Se abre y cierra en cada uso (lee siempre
+  el disco, también si el seeder escribe con la API arrancada) y un `threading.Lock` serializa el acceso.
+- `tests/conftest.py` (fixture `db_path` temporal) y `tests/test_database.py` (7 tests: ruta, ids, UTF-8,
+  reapertura, lectura desde otro proceso, 40 escrituras concurrentes).
+- Validaciones: `uv run pytest -q` → 45 passed; `db/` real sin tocar. Prueba negativa: sin el candado, 5/5
+  intentos con 8 hilos corrompen el JSON (`JSONDecodeError`); con candado 0/5. Reinicio real con uvicorn (envoltorio
+  temporal fuera del repo con rutas de prueba): arranque 1 (PID 27692) inserta `Nacex` → parada (puerto libre,
+  `curl` 000) → arranque 2 (PID 15444) devuelve el mismo registro con `doc_id` 1. Logs sin errores.
+- La consola de Python en Windows usa cp1252 (los acentos se ven mal al imprimir); el fichero está bien en UTF-8.
+  Tenerlo en cuenta en la salida del seeder.
 
 ## Trabajo pendiente
 
@@ -315,7 +332,7 @@ en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT
 
 ## Siguientes pasos
 
-1. Directorio de proveedores: TinyDB (`app/database.py`) → seeder (`uv run seed`) → endpoints → tests completos →
+1. Directorio de proveedores: seeder (`uv run seed`) → endpoints → tests completos →
    página en el backoffice → E2E → documentación (incl. `AGENTS.md`, que aún dice que `services/` está vacío y que
    no hay tests) → PR.
 2. Validar con el desarrollador los supuestos del documento y, tras su aprobación, crear el esqueleto de la fase 1
