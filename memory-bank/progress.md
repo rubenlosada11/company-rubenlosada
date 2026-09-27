@@ -6,13 +6,13 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/propuesta-arquitectura-backend` (desde `main` @ `f11ee15`, que ya incluye las
-  PR #3–#6).
+- **Rama de trabajo:** `feature/supplier-directory` (desde `main` @ `ee34a08`, que ya incluye las PR #3–#7).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
-- **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): documento
-  [`docs/ARCHITECTURE_PROPOSAL.md`](../docs/ARCHITECTURE_PROPOSAL.md) terminado; PR #7 abierta, pendiente de revisión y fusión.
-  Solo documentación: **el backend no está implementado**.
-- **Última actualización:** 2026-09-25.
+- **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
+- **Directorio de proveedores** (sin número de hito todavía; contexto en
+  [`CONTEXT-directorio.md`](../CONTEXT-directorio.md)): en curso en `services/api/` (FastAPI + Pydantic + TinyDB).
+  Hecho: entorno `uv` y modelos Pydantic con tests. Falta: TinyDB, seeder, endpoints, backoffice, documentación, PR.
+- **Última actualización:** 2026-09-28.
 
 | Componente | Estado |
 | --- | --- |
@@ -22,13 +22,13 @@
 | `.agents/skills/validate-delivery/` | ✅ Creada (`SKILL.md` + `check-route.mjs` + `check-hygiene.mjs`) |
 | `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
-| `services/` | 📝 Propuesta documentada (`docs/ARCHITECTURE_PROPOSAL.md`: `services/api/`, FastAPI); sin código |
+| `services/api/` | 🚧 Directorio de proveedores: entorno `uv` + modelos Pydantic (38 tests OK); sin endpoints aún |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
 | PR #5 `feature/hito-4-cierre` → `main` | ✅ Fusionada: Hito 4 “Entregado”, CEO y facturación en el website |
 | PR #6 `feature/hito-4-demos-produccion` → `main` | ✅ Fusionada (`f11ee15`): enlaces de producción de website y backoffice |
-| PR #7 `feature/propuesta-arquitectura-backend` → `main` | 🔍 Abierta: https://github.com/rubenlosada11/company-rubenlosada/pull/7 |
+| PR #7 `feature/propuesta-arquitectura-backend` → `main` | ✅ Fusionada (`ee34a08`) |
 
 ## Estado inicial (antes del Hito 4, `main` @ `50b77bd`)
 
@@ -251,15 +251,50 @@ pidió expresamente no implementar el backend, no instalar dependencias y no toc
   entregas del proyecto antes del Hito 5. Se corrigieron los mensajes antes del push. No añadir esta propuesta a
   `docs/hitos.md`.
 
+### 2026-09-27/28 — Directorio de proveedores (rama `feature/supplier-directory`)
+
+**Objetivo:** directorio centralizado de proveedores (Carlos Vega / Ana Whitfield) con FastAPI + Pydantic + TinyDB
+en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT-directorio.md` (10 campos,
+8 categorías, 2 estados, 15 proveedores de seed, moneda por país). Se trabaja por fases con parada y confirmación.
+
+**Decisiones del desarrollador (2026-09-27)**
+
+- Crear `services/api/` con paquete `app/` (entrypoint `app.main:app`), **TinyDB como excepción deliberada** a la
+  propuesta de `docs/ARCHITECTURE_PROPOSAL.md` (PostgreSQL/SQLAlchemy); sin Docker ni ORM.
+- `DELETE /suppliers/{id}` solo en la API: **sin botón de eliminar en la UI** (el CONTEXT dice “suspender, no
+  eliminar”).
+- Clave natural del seeder: `(name, country)`; `POST` no rechaza duplicados (el CONTEXT no lo pide).
+- `contact_email`: validación básica por regex, sin dependencia `email-validator`.
+- Se autoriza `uis/backoffice/.env.example` (`NEXT_PUBLIC_API_BASE_URL`); la API es **solo local** por ahora.
+- `CONTEXT-directorio.md` se versiona. Commits: `Directorio de proveedores — <cambio concreto>` (no hay hito aún).
+
+**Commit 1 — entorno `uv` y modelos Pydantic**
+
+- `services/api/pyproject.toml` (backend `uv_build`, `module-root = ""`), `uv.lock`, `.gitignore`, `app/main.py`
+  (`GET /health`), `app/models.py`, `tests/test_models.py`.
+- Modelos: `StrEnum` `Country`/`Currency`/`Category`/`Status` con los valores exactos del CONTEXT; `SupplierCreate`
+  (tarifa `> 0`, finita y `strict`, categorías ≥ 1 sin duplicados, moneda coherente con el país, email básico,
+  opcionales vacíos → `None`; `id`/`updated_at` enviados por el cliente se ignoran), `SupplierRateUpdate`,
+  `SupplierStatusUpdate`, `Supplier` (respuesta con `id` y `updated_at`), `utc_now()`.
+- Validaciones: `uv run pytest -q` → 38 passed (también con `-W error::DeprecationWarning`). Los 15 proveedores del
+  CONTEXT validan sin alteraciones. App FastAPI temporal: válido → 201; status inválido, tarifa 0/negativa, sin
+  `name`, USA+EUR → 422. `uv run uvicorn app.main:app` → `/health` 200, `/docs` 200.
+
+**Problemas encontrados y resueltos**
+
+- En modo laxo Pydantic aceptaba `true` como tarifa (`1.0`) y `"7.45"` como texto → campo `strict=True`.
+- Starlette 1.7 marca como obsoleto `TestClient` con `httpx` → dependencia de desarrollo cambiada a `httpx2`.
+- `git config` local tiene ahora un email personal; se mantiene la identidad `noreply` de GitHub pasada por `-c`.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
 
-- Revisar y fusionar la PR #7 (`feature/propuesta-arquitectura-backend` → `main`).
+- Capturas del directorio de proveedores (seeder, endpoint filtrado, backoffice con filtro) cuando esté terminado.
 - Opcional: rehacer la captura del website (`uis/website/screenshots/screenshot website.png`), que se hizo con 4
   datos y hoy el hero muestra 5.
-- Configurar `user.name`/`user.email` de Git en la máquina (los commits usan la identidad `noreply` de GitHub
-  pasada por `-c`, sin tocar la configuración).
+- Git ya tiene `user.name`/`user.email` en la máquina, pero con un email personal: los commits siguen usando la
+  identidad `noreply` de GitHub pasada por `-c`. Si se quiere, cambiar `user.email` a la `noreply`.
 - Tras fusionar, actualizar la rama local: `git checkout main` y `git pull`.
 
 **Decisiones abiertas (requieren confirmación; ver `projectbrief.md`)**
@@ -280,7 +315,9 @@ pidió expresamente no implementar el backend, no instalar dependencias y no toc
 
 ## Siguientes pasos
 
-1. Fusionar la PR #7 (propuesta de arquitectura de backend).
+1. Directorio de proveedores: TinyDB (`app/database.py`) → seeder (`uv run seed`) → endpoints → tests completos →
+   página en el backoffice → E2E → documentación (incl. `AGENTS.md`, que aún dice que `services/` está vacío y que
+   no hay tests) → PR.
 2. Validar con el desarrollador los supuestos del documento y, tras su aprobación, crear el esqueleto de la fase 1
    en `services/api/` (core, `/health`, `commercial`, `last_mile`, `reverse_logistics`), según
    `docs/ARCHITECTURE_PROPOSAL.md` §15.

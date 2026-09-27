@@ -17,13 +17,14 @@ JS es autónomo, con su propio `package.json` y `package-lock.json`, y se opera 
 | `uis/website/` | Hito 4. Web corporativa pública (Next.js). |
 | `uis/backoffice/` | Hito 4. Aplicación interna (Next.js). |
 | `packages/shared/` | `@repo/shared-types`: tipos de dominio (`Carrier`, `Shipment`, `ReturnRequest`, `Client`) y utilidades TS puras. `dist/` está versionado. |
-| `services/` | **Solo README.** No existe backend en el repo. Arquitectura propuesta (no implementada) en `docs/ARCHITECTURE_PROPOSAL.md`. |
+| `services/api/` | Directorio de proveedores (en curso): **FastAPI + Pydantic + TinyDB**, Python gestionado con **uv** (`pyproject.toml` + `uv.lock` propios), tests con `pytest`. Contexto: `CONTEXT-directorio.md`. |
 | `agents/`, `skills/`, `mcps/`, `workflows/`, `data/`, `infra/`, `scripts/`, `internal/`, `shared/` | Solo README/plantillas (`agents/_template`, `skills/_template`). |
 | `docs/` | `hitos.md` (registro de hitos), `ARCHITECTURE_PROPOSAL.md` (propuesta de backend; no es un hito) + READMEs. |
 | `memory-bank/`, `AGENTS.md`, `.agents/` | Infraestructura para agentes (Hito 4). |
 
-No existen: `docker-compose.yml`, CI/CD (`.github/`), tests automatizados, `Dockerfile`, base de datos.
-El `.gitignore` raíz solo contiene `node_modules/`; cada app Next.js tiene el suyo.
+No existen: `docker-compose.yml`, CI/CD (`.github/`), `Dockerfile`, base de datos de servidor. Los únicos tests
+automatizados son los de `services/api/tests/` (pytest).
+El `.gitignore` raíz solo contiene `node_modules/`; cada app Next.js y `services/api/` tienen el suyo.
 
 ## Stack
 
@@ -33,9 +34,13 @@ El `.gitignore` raíz solo contiene `node_modules/`; cada app Next.js tiene el s
   (`@tailwindcss/postcss`, `@import "tailwindcss"` en `app/globals.css`), ESLint 9 flat config con
   `eslint-config-next` (`core-web-vitals` + `typescript`), alias `@/*` → raíz de la app. Sin librerías de estado
   externas: hooks de React. Fuentes vía `next/font/google`.
-- **Backend:** ninguno. La única API consumida es la pública de Talent Tracker
-  (`https://playground.4geeks.com/tracker/api/v1`, solo la usa `talent-pipeline-tracker`).
-- **Backend propuesto (pendiente de aprobación, sin código):** una única app **FastAPI** en
+- **Backend:** `services/api/` — Python ≥ 3.12 (máquina: 3.14.6), **uv** 0.12, FastAPI 0.141, Pydantic 2.13,
+  TinyDB 4.9, uvicorn; desarrollo: pytest 9 + `httpx2` (Starlette 1.7 marca obsoleto `httpx` en `TestClient`).
+  Paquete `app/` sin `src/` (`uv_build` con `module-root = ""`), entrypoint `app.main:app`. Solo local por ahora.
+  Además, `talent-pipeline-tracker` consume la API pública de Talent Tracker
+  (`https://playground.4geeks.com/tracker/api/v1`).
+- **Arquitectura objetivo propuesta (no implementada; hoy `services/api/` solo contiene el directorio de
+  proveedores con TinyDB):** una única app **FastAPI** en
   `services/api/` como **monolito modular por dominios** (`commercial`, `last_mile`, `reverse_logistics`,
   `warehouse`, `customer_service`, `reporting`, `identity`), capas router → servicio → repositorio, capa
   `integrations/` para transportistas/SGA/ERP, API en `/api/v1`, configuración con `pydantic-settings`, CORS con
@@ -98,7 +103,15 @@ En documentación y comandos que se le den al desarrollador: **un comando por l�
 funcionan (npm los ejecuta con `cmd.exe`).
 
 `talent-pipeline-tracker` no tiene script `typecheck` (el tipado se comprueba en `next build`); no se ha tocado.
-**Tests:** no hay ninguno en el repo (ni runner instalado). Está fuera del alcance introducir uno sin acordarlo.
+**Tests:** solo en `services/api/` (pytest, acordado para el directorio de proveedores). Las apps JS no tienen.
+
+`services/api/` (desde esa carpeta, `cd services\api`):
+
+| Acción | Comando |
+| --- | --- |
+| Instalar dependencias (crea `.venv`) | `uv sync` |
+| Arrancar la API | `uv run uvicorn app.main:app --reload --port 8000` |
+| Tests | `uv run pytest -q` |
 
 ## Convenciones arquitectónicas
 
@@ -125,6 +138,18 @@ funcionan (npm los ejecuta con `cmd.exe`).
 | `AGENTS.md` en la raíz | Las apps Next.js ignoran su propio `AGENTS.md` generado por `next dev` (regla ya presente en el `.gitignore` del tracker); el de la raíz es el protocolo del repo. |
 | Fichero de contexto = `CONTEXT.es.md` | `CONTEXT.md` no existe. Se referencia el real; no se crea duplicado. |
 | Script `typecheck` añadido en apps nuevas | Permite el flujo lint → typecheck → build definido en `AGENTS.md` (patrón ya usado en `packages/shared`). |
+
+## Decisiones técnicas del directorio de proveedores (`services/api/`)
+
+| Decisión | Motivo |
+| --- | --- |
+| **TinyDB** (JSON en disco), sin PostgreSQL/ORM/Docker | Requisito deliberado del ejercicio; excepción aprobada a `docs/ARCHITECTURE_PROPOSAL.md`. |
+| **uv** con `pyproject.toml` + `uv.lock` propios del servicio | Un solo gestor de dependencias Python, igual que cada app JS tiene su lockfile. |
+| Paquete `app/` (no ficheros sueltos) | `uv run seed` necesita un script de `[project.scripts]`, que exige un paquete instalable. |
+| Enums (`StrEnum`) con los valores exactos de `CONTEXT-directorio.md` | Valores no válidos → 422 antes de llegar a TinyDB. |
+| Tarifa `strict` (`> 0`, finita) | En modo laxo Pydantic convertía `true` en `1.0`. |
+| `updated_at` solo lo pone el servidor (UTC) y solo cambia con la tarifa | El CONTEXT lo define como “última actualización de tarifa”. |
+| Email con regex básica | Decisión del desarrollador: sin `email-validator`. |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 
