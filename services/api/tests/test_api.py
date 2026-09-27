@@ -296,6 +296,14 @@ def test_data_survives_api_restart(client, db_path):
     assert json.loads(result.stdout) == updated
 
 
+@pytest.mark.parametrize(("method", "path"), [("GET", "/suppliers"), ("GET", f"/suppliers/{MRW}")])
+def test_json_responses_declare_utf8(seeded_client, method, path):
+    """Sin charset, PowerShell 5.1 muestra "MRW EspaÃ±a"."""
+    response = seeded_client.request(method, path)
+    assert response.headers["content-type"] == "application/json; charset=utf-8"
+    assert "MRW España" in response.content.decode("utf-8")
+
+
 def test_cors_allows_backoffice_origin(client):
     response = client.options(
         "/suppliers/1/rate",

@@ -7,4 +7,10 @@ Each subfolder inside `services/` must correspond to **one specific service** (f
 - **Main purpose**: to centralize all the backend logic, APIs, and queue consumers that support the company's use cases.
 - **Recommendation**: document in this file (or in sub-READMEs) the services you add, their objective, the technology used, and how to run them.
 
+## Services
+
+| Service | Technology | Purpose |
+| --- | --- | --- |
+| [`api/`](./api/README.md) | FastAPI + Pydantic + TinyDB (Python, uv) | Supplier directory (`/suppliers`): single source of truth for TrackFlow suppliers in the USA and Spain, used by the backoffice. Local only (no authentication). |
+
 > _Spanish version: [README.es.md](./README.es.md)._

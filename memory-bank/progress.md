@@ -11,8 +11,9 @@
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (sin número de hito todavía; contexto en
   [`CONTEXT-directorio.md`](../CONTEXT-directorio.md)): en curso en `services/api/` (FastAPI + Pydantic + TinyDB).
-  Hecho: API completa (FastAPI + TinyDB, seeder, 6 endpoints, 116 tests) y página `/proveedores` en el backoffice,
-  con E2E en navegador (47/47). Falta: revisión de entrega, seguridad, documentación final, capturas, PR.
+  Hecho: API completa (FastAPI + TinyDB, seeder, 6 endpoints, 118 tests), página `/proveedores` en el backoffice
+  (E2E 47/47), revisión de entrega y de seguridad, documentación y capturas. Entregado por PR a `main` (pendiente
+  de revisión y fusión).
 - **Última actualización:** 2026-09-28.
 
 | Componente | Estado |
@@ -23,7 +24,7 @@
 | `.agents/skills/validate-delivery/` | ✅ Creada (`SKILL.md` + `check-route.mjs` + `check-hygiene.mjs`) |
 | `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
-| `services/api/` | 🚧 Directorio de proveedores: API completa (6 endpoints) + seeder, 116 tests OK; solo local |
+| `services/api/` | 🚧 Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | `uis/backoffice/proveedores` | 🚧 Implementado y validado en local (E2E 47/47); pendiente de PR |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
@@ -377,11 +378,34 @@ en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT
 - Fallos de selectores de mis scripts E2E (`role=alert` del anunciador de rutas de Next, `aria-label="Categorías"`
   de las filas), no de la app.
 
+**Commit 6 — revisión de entrega, seguridad y documentación**
+
+- Checkout limpio de `5c817cc` (`git archive`, sin `.venv`/`node_modules`/`.next`/`db`): `uv sync --locked`, 116
+  passed, `uv run seed` 15/0/15 y 0/15/15; backoffice `npm ci` (0 vulnerabilidades), lint, typecheck y build → 0.
+- Seguridad (`main...HEAD`, 33 ficheros): sin `.env` (solo los dos `.env.example`), ni base de datos, `.venv`,
+  `node_modules`, `.next`, logs ni claves versionados; patrones de secretos → solo falsos positivos (`reloadToken`);
+  URLs del código solo locales (+ `evil.example` en un test de CORS). La API no tiene autenticación: documentado
+  como solo local.
+- **Corrección:** FastAPI respondía `application/json` sin `charset` y Windows PowerShell 5.1 (`Invoke-RestMethod`)
+  mostraba “MRW EspaÃ±a”. `app/main.py`: `default_response_class` con `application/json; charset=utf-8`; 2 tests
+  nuevos (118). Comprobado en PowerShell 5.1: acentos correctos.
+- Documentación: `services/api/README.md` completo (instalación, ejecución, variables, seeder, modelo, 6 endpoints
+  con respuestas **reales** capturadas de la API, comandos PowerShell 5.1 verificados, tests, persistencia,
+  limitaciones); `services/README*.md` (tabla de servicios); `uis/README*.md` (backoffice + `/proveedores`);
+  `AGENTS.md` y skill `validate-delivery` (ya hay `services/api` y tests con pytest; `check-route` solo HTML).
+- Mi script de edición convirtió `\a` de `services\api` en un carácter de control en `AGENTS.md`: detectado en el diff
+  y corregido (0 ficheros de texto versionados con `\x07`).
+- PowerShell 5.1: `Invoke-RestMethod` con una lista JSON necesita paréntesis para enumerarla; documentado.
+- Capturas del desarrollador (revisadas: contenido correcto y sin datos sensibles), enlazadas desde los READMEs:
+  `services/api/screenshots/screenshot seeder.png` (15/0/15 y 0/15/15), `screenshot endpoint filtro pais1-3.png`
+  (Swagger, `?country=Spain`, 200, `charset=utf-8`) y `uis/backoffice/screenshots/screenshot proveedores
+  filtro1-2.png` (España + última milla → 4; España → 6).
+- Commit 6 + push de `feature/supplier-directory` + PR a `main` (ver estado).
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
 
-- Capturas del directorio de proveedores (seeder, endpoint filtrado, backoffice con filtro) cuando esté terminado.
 - Opcional: rehacer la captura del website (`uis/website/screenshots/screenshot website.png`), que se hizo con 4
   datos y hoy el hero muestra 5.
 - Git ya tiene `user.name`/`user.email` en la máquina, pero con un email personal: los commits siguen usando la
@@ -406,7 +430,8 @@ en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT
 
 ## Siguientes pasos
 
-1. Directorio de proveedores: matriz de entrega → seguridad → documentación (incl. `AGENTS.md`, que aún dice que `services/` está vacío y que
+1. Directorio de proveedores: revisar y fusionar la PR de `feature/supplier-directory`; después `git checkout main`
+   y `git pull`. La demo pública de `/proveedores` mostrará el aviso de API no configurada (API solo local). (incl. `AGENTS.md`, que aún dice que `services/` está vacío y que
    no hay tests) → PR.
 2. Validar con el desarrollador los supuestos del documento y, tras su aprobación, crear el esqueleto de la fase 1
    en `services/api/` (core, `/health`, `commercial`, `last_mile`, `reverse_logistics`), según

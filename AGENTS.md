@@ -26,7 +26,7 @@ Después comprueba `git status` y `git branch --show-current`. **No trabajes en 
 | --- | --- |
 | Interfaz visual pública | `uis/website/` (la `uis/landing/` estática es del Hito 1: no se toca) |
 | Interfaz interna / admin | `uis/backoffice/` |
-| API o proceso en segundo plano | `services/` (hoy vacío; solo si hace falta de verdad) |
+| API o proceso en segundo plano | `services/` (hoy: `services/api/`, directorio de proveedores; nuevos servicios solo si hace falta de verdad) |
 | Tipos/utilidades usados por 2+ carpetas | `packages/` |
 | Agente de IA / skill de dominio / MCP | `agents/` / `skills/` / `mcps/` |
 | Skill para *agentes de programación* de este repo | `.agents/skills/` |
@@ -44,10 +44,12 @@ corrige y se **reinicia desde el paso 3** (o desde el 1 si el arreglo cambió el
 2. **Actualizar el memory bank.** Si cambió una decisión, el stack, un comando o el estado del trabajo, edita
    `memory-bank/progress.md` (siempre que haya avance) y `memory-bank/techContext.md` (si hay decisión técnica).
 3. **Ejecutar validaciones** en **cada app/paquete afectado**, desde su carpeta: `npm run lint`,
-   `npm run typecheck` (si el script existe), tests (si existen; hoy no hay ninguno) y `npm run build`.
+   `npm run typecheck` (si el script existe), tests (si existen; las apps JS no tienen) y `npm run build`.
+   En `services/api`: `uv run pytest -q` (y `uv lock --check` si cambian las dependencias).
 4. **Verificar que las apps arrancan y las rutas funcionan.** Para `website` y `backoffice`: arrancar (`npm run dev`
    o `npm run start` tras el build) y comprobar que `/` responde 200 con su contenido esperado y sin errores en
-   la salida del servidor. Usa la skill [`validate-delivery`](./.agents/skills/validate-delivery/SKILL.md), que
+   la salida del servidor. Para `services/api`: `uv run uvicorn app.main:app --port 8000` y `GET /health` → 200
+   (con `curl`: `check-route.mjs` solo acepta HTML). Usa la skill [`validate-delivery`](./.agents/skills/validate-delivery/SKILL.md), que
    automatiza los pasos 3–5.
 5. **Comprobar que no hay cambios accidentales.** `git status` sin ficheros inesperados: nada de `node_modules/`,
    `.next/`, `*.tsbuildinfo`, `.env*` (salvo `.env.example`), logs, capturas temporales ni ficheros fuera del
@@ -102,6 +104,9 @@ npm run typecheck    # tsc --noEmit (website, backoffice, packages/shared)
 npm run build        # compilación de producción
 npm run start        # servir el build
 ```
+
+`services/api` (Python + uv, desde `services\api`): `uv sync` · `uv run seed` · `uv run uvicorn app.main:app --port 8000`
+· `uv run pytest -q`.
 
 ## 7. Entrega (Git / PR)
 
