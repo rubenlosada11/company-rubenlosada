@@ -110,6 +110,7 @@ funcionan (npm los ejecuta con `cmd.exe`).
 | Acción | Comando |
 | --- | --- |
 | Instalar dependencias (crea `.venv`) | `uv sync` |
+| Cargar proveedores iniciales (idempotente) | `uv run seed` |
 | Arrancar la API | `uv run uvicorn app.main:app --reload --port 8000` |
 | Tests | `uv run pytest -q` |
 
@@ -151,7 +152,8 @@ funcionan (npm los ejecuta con `cmd.exe`).
 | `updated_at` solo lo pone el servidor (UTC) y solo cambia con la tarifa | El CONTEXT lo define como “última actualización de tarifa”. |
 | Email con regex básica | Decisión del desarrollador: sin `email-validator`. |
 | Base en `services/api/db/suppliers.json` (ignorada), `SUPPLIERS_DB_PATH` para cambiarla | Datos locales fuera de git; tests aislados en ficheros temporales. |
-| TinyDB se abre/cierra en cada uso + `threading.Lock` | TinyDB no es thread-safe y FastAPI usa un pool de hilos; sin candado el JSON se corrompe (comprobado). |
+| TinyDB se abre/cierra en cada uso + `threading.Lock` | TinyDB no es thread-safe y FastAPI usa un pool de hilos; sin candado el JSON se corrompe (comprobado). El candado no cubre otros procesos (seeder). |
+| Seeder `app/seed.py` → `[project.scripts] seed = "app.seed:main"` | Requisito `uv run seed`. Clave natural `(name casefold, country)`; no modifica existentes; valida con `SupplierCreate`; `stdout` en UTF-8 (en tuberías Windows usa cp1252). |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 

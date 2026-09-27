@@ -11,8 +11,8 @@
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (sin número de hito todavía; contexto en
   [`CONTEXT-directorio.md`](../CONTEXT-directorio.md)): en curso en `services/api/` (FastAPI + Pydantic + TinyDB).
-  Hecho: entorno `uv`, modelos Pydantic y persistencia TinyDB, con tests. Falta: seeder, endpoints, backoffice,
-  documentación, PR.
+  Hecho: entorno `uv`, modelos Pydantic, persistencia TinyDB y seeder (`uv run seed`), con tests. Falta: endpoints,
+  backoffice, documentación, PR.
 - **Última actualización:** 2026-09-28.
 
 | Componente | Estado |
@@ -23,7 +23,7 @@
 | `.agents/skills/validate-delivery/` | ✅ Creada (`SKILL.md` + `check-route.mjs` + `check-hygiene.mjs`) |
 | `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
-| `services/api/` | 🚧 Directorio de proveedores: entorno `uv` + modelos Pydantic + TinyDB (45 tests OK); sin endpoints aún |
+| `services/api/` | 🚧 Directorio de proveedores: modelos + TinyDB + seeder (54 tests OK); sin endpoints aún |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
@@ -303,6 +303,20 @@ en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT
 - La consola de Python en Windows usa cp1252 (los acentos se ven mal al imprimir); el fichero está bien en UTF-8.
   Tenerlo en cuenta en la salida del seeder.
 
+**Commit 3 — seeder**
+
+- `app/seed.py`: `SUPPLIERS_SEED` copiado literalmente del CONTEXT (15), validado con `SupplierCreate`, `updated_at`
+  del servidor; idempotente por `(name casefold, country)`; no modifica existentes. Salida `Seeder completed.` /
+  `Inserted` / `Skipped` / `Total` + lista `+`/`=` por proveedor. `pyproject.toml`: `[project.scripts] seed`.
+- `tests/test_seed.py` (9 tests): seed idéntico al bloque del CONTEXT (leído con `ast`), 1.ª ejecución 15/0/15,
+  2.ª 0/15/15 con los mismos ids, solo inserta los que faltan, no pisa cambios, mayúsculas, mismo nombre en otro país,
+  salida real de `main()`.
+- Validaciones: `uv run pytest -q` → 54 passed. `uv run seed` real en PowerShell sobre `db/` vacío → Inserted 15,
+  Skipped 0, Total 15; 2.ª ejecución → 0 / 15 / 15; exit 0 ambas; acentos correctos. Comprobación independiente del
+  fichero: 15 registros (ids 1–15), 15 claves únicas, idéntico al CONTEXT, todos con `updated_at` UTC; 13 activos
+  (suspendidos: Laser Ship, SAP WM Cloud); 9 USA / 6 Spain.
+- Limitación documentada: el candado no cubre otros procesos → ejecutar el seeder con la API parada o sin ediciones.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -332,7 +346,7 @@ en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT
 
 ## Siguientes pasos
 
-1. Directorio de proveedores: seeder (`uv run seed`) → endpoints → tests completos →
+1. Directorio de proveedores: endpoints → tests completos →
    página en el backoffice → E2E → documentación (incl. `AGENTS.md`, que aún dice que `services/` está vacío y que
    no hay tests) → PR.
 2. Validar con el desarrollador los supuestos del documento y, tras su aprobación, crear el esqueleto de la fase 1
