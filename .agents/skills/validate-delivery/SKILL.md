@@ -19,7 +19,7 @@ Esta skill **solo valida**: no arregla código, no hace commit y no modifica fic
 | Ficheros modificados | `git status --porcelain -uall` y `git diff --name-only` (+ `--staged`) |
 | Rama actual | `git branch --show-current` (no debe ser `main`) |
 | Apps/paquetes afectados | Primer/segundo segmento de cada ruta: `uis/<app>`, `packages/<pkg>`; el resto (`memory-bank/`, `.agents/`, `docs/`, `AGENTS.md`, READMEs) es documentación |
-| Package manager | **npm** (un `package-lock.json` por proyecto; no hay workspace raíz) |
+| Package manager | **npm** (un `package-lock.json` por proyecto; no hay workspace raíz). `services/api`: **uv** (`uv.lock`) |
 | Scripts disponibles | Sección `scripts` de `<app>/package.json` (usa solo los que existan) |
 | Puerto de cada app | `uis/website` → 3001, `uis/backoffice` → 3002, `uis/talent-pipeline-tracker` → 3000 |
 | Contenido esperado en `/` | `website`: `TrackFlow` y `Solicitar información`; `backoffice`: `Backoffice` y `Áreas de negocio` |
@@ -39,8 +39,11 @@ Ejecuta los pasos en orden. Ante el primer fallo, **detente**, informa y no cont
    ```bash
    npm run lint
    npm run typecheck   # solo si el script existe (website, backoffice, packages/shared)
-   npm test            # solo si el script existe (hoy no hay tests en el repo)
+   npm test            # solo si el script existe (hoy no hay tests en las apps JS)
    ```
+
+   Si el alcance incluye `services/api` (desde esa carpeta): `uv lock --check` y `uv run pytest -q`. Para su
+   arranque, `uv run uvicorn app.main:app --port 8000` y `curl` a `/health` (200): `check-route.mjs` exige HTML.
 
 4. **Build de producción** de cada app afectada:
    ```bash

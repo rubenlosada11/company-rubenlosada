@@ -1,0 +1,12 @@
+# entorno virtual y cachés de Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# base de datos TinyDB local (se regenera con `uv run seed`)
+db/
+
+# variables de entorno (solo se versiona .env.example)
+.env*
+!.env.example

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { NAV_ITEMS } from "@/lib/nav";
+import { NavLink } from "./NavLink";
 
 export function Topbar() {
   return (
@@ -24,16 +25,18 @@ export function Topbar() {
 
       <nav
         aria-label="Secciones del backoffice (móvil)"
-        className="flex gap-2 overflow-x-auto border-t border-slate-100 px-4 py-2 sm:px-6 lg:hidden"
+        className="flex scroll-px-4 gap-2 overflow-x-auto border-t border-slate-100 px-4 py-2 sm:scroll-px-6 sm:px-6 lg:hidden"
       >
         {NAV_ITEMS.map((item) => (
-          <a
+          <NavLink
             key={item.href}
             href={item.href}
-            className="shrink-0 rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            className="shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition"
+            inactiveClassName="border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+            activeClassName="border-blue-700 bg-blue-700 text-white hover:bg-blue-800"
           >
             {item.label}
-          </a>
+          </NavLink>
         ))}
       </nav>
     </header>

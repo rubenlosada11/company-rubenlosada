@@ -61,3 +61,42 @@ export interface BaselineFact {
   value: string;
   detail: string;
 }
+
+/* --- Directorio de proveedores (API `services/api`, contrato de CONTEXT-directorio.md) --- */
+
+export type SupplierCountry = "USA" | "Spain";
+export type SupplierCurrency = "USD" | "EUR";
+export type SupplierStatus = "active" | "suspended";
+export type SupplierCategory =
+  | "carrier_last_mile"
+  | "carrier_international"
+  | "warehouse_supplies"
+  | "packaging_materials"
+  | "reverse_logistics"
+  | "fleet_maintenance"
+  | "it_and_wms_software"
+  | "cleaning_and_facilities";
+
+/** Proveedor tal y como lo devuelve la API. `id` y `updated_at` los genera el servidor. */
+export interface Supplier {
+  id: number;
+  name: string;
+  country: SupplierCountry;
+  categories: SupplierCategory[];
+  rate_per_shipment: number;
+  currency: SupplierCurrency;
+  status: SupplierStatus;
+  service_zone: string | null;
+  contact_email: string | null;
+  notes: string | null;
+  /** ISO 8601 (UTC): última actualización de tarifa. */
+  updated_at: string;
+}
+
+/** Cuerpo de `POST /suppliers`: sin `id` ni `updated_at`. */
+export type SupplierCreatePayload = Omit<Supplier, "id" | "updated_at">;
+
+export interface SupplierFilters {
+  country: SupplierCountry | "";
+  category: SupplierCategory | "";
+}

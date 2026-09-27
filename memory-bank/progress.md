@@ -6,13 +6,15 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/propuesta-arquitectura-backend` (desde `main` @ `f11ee15`, que ya incluye las
-  PR #3–#6).
+- **Rama de trabajo:** `feature/supplier-directory` (desde `main` @ `ee34a08`, que ya incluye las PR #3–#7).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
-- **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): documento
-  [`docs/ARCHITECTURE_PROPOSAL.md`](../docs/ARCHITECTURE_PROPOSAL.md) terminado; PR #7 abierta, pendiente de revisión y fusión.
-  Solo documentación: **el backend no está implementado**.
-- **Última actualización:** 2026-09-25.
+- **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
+- **Directorio de proveedores** (sin número de hito todavía; contexto en
+  [`CONTEXT-directorio.md`](../CONTEXT-directorio.md)): en curso en `services/api/` (FastAPI + Pydantic + TinyDB).
+  Hecho: API completa (FastAPI + TinyDB, seeder, 6 endpoints, 118 tests), página `/proveedores` en el backoffice
+  (E2E 47/47), revisión de entrega y de seguridad, documentación y capturas. Entregado por PR a `main` (pendiente
+  de revisión y fusión).
+- **Última actualización:** 2026-09-28.
 
 | Componente | Estado |
 | --- | --- |
@@ -22,13 +24,14 @@
 | `.agents/skills/validate-delivery/` | ✅ Creada (`SKILL.md` + `check-route.mjs` + `check-hygiene.mjs`) |
 | `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
-| `services/` | 📝 Propuesta documentada (`docs/ARCHITECTURE_PROPOSAL.md`: `services/api/`, FastAPI); sin código |
+| `services/api/` | 🚧 Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
+| `uis/backoffice/proveedores` | 🚧 Implementado y validado en local (E2E 47/47); pendiente de PR |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
 | PR #5 `feature/hito-4-cierre` → `main` | ✅ Fusionada: Hito 4 “Entregado”, CEO y facturación en el website |
 | PR #6 `feature/hito-4-demos-produccion` → `main` | ✅ Fusionada (`f11ee15`): enlaces de producción de website y backoffice |
-| PR #7 `feature/propuesta-arquitectura-backend` → `main` | 🔍 Abierta: https://github.com/rubenlosada11/company-rubenlosada/pull/7 |
+| PR #7 `feature/propuesta-arquitectura-backend` → `main` | ✅ Fusionada (`ee34a08`) |
 
 ## Estado inicial (antes del Hito 4, `main` @ `50b77bd`)
 
@@ -251,15 +254,162 @@ pidió expresamente no implementar el backend, no instalar dependencias y no toc
   entregas del proyecto antes del Hito 5. Se corrigieron los mensajes antes del push. No añadir esta propuesta a
   `docs/hitos.md`.
 
+### 2026-09-27/28 — Directorio de proveedores (rama `feature/supplier-directory`)
+
+**Objetivo:** directorio centralizado de proveedores (Carlos Vega / Ana Whitfield) con FastAPI + Pydantic + TinyDB
+en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT-directorio.md` (10 campos,
+8 categorías, 2 estados, 15 proveedores de seed, moneda por país). Se trabaja por fases con parada y confirmación.
+
+**Decisiones del desarrollador (2026-09-27)**
+
+- Crear `services/api/` con paquete `app/` (entrypoint `app.main:app`), **TinyDB como excepción deliberada** a la
+  propuesta de `docs/ARCHITECTURE_PROPOSAL.md` (PostgreSQL/SQLAlchemy); sin Docker ni ORM.
+- `DELETE /suppliers/{id}` solo en la API: **sin botón de eliminar en la UI** (el CONTEXT dice “suspender, no
+  eliminar”).
+- Clave natural del seeder: `(name, country)`; `POST` no rechaza duplicados (el CONTEXT no lo pide).
+- `contact_email`: validación básica por regex, sin dependencia `email-validator`.
+- Se autoriza `uis/backoffice/.env.example` (`NEXT_PUBLIC_API_BASE_URL`); la API es **solo local** por ahora.
+- `CONTEXT-directorio.md` se versiona. Commits: `Directorio de proveedores — <cambio concreto>` (no hay hito aún).
+
+**Commit 1 — entorno `uv` y modelos Pydantic**
+
+- `services/api/pyproject.toml` (backend `uv_build`, `module-root = ""`), `uv.lock`, `.gitignore`, `app/main.py`
+  (`GET /health`), `app/models.py`, `tests/test_models.py`.
+- Modelos: `StrEnum` `Country`/`Currency`/`Category`/`Status` con los valores exactos del CONTEXT; `SupplierCreate`
+  (tarifa `> 0`, finita y `strict`, categorías ≥ 1 sin duplicados, moneda coherente con el país, email básico,
+  opcionales vacíos → `None`; `id`/`updated_at` enviados por el cliente se ignoran), `SupplierRateUpdate`,
+  `SupplierStatusUpdate`, `Supplier` (respuesta con `id` y `updated_at`), `utc_now()`.
+- Validaciones: `uv run pytest -q` → 38 passed (también con `-W error::DeprecationWarning`). Los 15 proveedores del
+  CONTEXT validan sin alteraciones. App FastAPI temporal: válido → 201; status inválido, tarifa 0/negativa, sin
+  `name`, USA+EUR → 422. `uv run uvicorn app.main:app` → `/health` 200, `/docs` 200.
+
+**Problemas encontrados y resueltos**
+
+- En modo laxo Pydantic aceptaba `true` como tarifa (`1.0`) y `"7.45"` como texto → campo `strict=True`.
+- Starlette 1.7 marca como obsoleto `TestClient` con `httpx` → dependencia de desarrollo cambiada a `httpx2`.
+- `git config` local tiene ahora un email personal; se mantiene la identidad `noreply` de GitHub pasada por `-c`.
+- `check-route.mjs` exige `text/html`: da FAIL con endpoints JSON aunque respondan 200. Para la API se usa `curl`.
+
+**Commit 2 — persistencia TinyDB**
+
+- `app/database.py`: `suppliers_table()` (context manager) y `get_suppliers_table()` (dependencia de FastAPI).
+  Fichero `services/api/db/suppliers.json` (ignorado en git; `git check-ignore` lo confirma), configurable con
+  `SUPPLIERS_DB_PATH`; UTF-8 legible (`ensure_ascii=False`, `indent=2`). Se abre y cierra en cada uso (lee siempre
+  el disco, también si el seeder escribe con la API arrancada) y un `threading.Lock` serializa el acceso.
+- `tests/conftest.py` (fixture `db_path` temporal) y `tests/test_database.py` (7 tests: ruta, ids, UTF-8,
+  reapertura, lectura desde otro proceso, 40 escrituras concurrentes).
+- Validaciones: `uv run pytest -q` → 45 passed; `db/` real sin tocar. Prueba negativa: sin el candado, 5/5
+  intentos con 8 hilos corrompen el JSON (`JSONDecodeError`); con candado 0/5. Reinicio real con uvicorn (envoltorio
+  temporal fuera del repo con rutas de prueba): arranque 1 (PID 27692) inserta `Nacex` → parada (puerto libre,
+  `curl` 000) → arranque 2 (PID 15444) devuelve el mismo registro con `doc_id` 1. Logs sin errores.
+- La consola de Python en Windows usa cp1252 (los acentos se ven mal al imprimir); el fichero está bien en UTF-8.
+  Tenerlo en cuenta en la salida del seeder.
+
+**Commit 3 — seeder**
+
+- `app/seed.py`: `SUPPLIERS_SEED` copiado literalmente del CONTEXT (15), validado con `SupplierCreate`, `updated_at`
+  del servidor; idempotente por `(name casefold, country)`; no modifica existentes. Salida `Seeder completed.` /
+  `Inserted` / `Skipped` / `Total` + lista `+`/`=` por proveedor. `pyproject.toml`: `[project.scripts] seed`.
+- `tests/test_seed.py` (9 tests): seed idéntico al bloque del CONTEXT (leído con `ast`), 1.ª ejecución 15/0/15,
+  2.ª 0/15/15 con los mismos ids, solo inserta los que faltan, no pisa cambios, mayúsculas, mismo nombre en otro país,
+  salida real de `main()`.
+- Validaciones: `uv run pytest -q` → 54 passed. `uv run seed` real en PowerShell sobre `db/` vacío → Inserted 15,
+  Skipped 0, Total 15; 2.ª ejecución → 0 / 15 / 15; exit 0 ambas; acentos correctos. Comprobación independiente del
+  fichero: 15 registros (ids 1–15), 15 claves únicas, idéntico al CONTEXT, todos con `updated_at` UTC; 13 activos
+  (suspendidos: Laser Ship, SAP WM Cloud); 9 USA / 6 Spain.
+- Limitación documentada: el candado no cubre otros procesos → ejecutar el seeder con la API parada o sin ediciones.
+
+**Commit 4 — API de proveedores y tests**
+
+- `app/routes/suppliers.py`: `POST` (201), `GET` con filtros `country`/`category` (enums → 422 si no existen;
+  `category` = pertenece a `categories`; combinables con AND), `GET /{id}`, `PATCH /{id}/rate` (renueva
+  `updated_at`), `PATCH /{id}/status` (no toca `updated_at`), `DELETE /{id}` (204). 404 con
+  `"Proveedor {id} no encontrado"`. Acceso a TinyDB por la dependencia `get_suppliers_table`; helpers `to_supplier`
+  y `get_or_404`. `app/main.py`: router + CORS (`CORS_ALLOWED_ORIGINS`, por defecto `localhost:3002` y
+  `127.0.0.1:3002`; métodos GET/POST/PATCH/DELETE; cabecera `Content-Type`).
+- `tests/test_api.py` + fixtures `client`/`seeded_client`: POST (201, id, timestamp, ignora id/updated_at del cliente,
+  422 por cada regla, campos obligatorios), GET (todos, país, categoría, multicategoría, combinado, 422 de filtros,
+  404, id no numérico), PATCH tarifa (valor, `updated_at` más reciente y persistido, 0/negativo/texto/bool/null →
+  422 sin cambios, 404), PATCH estado (válido, no toca `updated_at`, inválidos → 422, 404), DELETE (204 y 404),
+  persistencia en otro proceso, CORS.
+- Validaciones: `uv run pytest -q -W error::DeprecationWarning` → 116 passed. Mutaciones (quitar `updated_at` del
+  PATCH, ignorar el filtro de categoría, quitar el 404) → 1, 7 y 7 tests fallan; restaurado → 116 passed.
+  HTTP real con uvicorn sobre una copia de la base: filtros (Spain 6, reverse_logistics 2, Spain+carrier_last_mile
+  4, carrier_international 2), POST 201 / 422 (8 casos), PATCH tarifa 7.45→7.99 con `updated_at` nuevo, PATCH
+  estado, DELETE 204→404, reinicio del servidor conserva la tarifa, preflight CORS OK solo para `:3002`. Logs sin
+  errores ni 500. La base real `db/` sigue intacta (15, UPS 7.45).
+
+**Problemas encontrados**
+
+- `curl` con el JSON como argumento en Windows envía los acentos en cp1252 → la API responde 400 (cuerpo no UTF-8).
+  Es de la herramienta de prueba: con fichero UTF-8 o `urllib` funciona. En la documentación, usar Swagger UI o
+  `--data-binary @fichero.json`.
+- TinyDB reutiliza el `id` más alto si se borra ese proveedor (siguiente = máximo + 1). Se documenta como limitación:
+  el briefing pide que TinyDB asigne el id y la UI no borra.
+
+**Commit 5 — backoffice: página `/proveedores`**
+
+- Ruta `app/proveedores/page.tsx` + componentes cliente `SupplierDirectory` (filtros → `GET /suppliers?…` con
+  `AbortController`; “cargando” derivado de la clave de la petición por la regla `react-hooks/set-state-in-effect`),
+  `SupplierForm` (alta, validación en cliente, moneda derivada del país, errores 422 de FastAPI por campo) y
+  `SupplierRow` (tarifa editable en la fila y suspender/reactivar, con carga y error por fila; badges emerald/ámbar).
+  `lib/http.ts` (patrón del tracker; `ApiError.fieldErrors`), `lib/suppliers.ts`, `lib/data/suppliers.ts` (enums del
+  CONTEXT + etiquetas en español), tipos `Supplier*` en `types/index.ts`, `.env.example`
+  (`NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`). Sin botón de eliminar.
+- Menú: `lib/nav.ts` pasa a `/#resumen`… + `/proveedores`; `NavLink` (cliente) marca `aria-current` y en móvil
+  desplaza el chip activo a la vista (`scroll-px-*` en el `nav`). Pie del sidebar actualizado.
+- Si falta `NEXT_PUBLIC_API_BASE_URL` **no se lanza al importar** (rompería `next build` en producción): la página
+  muestra un aviso. Build sin la variable → OK y aviso visible (simula la demo pública).
+- Validaciones: `npm ci` (aviso `allow-scripts` ya conocido), `lint` 0, `typecheck` 0, `build` 0 (con y sin la
+  variable). `check-route`: `/` 200 (3/3, incl. Thomas Harry) y `/proveedores` 200. E2E Edge headless
+  (playwright-core fuera del repo, API sobre una copia de la base): **47/47** — menú y `aria-current`, 15 filas,
+  filtros país/categoría/combinado/vacío con la petición exacta y 0 navegaciones, alta (4 errores de cliente sin
+  petición, email, 422 real de FastAPI mostrado en alerta y en el campo, 201 id 16, cuerpo sin `id`/`updated_at`,
+  guardado en TinyDB), tarifa (0 en cliente sin PATCH, “Guardando…”, 7,99 al momento, `updated_at` renovado en
+  TinyDB y en la fila, error 422 en la fila), estado (badges, TinyDB, `updated_at` intacto, contador), sin botón de
+  borrar, 390 px sin desborde, API caída → aviso + Reintentar, 0 errores de consola. Regresión de `/`: anclas desde
+  `/proveedores`, filtro de iniciativas 33/33. Logs de API y backoffice sin errores ni 500. Base real intacta.
+
+**Problemas encontrados y resueltos**
+
+- Clases de color activas e inactivas a la vez (`bg-white` + `bg-blue-700`) dependían del orden del CSS → `NavLink`
+  separa `inactiveClassName`/`activeClassName`.
+- En móvil el chip “Proveedores” quedaba fuera de la vista → `scrollIntoView` + `scroll-padding`; comprobado a 390 px.
+- Fallos de selectores de mis scripts E2E (`role=alert` del anunciador de rutas de Next, `aria-label="Categorías"`
+  de las filas), no de la app.
+
+**Commit 6 — revisión de entrega, seguridad y documentación**
+
+- Checkout limpio de `5c817cc` (`git archive`, sin `.venv`/`node_modules`/`.next`/`db`): `uv sync --locked`, 116
+  passed, `uv run seed` 15/0/15 y 0/15/15; backoffice `npm ci` (0 vulnerabilidades), lint, typecheck y build → 0.
+- Seguridad (`main...HEAD`, 33 ficheros): sin `.env` (solo los dos `.env.example`), ni base de datos, `.venv`,
+  `node_modules`, `.next`, logs ni claves versionados; patrones de secretos → solo falsos positivos (`reloadToken`);
+  URLs del código solo locales (+ `evil.example` en un test de CORS). La API no tiene autenticación: documentado
+  como solo local.
+- **Corrección:** FastAPI respondía `application/json` sin `charset` y Windows PowerShell 5.1 (`Invoke-RestMethod`)
+  mostraba “MRW EspaÃ±a”. `app/main.py`: `default_response_class` con `application/json; charset=utf-8`; 2 tests
+  nuevos (118). Comprobado en PowerShell 5.1: acentos correctos.
+- Documentación: `services/api/README.md` completo (instalación, ejecución, variables, seeder, modelo, 6 endpoints
+  con respuestas **reales** capturadas de la API, comandos PowerShell 5.1 verificados, tests, persistencia,
+  limitaciones); `services/README*.md` (tabla de servicios); `uis/README*.md` (backoffice + `/proveedores`);
+  `AGENTS.md` y skill `validate-delivery` (ya hay `services/api` y tests con pytest; `check-route` solo HTML).
+- Mi script de edición convirtió `\a` de `services\api` en un carácter de control en `AGENTS.md`: detectado en el diff
+  y corregido (0 ficheros de texto versionados con `\x07`).
+- PowerShell 5.1: `Invoke-RestMethod` con una lista JSON necesita paréntesis para enumerarla; documentado.
+- Capturas del desarrollador (revisadas: contenido correcto y sin datos sensibles), enlazadas desde los READMEs:
+  `services/api/screenshots/screenshot seeder.png` (15/0/15 y 0/15/15), `screenshot endpoint filtro pais1-3.png`
+  (Swagger, `?country=Spain`, 200, `charset=utf-8`) y `uis/backoffice/screenshots/screenshot proveedores
+  filtro1-2.png` (España + última milla → 4; España → 6).
+- Commit 6 + push de `feature/supplier-directory` + PR a `main` (ver estado).
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
 
-- Revisar y fusionar la PR #7 (`feature/propuesta-arquitectura-backend` → `main`).
 - Opcional: rehacer la captura del website (`uis/website/screenshots/screenshot website.png`), que se hizo con 4
   datos y hoy el hero muestra 5.
-- Configurar `user.name`/`user.email` de Git en la máquina (los commits usan la identidad `noreply` de GitHub
-  pasada por `-c`, sin tocar la configuración).
+- Git ya tiene `user.name`/`user.email` en la máquina, pero con un email personal: los commits siguen usando la
+  identidad `noreply` de GitHub pasada por `-c`. Si se quiere, cambiar `user.email` a la `noreply`.
 - Tras fusionar, actualizar la rama local: `git checkout main` y `git pull`.
 
 **Decisiones abiertas (requieren confirmación; ver `projectbrief.md`)**
@@ -280,7 +430,9 @@ pidió expresamente no implementar el backend, no instalar dependencias y no toc
 
 ## Siguientes pasos
 
-1. Fusionar la PR #7 (propuesta de arquitectura de backend).
+1. Directorio de proveedores: revisar y fusionar la PR de `feature/supplier-directory`; después `git checkout main`
+   y `git pull`. La demo pública de `/proveedores` mostrará el aviso de API no configurada (API solo local). (incl. `AGENTS.md`, que aún dice que `services/` está vacío y que
+   no hay tests) → PR.
 2. Validar con el desarrollador los supuestos del documento y, tras su aprobación, crear el esqueleto de la fase 1
    en `services/api/` (core, `/health`, `commercial`, `last_mile`, `reverse_logistics`), según
    `docs/ARCHITECTURE_PROPOSAL.md` §15.
