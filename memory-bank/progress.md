@@ -26,7 +26,7 @@
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
-| Analizador de incidencias | 🚧 Fase 2 de 8: CONTEXT y paquete `packages/analisis-incidencias` (43 tests) |
+| Analizador de incidencias | 🚧 Fase 3 de 8: CONTEXT, paquete `packages/analisis-incidencias` y script `scripts/analyze.py` (70 tests) |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
@@ -453,6 +453,26 @@ Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/
 - `.gitignore` raíz: `__pycache__/`, `*.py[cod]`, `.pytest_cache/` y `scripts/results.csv` (antes solo
   `node_modules/`). Comprobado con `git check-ignore` y `git ls-files --others --ignored`.
 - Validación: `python -m pytest packages/analisis-incidencias/tests -q` (desde la raíz) → **43 passed**.
+- Commit `0d7c973`.
+
+**Fase 3 — script `scripts/analyze.py`**
+
+- Copiados de la fuente `analyze.py` y `incidents-trackflow.csv` (idénticos) y `tests/test_analyze.py` (solo cambia
+  la referencia al CONTEXT). La ruta al paquete (`parents[1] / "packages" / "analisis-incidencias" / "src"`) sigue
+  siendo válida. El CSV de prueba se versiona: son datos ficticios del ejercicio.
+- `scripts/README.es.md` (uso en PowerShell, pregunta de exportación, códigos de salida, privacidad, tests) y
+  `scripts/README.md` (resumen en inglés).
+- Validación:
+  - `python -m pytest scripts/tests packages/analisis-incidencias/tests -q` → **70 passed**.
+  - `python analyze.py incidents-trackflow.csv` desde `scripts/`: 100 · 95 · 5; inválidos TRF-000003 (seguimiento),
+    TRF-000025 (transportista/país), TRF-000042 (categoría), TRF-000068 (email), TRF-000097 (cerrada sin puntuación);
+    categorías 14/38/19/17/7; estados 29/52/14; países 50/45; satisfacción 52 de 52, media 3.06, distribución
+    6/11/15/14/6; por país US 2.96 · ES 3.17. Coincide con la sección de valores esperados.
+  - Misma salida de consola que el script de la fuente (salvo la ruta de exportación) y `results.csv` **idéntico
+    byte a byte** (con BOM UTF-8). Sin `@` en la consola ni en la exportación.
+  - Respuesta no válida → repite la pregunta; `s` exporta; `n` y EOF terminan sin exportar (exit 0); fichero
+    inexistente → exit 1; sin argumento → exit 2. En Windows PowerShell 5.1: acentos y caracteres de caja correctos,
+    exit 0. `scripts/results.csv` borrado tras la prueba (además está ignorado).
 
 ## Trabajo pendiente
 
