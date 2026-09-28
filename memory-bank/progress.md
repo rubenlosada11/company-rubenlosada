@@ -26,7 +26,7 @@
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
-| Analizador de incidencias | 🚧 Fase 6 de 8: código y documentación listos (70 + 144 tests, navegador 19/19); faltan las capturas del desarrollador |
+| Analizador de incidencias | 🚧 Fases 1–6 y 8 hechas (70 + 144 tests, navegador 19/19, capturas, despliegue documentado); falta auditoría final, push y PR |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
@@ -558,6 +558,37 @@ Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/
   resumen.png`, `… invalidos.png`, `… completo.png` y, además, `services/api/screenshots/screenshot incidencias
   analyze.png` (Swagger, 200, `Content-Disposition` expuesto). Enlazadas desde `docs/analizador-incidencias.md` y los
   README de `scripts/`, `services/api` y `uis/backoffice`. Servidores parados después.
+- Commit `45ea7f9`.
+
+**Fase 8 — preparación del despliegue (documentada, NO ejecutada)**
+
+- Por decisión del desarrollador se hace antes de la auditoría final y el push, para que la PR salga completa.
+- `docs/despliegue-api.md` para el agente del servidor: tarball con `services/api` **y**
+  `packages/analisis-incidencias`, `uv sync --locked --no-dev`, `uvicorn … --workers 1` (último análisis en memoria),
+  `SUPPLIERS_DB_PATH` fuera del código + `seed` la primera vez, `CORS_ALLOWED_ORIGINS`, `NEXT_PUBLIC_API_BASE_URL`
+  antes de `npm run build`, `client_max_body_size 6m` en nginx (1 MB por defecto), riesgo de publicar sin
+  autenticación, efecto en `/proveedores` y verificación (valores, `results.csv` de 5958 bytes con SHA-256
+  `f7ee9c99…bafa`). Ejemplos de `systemd` y nginx marcados como orientativos.
+- Topologías: A (subdominio + CORS; con autenticación exigiría cambios de código) y B (mismo host, el proxy envía
+  `/health`, `/suppliers` y `/api/incidents/` a la API; una sola protección, sin CORS; recomendada si se protege).
+- Comprobado en local: `git archive` de la rama con solo esas dos carpetas → `uv sync --locked --no-dev` (sin
+  dependencias de desarrollo), `seed` 15/0/15, `uvicorn --workers 1` con el origen de producción → `/health`, 15
+  proveedores, análisis 100/95/5, exportación con el mismo SHA-256 que el script, CORS de producción sí y `localhost`
+  no, `Content-Disposition` expuesto, log sin correos. Sin el paquete, `uv sync` falla (exit 2). No probados: proxy,
+  Cloudflare, autenticación ni la opción B en un servidor real.
+- Enlazado desde `docs/analizador-incidencias.md`, `services/api/README.md`, `docs/README*` y `techContext.md`.
+
+**Fase 7 — auditoría final (antes del push)**
+
+- Checkout limpio de `45ea7f9` (`git archive`, sin `.venv`, `node_modules`, `.next` ni `db`): paquete + script
+  **70 passed**; `services/api` `uv sync --locked`, `uv lock --check` OK, **144 passed** (`-W error::DeprecationWarning`);
+  backoffice `npm ci`, `lint` 0, `typecheck` 0, `build` 0; con la API (`seed`) y `npm run start`: `check-route` 200 en
+  `/`, `/proveedores` e `/incidencias`, navegador **19/19**; logs sin errores, 500, trazas ni `@`.
+- Seguridad del diff `main` + cambios pendientes (59 ficheros): sin `.env`, claves, `.venv`, `node_modules`, `.next`,
+  bases de datos, logs ni `results.csv`; sin patrones de secretos. Correos: solo `persona@example.com` en tests y los
+  99 ficticios del CSV de prueba (versionable). Sin referencias a IA salvo el texto literal del CONTEXT (D1); dos
+  frases de privacidad de `docs/analizador-incidencias.md` reformuladas (“ningún servicio externo”). Mensajes de commit
+  limpios. Enlaces relativos de los 21 `.md` de la rama: todos existen. Capturas: 7 PNG (la mayor, 1,8 MB).
 
 ## Trabajo pendiente
 
@@ -570,6 +601,10 @@ Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/
 - Tras fusionar, actualizar la rama local: `git checkout main` y `git pull`.
 
 **Decisiones abiertas (requieren confirmación; ver `projectbrief.md`)**
+
+- Despliegue de la API (`docs/despliegue-api.md`): autenticación de backoffice y API antes de publicar, topología
+  (A subdominio / B mismo host) y, si es A, el subdominio y su DNS.
+- Repositorio `analizador-incidencias`: dejarlo como está o archivarlo en GitHub (no borrarlo).
 
 - Supuestos de `docs/ARCHITECTURE_PROPOSAL.md` (base de datos, dominio de la API, staging, autenticación, moneda):
   validarlos antes de crear `services/api/`.

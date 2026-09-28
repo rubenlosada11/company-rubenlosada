@@ -14,7 +14,8 @@ JSON). Sin ORM, Docker ni base de datos de servidor: TinyDB es una elección del
 las páginas `/proveedores` e `/incidencias` del [backoffice](../../uis/backoffice/README.md).
 
 > Solo para uso **local**: no tiene autenticación. No publicarla sin añadirla antes (permite editar tarifas, estados
-> y borrar, y subir CSV con correos de clientes).
+> y borrar, y subir CSV con correos de clientes). Instrucciones de despliegue (no ejecutadas):
+> [`docs/despliegue-api.md`](../../docs/despliegue-api.md).
 
 ## Instalación
 

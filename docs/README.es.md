@@ -13,3 +13,5 @@ Esta carpeta contiene la **documentación transversal** del monorepo: guías de 
 - [`analizador-incidencias.md`](./analizador-incidencias.md) — analizador del CSV de incidencias de CX: script,
   API, página del backoffice, reglas de validación, métricas y decisiones.
 - [`pruebas-analizador-incidencias.md`](./pruebas-analizador-incidencias.md) — registro de pruebas del analizador.
+- [`despliegue-api.md`](./despliegue-api.md) — instrucciones (no ejecutadas) para desplegar `services/api` y conectar
+  el backoffice de producción: tarball, `uv`, variables, proxy, autenticación y verificación.

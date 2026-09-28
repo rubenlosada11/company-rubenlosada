@@ -84,7 +84,10 @@ cabecera `server: cloudflare`).
 
 Método de despliegue indicado al agente del servidor para website y backoffice: extraer exactamente `uis/website` y
 `uis/backoffice` del tarball de GitHub (`codeload.github.com/rubenlosada11/company-rubenlosada/tar.gz/main`) en la
-carpeta de cada sitio y ejecutar `npm ci --include=dev` y `npm run build` (necesita Node ≥ 20.9). Al añadir una nueva
+carpeta de cada sitio y ejecutar `npm ci --include=dev` y `npm run build` (necesita Node ≥ 20.9). La API
+(`services/api`) **no está desplegada**; instrucciones no ejecutadas en `docs/despliegue-api.md` (el tarball debe
+incluir también `packages/analisis-incidencias`, un solo worker, `NEXT_PUBLIC_API_BASE_URL` antes del build y
+autenticación antes de publicar). Al añadir una nueva
 uis desplegada: `LINK_PRODUCCION.md`, sección en su README y fila en `docs/hitos.md`.
 
 ## Comandos

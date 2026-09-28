@@ -11,7 +11,7 @@ Funciona de dos formas que comparten exactamente la misma lógica:
 - **Backoffice web** (ruta `/incidencias` de [`uis/backoffice`](../uis/backoffice/README.md)) sobre la **API**
   [`services/api`](../services/api/README.md), la misma que sirve el directorio de proveedores.
 
-Todo el procesamiento es local: el CSV contiene correos de clientes y no se envía a servicios externos ni de IA.
+Todo el procesamiento es local: el CSV contiene correos de clientes y no se envía a ningún servicio externo.
 
 > Se construyó primero en un repositorio aparte (`analizador-incidencias`) y se integró después en este monorepo,
 > adaptado a sus convenciones: API existente en lugar de una app nueva, `NEXT_PUBLIC_API_BASE_URL` + CORS en lugar de
@@ -249,7 +249,7 @@ Tomadas por el desarrollador en local con el CSV de prueba:
 
 ## Seguridad y datos sensibles
 
-- Sin servicios externos ni de IA: el paquete solo usa la biblioteca estándar; la API, FastAPI/Uvicorn.
+- Sin servicios externos: el paquete solo usa la biblioteca estándar; la API, FastAPI/Uvicorn.
 - `customer_email` nunca se imprime, registra, devuelve ni exporta (hay tests que lo comprueban en consola, JSON,
   log, exportación y página web). Los inválidos se identifican por número de línea e `incident_id`.
 - El log de la API registra la petición HTTP (uvicorn) y una línea de resumen por análisis del logger
@@ -286,3 +286,9 @@ Tomadas por el desarrollador en local con el CSV de prueba:
   mantiene la coma que define el CONTEXT.
 - En producción el backoffice no tiene la API (solo local), así que `/incidencias` muestra el aviso de variable no
   configurada, igual que `/proveedores`.
+
+## Despliegue
+
+No ejecutado. Instrucciones para el agente del servidor (tarball con `services/api` **y**
+`packages/analisis-incidencias`, `uv sync --locked --no-dev`, un solo worker, variables, tamaño de subida en el proxy,
+autenticación antes de publicar y verificación): [`despliegue-api.md`](./despliegue-api.md).

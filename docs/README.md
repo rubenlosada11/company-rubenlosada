@@ -15,3 +15,5 @@ This folder holds **cross-cutting documentation** for the monorepo: architecture
 - [`analizador-incidencias.md`](./analizador-incidencias.md) — CX incidents CSV analyzer: script, API, backoffice page,
   validation rules, metrics and decisions (in Spanish).
 - [`pruebas-analizador-incidencias.md`](./pruebas-analizador-incidencias.md) — analyzer test record (in Spanish).
+- [`despliegue-api.md`](./despliegue-api.md) — deployment instructions (not executed) for `services/api` and the
+  production backoffice: tarball, `uv`, variables, proxy, authentication and checks (in Spanish).
