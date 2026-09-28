@@ -6,14 +6,15 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/analizador-incidencias` (desde `main` @ `40ec659`, que ya incluye las PR #3–#8).
+- **Rama de trabajo:** `feature/analizador-incidencias-cierre` (desde `main` @ `8dc3993`, que ya incluye las PR #3–#9).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (práctica sin número de hito; contexto en
   [`CONTEXT-directorio.md`](../CONTEXT-directorio.md)): entregado, PR #8 fusionada (`40ec659`). API solo local.
 - **Analizador de incidencias** (práctica sin número de hito; contexto en
-  [`CONTEXT-incidencias.es.md`](../CONTEXT-incidencias.es.md)): **en curso**. Se integra en el monorepo desde el
-  repositorio `analizador-incidencias` (construido allí por error; solo lectura), por fases con confirmación.
+  [`CONTEXT-incidencias.es.md`](../CONTEXT-incidencias.es.md)): **entregado**, PR #9 fusionada (`8dc3993`). Integrado
+  desde el repositorio `analizador-incidencias` (construido allí por error). API solo local: despliegue documentado
+  en `docs/despliegue-api.md`, sin ejecutar.
 - **Última actualización:** 2026-09-28.
 
 | Componente | Estado |
@@ -26,7 +27,7 @@
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
-| Analizador de incidencias | 🚧 Fases 1–6 y 8 hechas (70 + 144 tests, navegador 19/19, capturas, despliegue documentado); falta auditoría final, push y PR |
+| Analizador de incidencias | ✅ Entregado (PR #9): paquete + script (70 tests), API (144 tests), `/incidencias` (navegador 19/19), capturas; en producción muestra el aviso de API no configurada |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
@@ -34,6 +35,7 @@
 | PR #6 `feature/hito-4-demos-produccion` → `main` | ✅ Fusionada (`f11ee15`): enlaces de producción de website y backoffice |
 | PR #7 `feature/propuesta-arquitectura-backend` → `main` | ✅ Fusionada (`ee34a08`) |
 | PR #8 `feature/supplier-directory` → `main` | ✅ Fusionada (`40ec659`) |
+| PR #9 `feature/analizador-incidencias` → `main` | ✅ Fusionada el 2026-09-28 (`8dc3993`) |
 
 ## Estado inicial (antes del Hito 4, `main` @ `50b77bd`)
 
@@ -589,6 +591,14 @@ Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/
   99 ficticios del CSV de prueba (versionable). Sin referencias a IA salvo el texto literal del CONTEXT (D1); dos
   frases de privacidad de `docs/analizador-incidencias.md` reformuladas (“ningún servicio externo”). Mensajes de commit
   limpios. Enlaces relativos de los 21 `.md` de la rama: todos existen. Capturas: 7 PNG (la mayor, 1,8 MB).
+- Commit `7b36797` (fase 8 + auditoría), push de la rama y PR #9 a `main` (7 commits, 60 ficheros, `MERGEABLE`),
+  verificada con `gh pr view` y comprobando que los enlaces de la descripción responden 200.
+
+### 2026-09-28 — cierre del analizador de incidencias (rama `feature/analizador-incidencias-cierre`)
+
+- El desarrollador fusionó la PR #9 (`8dc3993`). `main` local actualizado con `git pull`.
+- Este fichero pasa el analizador a “entregado” (antes decía “falta auditoría final, push y PR”, escrito antes de
+  crear la PR). Solo documentación.
 
 ## Trabajo pendiente
 
@@ -598,7 +608,7 @@ Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/
   datos y hoy el hero muestra 5.
 - Git ya tiene `user.name`/`user.email` en la máquina, pero con un email personal: los commits siguen usando la
   identidad `noreply` de GitHub pasada por `-c`. Si se quiere, cambiar `user.email` a la `noreply`.
-- Tras fusionar, actualizar la rama local: `git checkout main` y `git pull`.
+- Tras fusionar cada PR, actualizar la rama local: `git checkout main` y `git pull`.
 
 **Decisiones abiertas (requieren confirmación; ver `projectbrief.md`)**
 
@@ -622,9 +632,9 @@ Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/
 
 ## Siguientes pasos
 
-1. Analizador de incidencias: fases 2–8 (paquete, script, API, página `/incidencias`, documentación y capturas,
-   auditoría y PR, instrucciones de despliegue sin ejecutar). Al final, decidir qué hacer con el repositorio
-   `analizador-incidencias` (dejarlo o archivarlo en GitHub; no borrarlo).
+1. Analizador de incidencias (entregado): decidir qué hacer con el repositorio `analizador-incidencias` (dejarlo o
+   archivarlo en GitHub; no borrarlo) y, para usarlo en producción, las decisiones de `docs/despliegue-api.md`
+   (autenticación y topología) antes de desplegar la API.
 2. Validar con el desarrollador los supuestos del documento y, tras su aprobación, crear el esqueleto de la fase 1
    en `services/api/` (core, `/health`, `commercial`, `last_mile`, `reverse_logistics`), según
    `docs/ARCHITECTURE_PROPOSAL.md` §15.
