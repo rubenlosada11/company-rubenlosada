@@ -26,7 +26,7 @@
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
-| Analizador de incidencias | 🚧 Fase 4 de 8: CONTEXT, paquete, script (70 tests) y endpoints `/api/incidents` en `services/api` (144 tests) |
+| Analizador de incidencias | 🚧 Fase 5 de 8: paquete y script (70 tests), API (144 tests) y página `/incidencias` (navegador 19/19); falta documentación y capturas |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
@@ -504,6 +504,36 @@ Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/
   - Log: línea de resumen `trackflow.api.incidents: Análisis de 'incidents-trackflow.csv': 100 registros (95 válidos,
     5 inválidos)`, 0 `@`, 0 errores. Al redirigir el log a un fichero en Windows, las tildes salen en cp1252
     (limitación ya conocida de la fuente; en consola se ven bien).
+- Commit `e2671be`.
+
+**Fase 5 — página `/incidencias` en el backoffice**
+
+- Copiados de la fuente `app/incidencias/page.tsx` (cabecera alineada con `/proveedores` + `description`),
+  `components/incidencias/*` (7), `types/incidencias.ts` y `lib/formato.ts` (formato es-ES propio del analizador; no
+  duplica `formatRate`/`formatDateTime` de `lib/suppliers.ts`). `StatCard` y `PageSection` existentes, sin cambios.
+- `lib/http.ts`: nueva `fetchApi(path, init)` (URL base, aviso si falta `NEXT_PUBLIC_API_BASE_URL`, error de conexión,
+  `toApiError`) que devuelve el `Response` sin leer; `request` (proveedores) la usa y sigue añadiendo `Accept` y
+  `Content-Type: application/json`. Mensaje de conexión: “API de TrackFlow” (antes “API de proveedores”).
+- `lib/incidencias.ts` (en lugar de `lib/api.ts` de la fuente, patrón `lib/suppliers.ts`): `analizarCsv` (`FormData`
+  sin `Content-Type`) y `descargarResultados` (blob con el nombre de `Content-Disposition`). Errores con `ApiError`
+  de `http.ts` (se elimina el `ErrorApi` de la fuente). Sin proxy `rewrites` en `next.config.ts`.
+- `lib/nav.ts`: “Análisis de incidencias” → `/incidencias`. Pie del sidebar: proveedores e incidencias usan la API.
+- Validación:
+  - `npm run lint` 0 · `npm run typecheck` 0 · `npm run build` 0 (`/incidencias` estática).
+  - `check-route.mjs`: `/` 200 (2/2), `/proveedores` 200 (1/1), `/incidencias` 200 (2/2).
+  - Navegador (Edge + `playwright-core` 1.63 en el scratchpad, D3; API real en `:8000` sobre una **copia** de la base
+    de proveedores, backoffice con `npm run start`): **19/19** — los 14 casos de la fuente adaptados (menú y
+    `aria-current`, sin fichero, no `.csv` sin petición, 422 de CSV vacío, “Analizando…”, resumen, categoría/estado,
+    satisfacción con US 2,96 · ES 3,17, inválidos sin `@`, cruces y semana ISO, descarga **idéntica byte a byte** al
+    script, API caída → “No se pudo conectar con la API de TrackFlow”, 404 en la descarga, 390 px sin desborde) + 5
+    nuevos: petición `multipart/form-data` a `:8000` con el campo `file`, `Content-Disposition` legible desde el
+    navegador (D5), `detail` de un 500, orden de secciones y regresión de `/proveedores` (15 filas, menú activo) y `/`
+    (anclas sin `aria-current`). 0 errores de consola en los casos sin fallos simulados.
+  - Regresión de escritura tras el refactor de `http.ts`: suspender y reactivar un proveedor desde la UI → `PATCH`
+    con `application/json`, estado final igual al inicial en la copia; 0 errores.
+  - Build **sin** `NEXT_PUBLIC_API_BASE_URL` (escenario de la demo pública) → OK; al analizar muestra “Falta la
+    variable NEXT_PUBLIC_API_BASE_URL…” sin lanzar peticiones. Reconstruido después con la variable.
+  - Logs: backoffice sin errores; API sin 500, trazas ni `@`. Servidores parados.
 
 ## Trabajo pendiente
 

@@ -35,8 +35,8 @@ export function Sidebar() {
       </nav>
 
       <p className="mt-auto px-3 text-xs leading-relaxed text-blue-300">
-        TrackFlow Tech · Uso interno. El resumen procede de CONTEXT.es.md; el directorio de proveedores usa la API
-        local de proveedores.
+        TrackFlow Tech · Uso interno. El resumen procede de CONTEXT.es.md; el directorio de proveedores y el análisis
+        de incidencias usan la API local de TrackFlow.
       </p>
     </aside>
   );
