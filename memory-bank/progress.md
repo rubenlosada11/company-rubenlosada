@@ -26,7 +26,7 @@
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
-| Analizador de incidencias | 🚧 Fase 5 de 8: paquete y script (70 tests), API (144 tests) y página `/incidencias` (navegador 19/19); falta documentación y capturas |
+| Analizador de incidencias | 🚧 Fase 6 de 8: código y documentación listos (70 + 144 tests, navegador 19/19); faltan las capturas del desarrollador |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
@@ -534,6 +534,30 @@ Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/
   - Build **sin** `NEXT_PUBLIC_API_BASE_URL` (escenario de la demo pública) → OK; al analizar muestra “Falta la
     variable NEXT_PUBLIC_API_BASE_URL…” sin lanzar peticiones. Reconstruido después con la variable.
   - Logs: backoffice sin errores; API sin 500, trazas ni `@`. Servidores parados.
+- Commit `8712bfe`.
+
+**Fase 6 — documentación, memory bank y capturas**
+
+- `docs/analizador-incidencias.md` (adaptado de la fuente: rutas y comandos del monorepo, `/health`, CORS en lugar de
+  proxy, API compartida con proveedores, pruebas y decisiones de la integración) y
+  `docs/pruebas-analizador-incidencias.md` (resultados **reales** de las fases 2–5). Índice en `docs/README*.md`.
+  **No** se añade a `docs/hitos.md` (D6).
+- READMEs: `services/api` (título, sección “Analizador de incidencias” con endpoints, comandos `curl.exe` verificados
+  en PowerShell 5.1, tests 144, estructura y limitaciones), `services/README*`, `uis/backoffice` (ruta `/incidencias`,
+  estructura, validación de las 3 rutas, producción), `uis/README*` y `scripts/README*` (enlace a `docs/`).
+- `AGENTS.md` (§2 mapa de `services/api`; §3 tests Python de `packages/analisis-incidencias` y `scripts/`) y skill
+  `validate-delivery` (paso 3, mismos tests).
+- `techContext.md`: estructura (`packages/analisis-incidencias`, `services/api`, `scripts/`), tests Python, `.gitignore`
+  raíz, dependencias de la API, comandos del analizador y sección “Decisiones técnicas del analizador de incidencias”.
+- Comprobaciones de la documentación: los comandos `curl.exe` del README de la API funcionan en PowerShell 5.1
+  (exportación de 5958 bytes, igual que la del script); Swagger UI muestra selector de fichero en
+  `POST /api/incidents/analyze` y responde 200; enlaces relativos de los 15 `.md` tocados → solo faltan las 4 capturas.
+- **Capturas (D2), tomadas por el desarrollador** con el entorno preparado (API `:8000` y backoffice `npm run start`
+  `:3002`) y revisadas (valores correctos, sin correos ni datos sensibles): `scripts/screenshots/screenshot script
+  consola1-3.png` (salida completa en PowerShell y exportación), `uis/backoffice/screenshots/screenshot incidencias
+  resumen.png`, `… invalidos.png`, `… completo.png` y, además, `services/api/screenshots/screenshot incidencias
+  analyze.png` (Swagger, 200, `Content-Disposition` expuesto). Enlazadas desde `docs/analizador-incidencias.md` y los
+  README de `scripts/`, `services/api` y `uis/backoffice`. Servidores parados después.
 
 ## Trabajo pendiente
 

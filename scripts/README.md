@@ -17,4 +17,5 @@ metrics and export live in [`packages/analisis-incidencias`](../packages/analisi
 - [`incidents-trackflow.csv`](./incidents-trackflow.csv): exercise test file (100 rows, fictitious data).
 - Tests (from the repo root): `python -m pytest scripts/tests packages/analisis-incidencias/tests`.
 
-Full details in the Spanish version: [README.es.md](./README.es.md).
+Full details in the Spanish version: [README.es.md](./README.es.md) and in
+[`docs/analizador-incidencias.md`](../docs/analizador-incidencias.md).

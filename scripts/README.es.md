@@ -30,4 +30,7 @@ python analyze.py incidents-trackflow.csv
 - Códigos de salida: `0` correcto, `1` error de fichero, `2` falta el argumento.
 - Nunca muestra ni exporta `customer_email`: los inválidos se identifican por línea e `incident_id`.
 
-Tests, desde la raíz del repo: `python -m pytest scripts/tests packages/analisis-incidencias/tests`.
+Tests, desde la raíz del repo: `python -m pytest scripts/tests packages/analisis-incidencias/tests`. Documentación
+completa (API, backoffice, reglas y decisiones): [`docs/analizador-incidencias.md`](../docs/analizador-incidencias.md).
+Captura de la salida en consola (tres partes): [1](./screenshots/screenshot%20script%20consola1.png),
+[2](./screenshots/screenshot%20script%20consola2.png) y [3](./screenshots/screenshot%20script%20consola3.png).

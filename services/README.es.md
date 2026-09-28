@@ -11,4 +11,4 @@ Cada subcarpeta dentro de `services/` debe corresponder a **un servicio concreto
 
 | Servicio | Tecnología | Propósito |
 | --- | --- | --- |
-| [`api/`](./api/README.md) | FastAPI + Pydantic + TinyDB (Python, uv) | Directorio de proveedores (`/suppliers`): fuente única de verdad de los proveedores de TrackFlow en USA y España, consumida por el backoffice. Solo local (sin autenticación). |
+| [`api/`](./api/README.md) | FastAPI + Pydantic + TinyDB (Python, uv) | Directorio de proveedores (`/suppliers`): fuente única de verdad de los proveedores de TrackFlow en USA y España; y analizador de incidencias de CX (`/api/incidents`): validación, métricas y exportación a CSV del fichero de incidencias del helpdesk, con `packages/analisis-incidencias`. Los consume el backoffice. Solo local (sin autenticación). |

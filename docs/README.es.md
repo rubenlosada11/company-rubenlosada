@@ -10,3 +10,6 @@ Esta carpeta contiene la **documentación transversal** del monorepo: guías de 
 - [`hitos.md`](./hitos.md) — registro de los hitos completados, sus carpetas y sus demos públicas.
 - [`ARCHITECTURE_PROPOSAL.md`](./ARCHITECTURE_PROPOSAL.md) — propuesta de arquitectura de backend (monolito
   modular FastAPI por dominios de negocio) para `services/api/`; aún no implementada.
+- [`analizador-incidencias.md`](./analizador-incidencias.md) — analizador del CSV de incidencias de CX: script,
+  API, página del backoffice, reglas de validación, métricas y decisiones.
+- [`pruebas-analizador-incidencias.md`](./pruebas-analizador-incidencias.md) — registro de pruebas del analizador.

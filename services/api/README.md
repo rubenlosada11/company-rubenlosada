@@ -1,15 +1,20 @@
-# TrackFlow API — Directorio de proveedores
+# TrackFlow API — Directorio de proveedores y analizador de incidencias
 
-API del **directorio de proveedores** de TrackFlow: el registro centralizado que sustituye a las hojas de cálculo
-de Carlos Vega (Carrier Operations) y Ana Whitfield (Warehouse Operations) y unifica los mercados de USA y España.
-Fuente de verdad de campos, categorías, estados y datos iniciales: [`CONTEXT-directorio.md`](../../CONTEXT-directorio.md).
+API de TrackFlow con dos módulos:
+
+- **Directorio de proveedores** (`/suppliers`): el registro centralizado que sustituye a las hojas de cálculo de Carlos
+  Vega (Carrier Operations) y Ana Whitfield (Warehouse Operations) y unifica los mercados de USA y España. Fuente de
+  verdad de campos, categorías, estados y datos iniciales: [`CONTEXT-directorio.md`](../../CONTEXT-directorio.md).
+- **Analizador de incidencias** (`/api/incidents`): valida el CSV de incidencias de CX y calcula sus métricas con el
+  paquete compartido [`packages/analisis-incidencias`](../../packages/analisis-incidencias/README.md). Ver
+  [Analizador de incidencias](#analizador-de-incidencias).
 
 **Stack:** Python ≥ 3.12, [uv](https://docs.astral.sh/uv/), FastAPI, Pydantic y TinyDB (base de datos en un fichero
-JSON). Sin ORM, Docker ni base de datos de servidor: TinyDB es una elección deliberada de este ejercicio. La consume la
-página `/proveedores` del [backoffice](../../uis/backoffice/README.md).
+JSON). Sin ORM, Docker ni base de datos de servidor: TinyDB es una elección deliberada de este ejercicio. La consumen
+las páginas `/proveedores` e `/incidencias` del [backoffice](../../uis/backoffice/README.md).
 
 > Solo para uso **local**: no tiene autenticación. No publicarla sin añadirla antes (permite editar tarifas, estados
-> y borrar).
+> y borrar, y subir CSV con correos de clientes).
 
 ## Instalación
 
@@ -20,8 +25,8 @@ cd services\api
 uv sync
 ```
 
-`uv sync` crea `.venv/` e instala las versiones exactas de `uv.lock` (FastAPI, Pydantic, TinyDB, uvicorn; y pytest +
-httpx2 para los tests).
+`uv sync` crea `.venv/` e instala las versiones exactas de `uv.lock` (FastAPI, Pydantic, TinyDB, uvicorn,
+python-multipart y el paquete local `analisis-incidencias` en modo editable; y pytest + httpx2 para los tests).
 
 ## Ejecución
 
@@ -38,7 +43,7 @@ Variables de entorno opcionales (todas tienen valor por defecto; no hace falta n
 | Variable | Por defecto | Para qué |
 | --- | --- | --- |
 | `SUPPLIERS_DB_PATH` | `services/api/db/suppliers.json` | Fichero de TinyDB |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:3002,http://127.0.0.1:3002` | Orígenes del navegador autorizados (el backoffice) |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3002,http://127.0.0.1:3002` | Orígenes del navegador autorizados (el backoffice). La API expone `Content-Disposition` para las descargas |
 
 ## Seeder
 
@@ -245,13 +250,44 @@ curl.exe -s "http://localhost:8000/suppliers?category=carrier_international"
   Swagger UI o `curl.exe --data-binary "@cuerpo.json"` (como argumento, Windows los envía mal codificados y la API
   responde 400).
 
+## Analizador de incidencias
+
+Endpoints en [`app/routes/incidents.py`](./app/routes/incidents.py); validación, métricas y exportación en
+[`packages/analisis-incidencias`](../../packages/analisis-incidencias/README.md) (la misma lógica que
+`scripts/analyze.py`). Contexto: [`CONTEXT-incidencias.es.md`](../../CONTEXT-incidencias.es.md). Documentación completa
+(reglas, métricas, formato del CSV y decisiones): [`docs/analizador-incidencias.md`](../../docs/analizador-incidencias.md).
+
+| Método y ruta | Éxito | Errores |
+| --- | --- | --- |
+| `POST /api/incidents/analyze` | 200 + métricas en JSON (`multipart/form-data`, CSV en el campo `file`) | 400 sin fichero · 413 > 5 MB · 415 no `.csv` · 422 contenido no procesable · 500 genérico |
+| `GET /api/incidents/results/export` | 200 + `results.csv` (`text/csv; charset=utf-8`, `attachment`) | 404 sin análisis previo · 500 genérico |
+
+- Prefijo `/api` porque así lo pide el ejercicio (proveedores usa `/suppliers` sin prefijo).
+- El último análisis correcto se guarda **en memoria** (`app.state.ultimo_analisis`): se pierde al reiniciar y exige
+  un solo proceso (un worker). Un análisis fallido no lo sustituye.
+- Los errores inesperados se capturan solo en este router: al cliente le llega `{"detail": "Error interno del
+  servidor."}` y la traza queda en el log. Proveedores no cambia.
+- El log (`trackflow.api.incidents`) registra una línea de resumen por análisis, sin correos:
+  `Análisis de 'incidents-trackflow.csv': 100 registros (95 válidos, 5 inválidos)`.
+
+Desde PowerShell 5.1, con el CSV de prueba (desde `services\api`):
+
+```powershell
+curl.exe -s -F "file=@..\..\scripts\incidents-trackflow.csv" http://localhost:8000/api/incidents/analyze
+curl.exe -s -o results.csv http://localhost:8000/api/incidents/results/export
+```
+
+El `results.csv` descargado es idéntico byte a byte al que exporta `python analyze.py`. También se pueden probar desde
+Swagger UI (`/docs`, botón “Try it out” y selector de fichero).
+
 ## Tests
 
 ```powershell
 uv run pytest -q
 ```
 
-118 tests con pytest y `TestClient`, cada uno sobre una base TinyDB temporal (nunca tocan `db/suppliers.json`):
+144 tests con pytest y `TestClient`: 118 del directorio de proveedores (cada uno sobre una base TinyDB temporal; nunca
+tocan `db/suppliers.json`) y 26 del analizador de incidencias:
 
 | Fichero | Qué cubre |
 | --- | --- |
@@ -259,6 +295,7 @@ uv run pytest -q
 | [`tests/test_database.py`](./tests/test_database.py) | Ruta, ids, UTF-8, reapertura, lectura desde otro proceso, escrituras concurrentes |
 | [`tests/test_seed.py`](./tests/test_seed.py) | Seed idéntico al CONTEXT, 1.ª y 2.ª ejecución, inserción parcial, no sobrescribe, salida por consola |
 | [`tests/test_api.py`](./tests/test_api.py) | Los 6 endpoints: 201/200/204, filtros y combinación, 404, 422, `updated_at`, persistencia al reiniciar (otro proceso), CORS, UTF-8 |
+| [`tests/test_incidents.py`](./tests/test_incidents.py) | Valores esperados del CONTEXT, equivalencia con el script y exportación idéntica byte a byte, 400/404/413/415/422/500, último análisis, sin correos en JSON/log/exportación, CORS y `Content-Disposition` expuesto |
 
 ## Persistencia
 
@@ -278,14 +315,16 @@ El acceso está en [`app/database.py`](./app/database.py): cada uso abre el fich
 
 ```text
 services/api/
-├── pyproject.toml        # dependencias, script `seed`, entrypoint app.main:app
+├── pyproject.toml        # dependencias (incl. ../../packages/analisis-incidencias), script `seed`, entrypoint
 ├── uv.lock
 ├── app/
-│   ├── main.py           # FastAPI, CORS, JSON UTF-8, /health
+│   ├── main.py           # FastAPI, CORS, JSON UTF-8, logger `trackflow`, /health
 │   ├── models.py         # modelos Pydantic y valores válidos del CONTEXT
 │   ├── database.py       # TinyDB
 │   ├── seed.py           # `uv run seed`
-│   └── routes/suppliers.py
+│   └── routes/
+│       ├── suppliers.py  # /suppliers
+│       └── incidents.py  # /api/incidents
 ├── tests/
 └── db/                   # base local (ignorada en git)
 ```
@@ -299,7 +338,11 @@ Tomadas por el desarrollador en local (carpeta [`screenshots/`](./screenshots/))
   [parte 2](./screenshots/screenshot%20endpoint%20filtro%20pais2.png),
   [parte 3](./screenshots/screenshot%20endpoint%20filtro%20pais3.png)
 
-La del backoffice con filtros está en [`uis/backoffice/screenshots/`](../../uis/backoffice/screenshots/).
+- `POST /api/incidents/analyze` en Swagger UI con el CSV de prueba (200, `access-control-expose-headers:
+  Content-Disposition`): [`screenshot incidencias analyze.png`](./screenshots/screenshot%20incidencias%20analyze.png)
+
+Las del backoffice (proveedores con filtros y análisis de incidencias) están en
+[`uis/backoffice/screenshots/`](../../uis/backoffice/screenshots/).
 
 ## Limitaciones conocidas
 
@@ -309,3 +352,5 @@ La del backoffice con filtros está en [`uis/backoffice/screenshots/`](../../uis
 - Un único `updated_at` por proveedor (última actualización de tarifa): no se guarda el histórico de tarifas
   anteriores.
 - El seeder y la API no se coordinan entre procesos (ver la nota del seeder).
+- El último análisis de incidencias vive en memoria: se pierde al reiniciar, es compartido por todos los usuarios y con
+  varios workers la exportación podría no encontrarlo.

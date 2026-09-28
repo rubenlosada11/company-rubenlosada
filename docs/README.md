@@ -12,3 +12,6 @@ This folder holds **cross-cutting documentation** for the monorepo: architecture
 - [`hitos.md`](./hitos.md) — record of completed milestones, their folders, and their public demos (in Spanish).
 - [`ARCHITECTURE_PROPOSAL.md`](./ARCHITECTURE_PROPOSAL.md) — backend architecture proposal (FastAPI modular monolith
   by business domain) for `services/api/`; not implemented yet (in Spanish).
+- [`analizador-incidencias.md`](./analizador-incidencias.md) — CX incidents CSV analyzer: script, API, backoffice page,
+  validation rules, metrics and decisions (in Spanish).
+- [`pruebas-analizador-incidencias.md`](./pruebas-analizador-incidencias.md) — analyzer test record (in Spanish).

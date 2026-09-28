@@ -42,8 +42,10 @@ Ejecuta los pasos en orden. Ante el primer fallo, **detente**, informa y no cont
    npm test            # solo si el script existe (hoy no hay tests en las apps JS)
    ```
 
-   Si el alcance incluye `services/api` (desde esa carpeta): `uv lock --check` y `uv run pytest -q`. Para su
-   arranque, `uv run uvicorn app.main:app --port 8000` y `curl` a `/health` (200): `check-route.mjs` exige HTML.
+   Si el alcance incluye `services/api` (desde esa carpeta): `uv lock --check` y `uv run pytest -q`. Si incluye
+   `packages/analisis-incidencias` o `scripts/` (Python): `python -m pytest scripts/tests packages/analisis-incidencias/tests`
+   desde la raíz, y además los tests de `services/api`, que dependen del paquete. Para
+   arrancar la API, `uv run uvicorn app.main:app --port 8000` y `curl` a `/health` (200): `check-route.mjs` exige HTML.
 
 4. **Build de producción** de cada app afectada:
    ```bash
