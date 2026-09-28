@@ -1,11 +1,13 @@
 [project]
 name = "trackflow-api"
 version = "0.1.0"
-description = "API de TrackFlow: directorio de proveedores (FastAPI + Pydantic + TinyDB)."
+description = "API de TrackFlow: directorio de proveedores (FastAPI + Pydantic + TinyDB) y analizador de incidencias."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "analisis-incidencias",
     "fastapi>=0.141.1",
+    "python-multipart>=0.0.32",
     "tinydb>=4.9.0",
     "uvicorn>=0.54.0",
 ]
@@ -22,6 +24,9 @@ build-backend = "uv_build"
 # El código vive en `app/` (sin `src/`), con el entrypoint `app.main:app` de docs/ARCHITECTURE_PROPOSAL.md.
 module-name = "app"
 module-root = ""
+
+[tool.uv.sources]
+analisis-incidencias = { path = "../../packages/analisis-incidencias", editable = true }
 
 [tool.fastapi]
 entrypoint = "app.main:app"

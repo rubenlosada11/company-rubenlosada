@@ -26,7 +26,7 @@ Después comprueba `git status` y `git branch --show-current`. **No trabajes en 
 | --- | --- |
 | Interfaz visual pública | `uis/website/` (la `uis/landing/` estática es del Hito 1: no se toca) |
 | Interfaz interna / admin | `uis/backoffice/` |
-| API o proceso en segundo plano | `services/` (hoy: `services/api/`, directorio de proveedores; nuevos servicios solo si hace falta de verdad) |
+| API o proceso en segundo plano | `services/` (hoy: `services/api/`, directorio de proveedores y analizador de incidencias; nuevos servicios solo si hace falta de verdad) |
 | Tipos/utilidades usados por 2+ carpetas | `packages/` |
 | Agente de IA / skill de dominio / MCP | `agents/` / `skills/` / `mcps/` |
 | Skill para *agentes de programación* de este repo | `.agents/skills/` |
@@ -45,7 +45,9 @@ corrige y se **reinicia desde el paso 3** (o desde el 1 si el arreglo cambió el
    `memory-bank/progress.md` (siempre que haya avance) y `memory-bank/techContext.md` (si hay decisión técnica).
 3. **Ejecutar validaciones** en **cada app/paquete afectado**, desde su carpeta: `npm run lint`,
    `npm run typecheck` (si el script existe), tests (si existen; las apps JS no tienen) y `npm run build`.
-   En `services/api`: `uv run pytest -q` (y `uv lock --check` si cambian las dependencias).
+   En `services/api`: `uv run pytest -q` (y `uv lock --check` si cambian las dependencias). Si cambian
+   `packages/analisis-incidencias` o `scripts/`: `python -m pytest scripts/tests packages/analisis-incidencias/tests`
+   desde la raíz (y también los tests de `services/api`, que usan el paquete).
 4. **Verificar que las apps arrancan y las rutas funcionan.** Para `website` y `backoffice`: arrancar (`npm run dev`
    o `npm run start` tras el build) y comprobar que `/` responde 200 con su contenido esperado y sin errores en
    la salida del servidor. Para `services/api`: `uv run uvicorn app.main:app --port 8000` y `GET /health` → 200

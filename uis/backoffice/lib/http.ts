@@ -58,7 +58,11 @@ async function toApiError(res: Response): Promise<ApiError> {
   return new ApiError(res.statusText || `Error ${res.status}`, res.status);
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * Petición a la API sin tocar cabeceras ni cuerpo: URL base, error de conexión y respuestas de error como `ApiError`.
+ * Devuelve la respuesta sin leer, para cuerpos que no son JSON (subida con `FormData`, descarga de un CSV).
+ */
+export async function fetchApi(path: string, init?: RequestInit): Promise<Response> {
   if (!API_BASE_URL) {
     throw new ApiError(
       "Falta la variable NEXT_PUBLIC_API_BASE_URL. Crea uis/backoffice/.env.local a partir de .env.example y reinicia el backoffice.",
@@ -68,23 +72,28 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
-      ...init,
-      headers: {
-        Accept: "application/json",
-        ...(init?.body ? { "Content-Type": "application/json" } : {}),
-        ...init?.headers,
-      },
-    });
+    res = await fetch(`${API_BASE_URL}${path}`, init);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
     throw new ApiError(
-      `No se pudo conectar con la API de proveedores (${API_BASE_URL}). Comprueba que está arrancada.`,
+      `No se pudo conectar con la API de TrackFlow (${API_BASE_URL}). Comprueba que está arrancada.`,
       0
     );
   }
 
   if (!res.ok) throw await toApiError(res);
+  return res;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetchApi(path, {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...init?.headers,
+    },
+  });
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }

@@ -8,3 +8,10 @@ Each subfolder under `packages/` should represent **one versionable package** (f
 - **Recommendation**: document packages as you add them—their public API and how they are consumed from `apps/`, `agents/`, and `workflows/`.
 
 > _Spanish version: [README.es.md](./README.es.md)._
+
+## Packages
+
+| Package | Language | Contents | Used by |
+| --- | --- | --- | --- |
+| [`shared/`](./shared/README.md) | TypeScript | `@repo/shared-types`: TrackFlow domain types and pure utilities (Milestone 2) | `uis/script-automatizacion` |
+| [`analisis-incidencias/`](./analisis-incidencias/README.md) | Python (standard library only) | Loading, validation, metrics and export of the CX incidents CSV ([`CONTEXT-incidencias.es.md`](../CONTEXT-incidencias.es.md)) | `scripts/analyze.py` and `services/api` |

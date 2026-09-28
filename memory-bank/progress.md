@@ -6,14 +6,14 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/supplier-directory` (desde `main` @ `ee34a08`, que ya incluye las PR #3–#7).
+- **Rama de trabajo:** `feature/analizador-incidencias` (desde `main` @ `40ec659`, que ya incluye las PR #3–#8).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
-- **Directorio de proveedores** (sin número de hito todavía; contexto en
-  [`CONTEXT-directorio.md`](../CONTEXT-directorio.md)): en curso en `services/api/` (FastAPI + Pydantic + TinyDB).
-  Hecho: API completa (FastAPI + TinyDB, seeder, 6 endpoints, 118 tests), página `/proveedores` en el backoffice
-  (E2E 47/47), revisión de entrega y de seguridad, documentación y capturas. Entregado por PR a `main` (pendiente
-  de revisión y fusión).
+- **Directorio de proveedores** (práctica sin número de hito; contexto en
+  [`CONTEXT-directorio.md`](../CONTEXT-directorio.md)): entregado, PR #8 fusionada (`40ec659`). API solo local.
+- **Analizador de incidencias** (práctica sin número de hito; contexto en
+  [`CONTEXT-incidencias.es.md`](../CONTEXT-incidencias.es.md)): **en curso**. Se integra en el monorepo desde el
+  repositorio `analizador-incidencias` (construido allí por error; solo lectura), por fases con confirmación.
 - **Última actualización:** 2026-09-28.
 
 | Componente | Estado |
@@ -24,14 +24,16 @@
 | `.agents/skills/validate-delivery/` | ✅ Creada (`SKILL.md` + `check-route.mjs` + `check-hygiene.mjs`) |
 | `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
-| `services/api/` | 🚧 Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
-| `uis/backoffice/proveedores` | 🚧 Implementado y validado en local (E2E 47/47); pendiente de PR |
+| `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
+| `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
+| Analizador de incidencias | 🚧 Fases 1–6 y 8 hechas (70 + 144 tests, navegador 19/19, capturas, despliegue documentado); falta auditoría final, push y PR |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
 | PR #5 `feature/hito-4-cierre` → `main` | ✅ Fusionada: Hito 4 “Entregado”, CEO y facturación en el website |
 | PR #6 `feature/hito-4-demos-produccion` → `main` | ✅ Fusionada (`f11ee15`): enlaces de producción de website y backoffice |
 | PR #7 `feature/propuesta-arquitectura-backend` → `main` | ✅ Fusionada (`ee34a08`) |
+| PR #8 `feature/supplier-directory` → `main` | ✅ Fusionada (`40ec659`) |
 
 ## Estado inicial (antes del Hito 4, `main` @ `50b77bd`)
 
@@ -402,6 +404,192 @@ en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT
   filtro1-2.png` (España + última milla → 4; España → 6).
 - Commit 6 + push de `feature/supplier-directory` + PR a `main` (ver estado).
 
+### 2026-09-28 — Analizador de incidencias (rama `feature/analizador-incidencias`)
+
+**Objetivo:** traer al monorepo el analizador del CSV de incidencias de CX (Valentina Cruz), que se construyó, probó
+y fusionó por error en el repositorio `analizador-incidencias` (PR #1). Se adapta a las convenciones del monorepo, sin
+reconstruirlo ni copiarlo a ciegas. Ese repositorio es **solo lectura**; qué hacer con él se decide al final.
+Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/analyze.py`, endpoints en
+`services/api` y página `/incidencias` en el backoffice. Fases con parada y confirmación antes de cada commit.
+
+**Fase 0 — auditoría (sin cambios)**
+
+- `main` @ `40ec659` al día con `origin/main`. Base: `services/api` `uv lock --check` OK y 118 passed; backoffice
+  `lint`/`typecheck`/`build` → 0. El script de la fuente reproduce los valores esperados del CONTEXT (100/95/5).
+- Choques detectados: `app/main.py` sin `create_app` y con `/health` (no `/api/health`), CORS sin `expose_headers`,
+  sin configuración de logging; `lib/http.ts` fuerza `Content-Type: application/json` y lee siempre JSON (rompe
+  `FormData` y la descarga del CSV). `StatCard` y `PageSection` son idénticos en ambos repos (se reutilizan).
+
+**Decisiones del desarrollador (2026-09-28)**
+
+- **D1:** `CONTEXT-incidencias.es.md` en la raíz, copia literal del `CONTEXT.es.md` de la fuente. El `CONTEXT.es.md`
+  de la empresa no se toca.
+- **D2:** capturas **manuales** del desarrollador (no se reutilizan las generadas de la fuente); se preparan el
+  entorno, los nombres y las carpetas `screenshots/` en la fase de documentación.
+- **D3:** pruebas en navegador fuera del repo (Edge + `playwright-core` en el scratchpad), sin dependencia nueva en
+  el backoffice.
+- **D4:** errores inesperados capturados solo en el router de incidencias (log + 500 `{"detail": "Error interno del
+  servidor."}`); logger `trackflow` a INFO en `main.py` sin tocar el logger raíz.
+- **D5:** CORS con `expose_headers=["Content-Disposition"]` para que la descarga conserve el nombre del fichero.
+- **D6:** práctica **sin número de hito**: commits `Analizador de incidencias — …`; **no** se añade a
+  `docs/hitos.md` ni a `lib/data/milestones.ts` (igual que proveedores). El rastro queda en commits, memory bank,
+  READMEs y `docs/`.
+
+**Fase 1 — rama y CONTEXT**
+
+- Rama `feature/analizador-incidencias` desde `main` @ `40ec659`.
+- `CONTEXT-incidencias.es.md` = copia literal (`cmp` sin diferencias). Contiene inconsistencias propias ya conocidas
+  (menciona 1.000 filas y la ruta `incidents-analysis/…`; la salida esperada está en inglés): mandan la tabla de
+  valores esperados (100 filas) y la decisión de salida en español.
+- Corregido el estado de este fichero: la PR #8 (proveedores) ya estaba fusionada.
+- Commit `9e032ad`.
+
+**Fase 2 — paquete compartido `packages/analisis-incidencias`**
+
+- Copiado desde `HEAD` de la fuente con `git archive` (sin `__pycache__`). Único cambio: las referencias a
+  `CONTEXT.es.md` (en el monorepo es el de la empresa) pasan a `CONTEXT-incidencias.es.md` en el README, `dominio.py`
+  y `validacion.py` (4 líneas; el resto es idéntico a la fuente).
+- `packages/README.md` y `README.es.md`: nueva tabla de paquetes (`shared` y `analisis-incidencias`, con quién los usa).
+- `.gitignore` raíz: `__pycache__/`, `*.py[cod]`, `.pytest_cache/` y `scripts/results.csv` (antes solo
+  `node_modules/`). Comprobado con `git check-ignore` y `git ls-files --others --ignored`.
+- Validación: `python -m pytest packages/analisis-incidencias/tests -q` (desde la raíz) → **43 passed**.
+- Commit `0d7c973`.
+
+**Fase 3 — script `scripts/analyze.py`**
+
+- Copiados de la fuente `analyze.py` y `incidents-trackflow.csv` (idénticos) y `tests/test_analyze.py` (solo cambia
+  la referencia al CONTEXT). La ruta al paquete (`parents[1] / "packages" / "analisis-incidencias" / "src"`) sigue
+  siendo válida. El CSV de prueba se versiona: son datos ficticios del ejercicio.
+- `scripts/README.es.md` (uso en PowerShell, pregunta de exportación, códigos de salida, privacidad, tests) y
+  `scripts/README.md` (resumen en inglés).
+- Validación:
+  - `python -m pytest scripts/tests packages/analisis-incidencias/tests -q` → **70 passed**.
+  - `python analyze.py incidents-trackflow.csv` desde `scripts/`: 100 · 95 · 5; inválidos TRF-000003 (seguimiento),
+    TRF-000025 (transportista/país), TRF-000042 (categoría), TRF-000068 (email), TRF-000097 (cerrada sin puntuación);
+    categorías 14/38/19/17/7; estados 29/52/14; países 50/45; satisfacción 52 de 52, media 3.06, distribución
+    6/11/15/14/6; por país US 2.96 · ES 3.17. Coincide con la sección de valores esperados.
+  - Misma salida de consola que el script de la fuente (salvo la ruta de exportación) y `results.csv` **idéntico
+    byte a byte** (con BOM UTF-8). Sin `@` en la consola ni en la exportación.
+  - Respuesta no válida → repite la pregunta; `s` exporta; `n` y EOF terminan sin exportar (exit 0); fichero
+    inexistente → exit 1; sin argumento → exit 2. En Windows PowerShell 5.1: acentos y caracteres de caja correctos,
+    exit 0. `scripts/results.csv` borrado tras la prueba (además está ignorado).
+- Commit `3fee3b0`.
+
+**Fase 4 — API en el servicio existente (`services/api`)**
+
+- `app/routes/incidents.py` (a partir de `routers/incidents.py` de la fuente): `POST /api/incidents/analyze`
+  (multipart, campo `file`) y `GET /api/incidents/results/export`. Errores 400/404/413/415/422; **D4**: los errores
+  inesperados se capturan solo en este router (`logger.exception` + 500 `{"detail": "Error interno del servidor."}`),
+  también al generar la exportación. Se mantiene el prefijo `/api` del enunciado (proveedores usa `/suppliers`).
+- `app/main.py`: registra el router, `app.state.ultimo_analisis = None`, **D5** `expose_headers=["Content-Disposition"]`
+  y logger `trackflow` a INFO con su propio handler (formato alineado con uvicorn; el logger raíz no se toca). Sin
+  `create_app` ni manejador global: proveedores no cambia.
+- `pyproject.toml` con `uv add`: `python-multipart>=0.0.32` y `analisis-incidencias` (`[tool.uv.sources]`, ruta
+  `../../packages/analisis-incidencias`, `editable = true`); `uv.lock` regenerado (+18 líneas); `uv lock --check` OK.
+- `tests/test_incidents.py`: los 23 de la fuente adaptados (app del módulo, fixture `client` del `conftest.py`, estado
+  reiniciado por test con un fixture `autouse`, `/health`, 500 sin `raise_server_exceptions=False`) + 3 nuevos: log
+  del análisis sin correos, 500 al exportar y `Access-Control-Expose-Headers`.
+- Validación:
+  - `uv run pytest -q -W error::DeprecationWarning` → **144 passed** (118 proveedores + 26 incidencias).
+  - Mutaciones: sin `expose_headers` falla el test de CORS; sin el `except Exception` falla el test del 500.
+    Restaurado → 144 passed.
+  - `uv run uvicorn app.main:app --port 8000` + `curl`: `/health` 200; `/suppliers?country=Spain` 200 (6); export sin
+    análisis 404; sin fichero 400; `.xlsx` 415; vacío 422; 5 MB + 1 byte 413; CSV de prueba 200
+    (`application/json; charset=utf-8`) con todos los valores esperados (100/95/5, inválidos por línea e ID,
+    categorías, estados, países, satisfacción 3.06 y 6/11/15/14/6, US 2.96 · ES 3.17) y sin `@`; export 200
+    `text/csv; charset=utf-8`, `attachment; filename="results.csv"`, `Access-Control-Expose-Headers:
+    Content-Disposition`, **idéntico byte a byte** al `results.csv` del script; un 422 posterior no sustituye el
+    último análisis. Preflight CORS: `:3002` permitido, otro origen rechazado; preflight `PATCH /suppliers/1/rate`
+    sigue permitido.
+  - Log: línea de resumen `trackflow.api.incidents: Análisis de 'incidents-trackflow.csv': 100 registros (95 válidos,
+    5 inválidos)`, 0 `@`, 0 errores. Al redirigir el log a un fichero en Windows, las tildes salen en cp1252
+    (limitación ya conocida de la fuente; en consola se ven bien).
+- Commit `e2671be`.
+
+**Fase 5 — página `/incidencias` en el backoffice**
+
+- Copiados de la fuente `app/incidencias/page.tsx` (cabecera alineada con `/proveedores` + `description`),
+  `components/incidencias/*` (7), `types/incidencias.ts` y `lib/formato.ts` (formato es-ES propio del analizador; no
+  duplica `formatRate`/`formatDateTime` de `lib/suppliers.ts`). `StatCard` y `PageSection` existentes, sin cambios.
+- `lib/http.ts`: nueva `fetchApi(path, init)` (URL base, aviso si falta `NEXT_PUBLIC_API_BASE_URL`, error de conexión,
+  `toApiError`) que devuelve el `Response` sin leer; `request` (proveedores) la usa y sigue añadiendo `Accept` y
+  `Content-Type: application/json`. Mensaje de conexión: “API de TrackFlow” (antes “API de proveedores”).
+- `lib/incidencias.ts` (en lugar de `lib/api.ts` de la fuente, patrón `lib/suppliers.ts`): `analizarCsv` (`FormData`
+  sin `Content-Type`) y `descargarResultados` (blob con el nombre de `Content-Disposition`). Errores con `ApiError`
+  de `http.ts` (se elimina el `ErrorApi` de la fuente). Sin proxy `rewrites` en `next.config.ts`.
+- `lib/nav.ts`: “Análisis de incidencias” → `/incidencias`. Pie del sidebar: proveedores e incidencias usan la API.
+- Validación:
+  - `npm run lint` 0 · `npm run typecheck` 0 · `npm run build` 0 (`/incidencias` estática).
+  - `check-route.mjs`: `/` 200 (2/2), `/proveedores` 200 (1/1), `/incidencias` 200 (2/2).
+  - Navegador (Edge + `playwright-core` 1.63 en el scratchpad, D3; API real en `:8000` sobre una **copia** de la base
+    de proveedores, backoffice con `npm run start`): **19/19** — los 14 casos de la fuente adaptados (menú y
+    `aria-current`, sin fichero, no `.csv` sin petición, 422 de CSV vacío, “Analizando…”, resumen, categoría/estado,
+    satisfacción con US 2,96 · ES 3,17, inválidos sin `@`, cruces y semana ISO, descarga **idéntica byte a byte** al
+    script, API caída → “No se pudo conectar con la API de TrackFlow”, 404 en la descarga, 390 px sin desborde) + 5
+    nuevos: petición `multipart/form-data` a `:8000` con el campo `file`, `Content-Disposition` legible desde el
+    navegador (D5), `detail` de un 500, orden de secciones y regresión de `/proveedores` (15 filas, menú activo) y `/`
+    (anclas sin `aria-current`). 0 errores de consola en los casos sin fallos simulados.
+  - Regresión de escritura tras el refactor de `http.ts`: suspender y reactivar un proveedor desde la UI → `PATCH`
+    con `application/json`, estado final igual al inicial en la copia; 0 errores.
+  - Build **sin** `NEXT_PUBLIC_API_BASE_URL` (escenario de la demo pública) → OK; al analizar muestra “Falta la
+    variable NEXT_PUBLIC_API_BASE_URL…” sin lanzar peticiones. Reconstruido después con la variable.
+  - Logs: backoffice sin errores; API sin 500, trazas ni `@`. Servidores parados.
+- Commit `8712bfe`.
+
+**Fase 6 — documentación, memory bank y capturas**
+
+- `docs/analizador-incidencias.md` (adaptado de la fuente: rutas y comandos del monorepo, `/health`, CORS en lugar de
+  proxy, API compartida con proveedores, pruebas y decisiones de la integración) y
+  `docs/pruebas-analizador-incidencias.md` (resultados **reales** de las fases 2–5). Índice en `docs/README*.md`.
+  **No** se añade a `docs/hitos.md` (D6).
+- READMEs: `services/api` (título, sección “Analizador de incidencias” con endpoints, comandos `curl.exe` verificados
+  en PowerShell 5.1, tests 144, estructura y limitaciones), `services/README*`, `uis/backoffice` (ruta `/incidencias`,
+  estructura, validación de las 3 rutas, producción), `uis/README*` y `scripts/README*` (enlace a `docs/`).
+- `AGENTS.md` (§2 mapa de `services/api`; §3 tests Python de `packages/analisis-incidencias` y `scripts/`) y skill
+  `validate-delivery` (paso 3, mismos tests).
+- `techContext.md`: estructura (`packages/analisis-incidencias`, `services/api`, `scripts/`), tests Python, `.gitignore`
+  raíz, dependencias de la API, comandos del analizador y sección “Decisiones técnicas del analizador de incidencias”.
+- Comprobaciones de la documentación: los comandos `curl.exe` del README de la API funcionan en PowerShell 5.1
+  (exportación de 5958 bytes, igual que la del script); Swagger UI muestra selector de fichero en
+  `POST /api/incidents/analyze` y responde 200; enlaces relativos de los 15 `.md` tocados → solo faltan las 4 capturas.
+- **Capturas (D2), tomadas por el desarrollador** con el entorno preparado (API `:8000` y backoffice `npm run start`
+  `:3002`) y revisadas (valores correctos, sin correos ni datos sensibles): `scripts/screenshots/screenshot script
+  consola1-3.png` (salida completa en PowerShell y exportación), `uis/backoffice/screenshots/screenshot incidencias
+  resumen.png`, `… invalidos.png`, `… completo.png` y, además, `services/api/screenshots/screenshot incidencias
+  analyze.png` (Swagger, 200, `Content-Disposition` expuesto). Enlazadas desde `docs/analizador-incidencias.md` y los
+  README de `scripts/`, `services/api` y `uis/backoffice`. Servidores parados después.
+- Commit `45ea7f9`.
+
+**Fase 8 — preparación del despliegue (documentada, NO ejecutada)**
+
+- Por decisión del desarrollador se hace antes de la auditoría final y el push, para que la PR salga completa.
+- `docs/despliegue-api.md` para el agente del servidor: tarball con `services/api` **y**
+  `packages/analisis-incidencias`, `uv sync --locked --no-dev`, `uvicorn … --workers 1` (último análisis en memoria),
+  `SUPPLIERS_DB_PATH` fuera del código + `seed` la primera vez, `CORS_ALLOWED_ORIGINS`, `NEXT_PUBLIC_API_BASE_URL`
+  antes de `npm run build`, `client_max_body_size 6m` en nginx (1 MB por defecto), riesgo de publicar sin
+  autenticación, efecto en `/proveedores` y verificación (valores, `results.csv` de 5958 bytes con SHA-256
+  `f7ee9c99…bafa`). Ejemplos de `systemd` y nginx marcados como orientativos.
+- Topologías: A (subdominio + CORS; con autenticación exigiría cambios de código) y B (mismo host, el proxy envía
+  `/health`, `/suppliers` y `/api/incidents/` a la API; una sola protección, sin CORS; recomendada si se protege).
+- Comprobado en local: `git archive` de la rama con solo esas dos carpetas → `uv sync --locked --no-dev` (sin
+  dependencias de desarrollo), `seed` 15/0/15, `uvicorn --workers 1` con el origen de producción → `/health`, 15
+  proveedores, análisis 100/95/5, exportación con el mismo SHA-256 que el script, CORS de producción sí y `localhost`
+  no, `Content-Disposition` expuesto, log sin correos. Sin el paquete, `uv sync` falla (exit 2). No probados: proxy,
+  Cloudflare, autenticación ni la opción B en un servidor real.
+- Enlazado desde `docs/analizador-incidencias.md`, `services/api/README.md`, `docs/README*` y `techContext.md`.
+
+**Fase 7 — auditoría final (antes del push)**
+
+- Checkout limpio de `45ea7f9` (`git archive`, sin `.venv`, `node_modules`, `.next` ni `db`): paquete + script
+  **70 passed**; `services/api` `uv sync --locked`, `uv lock --check` OK, **144 passed** (`-W error::DeprecationWarning`);
+  backoffice `npm ci`, `lint` 0, `typecheck` 0, `build` 0; con la API (`seed`) y `npm run start`: `check-route` 200 en
+  `/`, `/proveedores` e `/incidencias`, navegador **19/19**; logs sin errores, 500, trazas ni `@`.
+- Seguridad del diff `main` + cambios pendientes (59 ficheros): sin `.env`, claves, `.venv`, `node_modules`, `.next`,
+  bases de datos, logs ni `results.csv`; sin patrones de secretos. Correos: solo `persona@example.com` en tests y los
+  99 ficticios del CSV de prueba (versionable). Sin referencias a IA salvo el texto literal del CONTEXT (D1); dos
+  frases de privacidad de `docs/analizador-incidencias.md` reformuladas (“ningún servicio externo”). Mensajes de commit
+  limpios. Enlaces relativos de los 21 `.md` de la rama: todos existen. Capturas: 7 PNG (la mayor, 1,8 MB).
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -413,6 +601,10 @@ en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT
 - Tras fusionar, actualizar la rama local: `git checkout main` y `git pull`.
 
 **Decisiones abiertas (requieren confirmación; ver `projectbrief.md`)**
+
+- Despliegue de la API (`docs/despliegue-api.md`): autenticación de backoffice y API antes de publicar, topología
+  (A subdominio / B mismo host) y, si es A, el subdominio y su DNS.
+- Repositorio `analizador-incidencias`: dejarlo como está o archivarlo en GitHub (no borrarlo).
 
 - Supuestos de `docs/ARCHITECTURE_PROPOSAL.md` (base de datos, dominio de la API, staging, autenticación, moneda):
   validarlos antes de crear `services/api/`.
@@ -430,9 +622,9 @@ en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT
 
 ## Siguientes pasos
 
-1. Directorio de proveedores: revisar y fusionar la PR de `feature/supplier-directory`; después `git checkout main`
-   y `git pull`. La demo pública de `/proveedores` mostrará el aviso de API no configurada (API solo local). (incl. `AGENTS.md`, que aún dice que `services/` está vacío y que
-   no hay tests) → PR.
+1. Analizador de incidencias: fases 2–8 (paquete, script, API, página `/incidencias`, documentación y capturas,
+   auditoría y PR, instrucciones de despliegue sin ejecutar). Al final, decidir qué hacer con el repositorio
+   `analizador-incidencias` (dejarlo o archivarlo en GitHub; no borrarlo).
 2. Validar con el desarrollador los supuestos del documento y, tras su aprobación, crear el esqueleto de la fase 1
    en `services/api/` (core, `/health`, `commercial`, `last_mile`, `reverse_logistics`), según
    `docs/ARCHITECTURE_PROPOSAL.md` §15.

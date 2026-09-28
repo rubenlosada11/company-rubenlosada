@@ -17,14 +17,17 @@ JS es autónomo, con su propio `package.json` y `package-lock.json`, y se opera 
 | `uis/website/` | Hito 4. Web corporativa pública (Next.js). |
 | `uis/backoffice/` | Hito 4. Aplicación interna (Next.js). |
 | `packages/shared/` | `@repo/shared-types`: tipos de dominio (`Carrier`, `Shipment`, `ReturnRequest`, `Client`) y utilidades TS puras. `dist/` está versionado. |
-| `services/api/` | Directorio de proveedores (en curso): **FastAPI + Pydantic + TinyDB**, Python gestionado con **uv** (`pyproject.toml` + `uv.lock` propios), tests con `pytest`. Contexto: `CONTEXT-directorio.md`. |
-| `agents/`, `skills/`, `mcps/`, `workflows/`, `data/`, `infra/`, `scripts/`, `internal/`, `shared/` | Solo README/plantillas (`agents/_template`, `skills/_template`). |
+| `packages/analisis-incidencias/` | Paquete Python (solo biblioteca estándar, `uv_build`, `src/`): carga, validación, métricas y exportación del CSV de incidencias de CX. Lo usan `scripts/analyze.py` y `services/api`. Contexto: `CONTEXT-incidencias.es.md`. |
+| `services/api/` | **FastAPI + Pydantic + TinyDB**, Python gestionado con **uv** (`pyproject.toml` + `uv.lock` propios), tests con `pytest`. Directorio de proveedores (`/suppliers`, contexto `CONTEXT-directorio.md`) y analizador de incidencias (`/api/incidents`, contexto `CONTEXT-incidencias.es.md`). |
+| `scripts/` | `analyze.py`: CLI del analizador de incidencias (+ `incidents-trackflow.csv` de prueba y `tests/`). |
+| `agents/`, `skills/`, `mcps/`, `workflows/`, `data/`, `infra/`, `internal/`, `shared/` | Solo README/plantillas (`agents/_template`, `skills/_template`). |
 | `docs/` | `hitos.md` (registro de hitos), `ARCHITECTURE_PROPOSAL.md` (propuesta de backend; no es un hito) + READMEs. |
 | `memory-bank/`, `AGENTS.md`, `.agents/` | Infraestructura para agentes (Hito 4). |
 
 No existen: `docker-compose.yml`, CI/CD (`.github/`), `Dockerfile`, base de datos de servidor. Los únicos tests
-automatizados son los de `services/api/tests/` (pytest).
-El `.gitignore` raíz solo contiene `node_modules/`; cada app Next.js y `services/api/` tienen el suyo.
+automatizados son de Python (pytest): `services/api/tests/`, `packages/analisis-incidencias/tests/` y `scripts/tests/`.
+El `.gitignore` raíz contiene `node_modules/`, los cachés de Python (`__pycache__/`, `*.py[cod]`, `.pytest_cache/`) y
+`scripts/results.csv`; cada app Next.js y `services/api/` tienen el suyo.
 
 ## Stack
 
@@ -35,7 +38,8 @@ El `.gitignore` raíz solo contiene `node_modules/`; cada app Next.js y `service
   `eslint-config-next` (`core-web-vitals` + `typescript`), alias `@/*` → raíz de la app. Sin librerías de estado
   externas: hooks de React. Fuentes vía `next/font/google`.
 - **Backend:** `services/api/` — Python ≥ 3.12 (máquina: 3.14.6), **uv** 0.12, FastAPI 0.141, Pydantic 2.13,
-  TinyDB 4.9, uvicorn; desarrollo: pytest 9 + `httpx2` (Starlette 1.7 marca obsoleto `httpx` en `TestClient`).
+  TinyDB 4.9, uvicorn, `python-multipart` (subida de ficheros) y el paquete local `analisis-incidencias` (editable,
+  `[tool.uv.sources]`); desarrollo: pytest 9 + `httpx2` (Starlette 1.7 marca obsoleto `httpx` en `TestClient`).
   Paquete `app/` sin `src/` (`uv_build` con `module-root = ""`), entrypoint `app.main:app`. Solo local por ahora.
   Además, `talent-pipeline-tracker` consume la API pública de Talent Tracker
   (`https://playground.4geeks.com/tracker/api/v1`).
@@ -80,7 +84,10 @@ cabecera `server: cloudflare`).
 
 Método de despliegue indicado al agente del servidor para website y backoffice: extraer exactamente `uis/website` y
 `uis/backoffice` del tarball de GitHub (`codeload.github.com/rubenlosada11/company-rubenlosada/tar.gz/main`) en la
-carpeta de cada sitio y ejecutar `npm ci --include=dev` y `npm run build` (necesita Node ≥ 20.9). Al añadir una nueva
+carpeta de cada sitio y ejecutar `npm ci --include=dev` y `npm run build` (necesita Node ≥ 20.9). La API
+(`services/api`) **no está desplegada**; instrucciones no ejecutadas en `docs/despliegue-api.md` (el tarball debe
+incluir también `packages/analisis-incidencias`, un solo worker, `NEXT_PUBLIC_API_BASE_URL` antes del build y
+autenticación antes de publicar). Al añadir una nueva
 uis desplegada: `LINK_PRODUCCION.md`, sección en su README y fila en `docs/hitos.md`.
 
 ## Comandos
@@ -103,7 +110,8 @@ En documentación y comandos que se le den al desarrollador: **un comando por l�
 funcionan (npm los ejecuta con `cmd.exe`).
 
 `talent-pipeline-tracker` no tiene script `typecheck` (el tipado se comprueba en `next build`); no se ha tocado.
-**Tests:** solo en `services/api/` (pytest, acordado para el directorio de proveedores). Las apps JS no tienen.
+**Tests:** solo en Python (pytest): `services/api/`, `packages/analisis-incidencias/` y `scripts/`. Las apps JS no
+tienen: las pruebas en navegador se hacen fuera del repo (Edge + `playwright-core` en el scratchpad).
 
 `services/api/` (desde esa carpeta, `cd services\api`):
 
@@ -113,6 +121,13 @@ funcionan (npm los ejecuta con `cmd.exe`).
 | Cargar proveedores iniciales (idempotente) | `uv run seed` |
 | Arrancar la API | `uv run uvicorn app.main:app --reload --port 8000` |
 | Tests | `uv run pytest -q` |
+
+Analizador de incidencias (Python ≥ 3.11 del sistema, sin instalar nada):
+
+| Acción | Comando |
+| --- | --- |
+| Ejecutar el script (desde `scripts`) | `python analyze.py incidents-trackflow.csv` |
+| Tests del paquete y del script (desde la raíz) | `python -m pytest scripts/tests packages/analisis-incidencias/tests` |
 
 ## Convenciones arquitectónicas
 
@@ -161,6 +176,30 @@ funcionan (npm los ejecuta con `cmd.exe`).
 | Sin la variable, `lib/http.ts` no lanza al importar: error en la UI | Un `throw` en módulo rompería `next build` en el servidor de producción (sin `.env.local`). |
 | Backoffice: tests E2E fuera del repo (Edge + playwright-core en el scratchpad) | Sin runner de tests JS en el repo (no acordado); mismo método que el Hito 4. |
 | Seeder `app/seed.py` → `[project.scripts] seed = "app.seed:main"` | Requisito `uv run seed`. Clave natural `(name casefold, country)`; no modifica existentes; valida con `SupplierCreate`; `stdout` en UTF-8 (en tuberías Windows usa cp1252). |
+
+## Decisiones técnicas del analizador de incidencias
+
+Contexto: `CONTEXT-incidencias.es.md`. Documentación: `docs/analizador-incidencias.md`. Se construyó en el repositorio
+`analizador-incidencias` y se integró aquí (2026-09-28).
+
+| Decisión | Motivo |
+| --- | --- |
+| Python estándar, sin pandas; lógica en `packages/analisis-incidencias` | Conteos simples sobre 100 filas; un solo código para el script y la API. El script la importa desde `src/` (sin instalar); la API, como dependencia editable con `uv`. |
+| Validación: 8 reglas del CONTEXT + 5 complementarias (ID `TRF-` + 6 dígitos, fecha real `YYYY-MM-DD`, `customer_type`, `status`, número de columnas) | Las complementarias cubren campos obligatorios del CONTEXT sin alterar los valores esperados. |
+| Criterios: un inválido cuenta una vez y aparece en cada regla; con país inválido solo se comprueba que el transportista exista; solo se recortan espacios (`closed` es inválido); puntuación en OPEN/DISCARDED válida pero fuera del índice | Contrato fijado con los valores esperados del CONTEXT. |
+| Salida en español; pregunta `¿Deseas exportar los resultados a CSV? [s / n]` (`s/sí/si/y/n/no`, repite ante otra respuesta, EOF/Ctrl+C sin exportar) | Decisión del equipo. |
+| `results.csv`: una fila por métrica (`seccion,metrica,valor,porcentaje`), UTF-8 con BOM; mismos bytes en script y API (`generar_csv_bytes`) | Petición de Valentina Cruz; Excel respeta los acentos. |
+| Endpoints en la API existente: `POST /api/incidents/analyze` (multipart, `file`) y `GET /api/incidents/results/export` | Los exige el ejercicio (con prefijo `/api`, a diferencia de `/suppliers`); sin app FastAPI aparte. |
+| Errores JSON `{"detail"}`: 400 sin fichero, 404 export sin análisis, 413 > 5 MB, 415 no `.csv`, 422 no procesable, 500 genérico | El 500 se captura **solo en el router de incidencias** (D4): un manejador global cambiaría proveedores. |
+| Logger `trackflow` a INFO con handler propio en `app/main.py` | La línea de resumen por análisis sale en uvicorn sin tocar el logger raíz. |
+| Último análisis en memoria (`app.state.ultimo_analisis`); un análisis fallido no lo sustituye | Sin base de datos. Exige **un solo worker** en producción. |
+| La respuesta incluye `reglas` (etiquetas) | El frontend no duplica las etiquetas. |
+| CORS con `expose_headers=["Content-Disposition"]` (D5) | Sin ella, el navegador no puede leer el nombre del fichero de la descarga. |
+| Backoffice: `fetchApi` en `lib/http.ts` + `lib/incidencias.ts`; sin proxy `rewrites` | `request` fuerza JSON y rompe `FormData`/blob; `fetchApi` comparte URL base y errores con proveedores. |
+| Página `/incidencias`: resumen → categoría → estado → satisfacción → inválidos → desgloses → temporal → cruces; es-ES; barras `blue-700`; aviso de inválidos en ámbar con icono y texto | Diseño acordado; reutiliza `StatCard`, `PageSection` y `NavLink`. |
+| Privacidad: `customer_email` nunca en consola, JSON, exportación, página ni logs; inválidos por línea e `incident_id` | Requisito del CONTEXT; cubierto por tests. |
+| Pruebas en navegador fuera del repo (D3); capturas manuales del desarrollador (D2) | Convenciones de `AGENTS.md`. |
+| Práctica sin número de hito (D6): commits `Analizador de incidencias — …`; no va a `docs/hitos.md` ni a `lib/data/milestones.ts` | Decisión del desarrollador, igual que proveedores. |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 

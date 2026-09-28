@@ -1,8 +1,9 @@
 # TrackFlow Backoffice
 
 Aplicación interna de TrackFlow Tech. Muestra la estructura del negocio, el backlog de iniciativas de TrackFlow
-Tech y el estado de los hitos del proyecto **a partir del contexto de empresa** (ruta `/`), y el **directorio de
-proveedores** conectado a la API [`services/api`](../../services/api/README.md) (ruta `/proveedores`).
+Tech y el estado de los hitos del proyecto **a partir del contexto de empresa** (ruta `/`), el **directorio de
+proveedores** (ruta `/proveedores`) y el **analizador de incidencias** de CX (ruta `/incidencias`), estos dos
+conectados a la API [`services/api`](../../services/api/README.md).
 
 Next.js (App Router) + React + TypeScript + Tailwind CSS, con las mismas versiones y herramientas que
 [`talent-pipeline-tracker`](../talent-pipeline-tracker/README.md). Sin librerías de estado ni de UI.
@@ -48,6 +49,23 @@ Capturas con filtros aplicados: [España + Carrier de última milla](./screensho
 No hay botón de eliminar: el flujo de TrackFlow es suspender a los proveedores, no borrarlos. Si la API no responde
 o falta la variable `NEXT_PUBLIC_API_BASE_URL`, la página muestra un aviso con el motivo y un botón “Reintentar”.
 
+## Qué muestra la ruta `/incidencias`
+
+Analizador del CSV de incidencias exportado del helpdesk para Valentina Cruz (CX), según
+[`CONTEXT-incidencias.es.md`](../../CONTEXT-incidencias.es.md). Documentación completa:
+[`docs/analizador-incidencias.md`](../../docs/analizador-incidencias.md).
+
+| Función | Llamada a la API |
+| --- | --- |
+| Seleccionar o arrastrar el CSV y analizarlo (“Analizando…” mientras tanto; `.csv` comprobado antes de enviar) | `POST /api/incidents/analyze` (`multipart/form-data`, campo `file`) |
+| Resumen, categoría, estado, satisfacción, registros inválidos (por línea e ID, sin correos), más desgloses, evolución temporal y cruces, con números en formato es-ES | — (respuesta del análisis) |
+| Botón **Descargar resultados CSV**: `results.csv`, idéntico al que exporta `scripts/analyze.py` | `GET /api/incidents/results/export` |
+
+Los errores de la API (`detail`), una API que no responde o la falta de `NEXT_PUBLIC_API_BASE_URL` se muestran como
+aviso en el formulario. Capturas con el CSV de prueba: [resumen](./screenshots/screenshot%20incidencias%20resumen.png),
+[registros inválidos](./screenshots/screenshot%20incidencias%20invalidos.png) y
+[página completa](./screenshots/screenshot%20incidencias%20completo.png).
+
 ## Estructura
 
 ```text
@@ -56,17 +74,22 @@ backoffice/
 │   ├── layout.tsx        # layout propio: sidebar + barra superior; `noindex` (herramienta interna)
 │   ├── page.tsx          # ruta `/`
 │   ├── proveedores/page.tsx  # ruta `/proveedores`
+│   ├── incidencias/page.tsx  # ruta `/incidencias`
 │   └── globals.css
 ├── components/           # Sidebar, Topbar, NavLink (cliente: enlace activo), Overview, Explorer (cliente: filtros),
-│                         # AreaCard, Milestones, PageSection, StatCard, Badge,
-│                         # SupplierDirectory, SupplierForm, SupplierRow (cliente: directorio de proveedores)
+│   │                     # AreaCard, Milestones, PageSection, StatCard, Badge,
+│   │                     # SupplierDirectory, SupplierForm, SupplierRow (cliente: directorio de proveedores)
+│   └── incidencias/      # AnalizadorIncidencias (cliente), SelectorCsv (cliente), ResultadosAnalisis, ListaBarras,
+│                         # TablaCruce, TablaSatisfaccion, RegistrosInvalidos
 ├── lib/
 │   ├── data/             # areas.ts, initiatives.ts, milestones.ts, baseline.ts, suppliers.ts (valores del CONTEXT)
 │   ├── initiatives.ts    # lógica pura: filterInitiatives, countByArea, countByStatus
-│   ├── http.ts           # cliente HTTP de la API (errores 422 de FastAPI por campo)
+│   ├── http.ts           # cliente HTTP de la API: fetchApi (URL base y errores) y http (JSON; errores 422 por campo)
 │   ├── suppliers.ts      # llamadas a /suppliers, validación del formulario y formato de tarifas y fechas
+│   ├── incidencias.ts    # subida del CSV (FormData) y descarga de results.csv (blob)
+│   ├── formato.ts        # formato es-ES del analizador (enteros, porcentajes, medias, semanas ISO)
 │   └── nav.ts
-├── types/index.ts        # BusinessArea, Initiative, Milestone, BaselineFact, Supplier…
+├── types/                # index.ts (BusinessArea, Initiative, Milestone, Supplier…) e incidencias.ts (respuesta del análisis)
 ├── .env.example          # NEXT_PUBLIC_API_BASE_URL
 └── public/logo/          # logo (copiado de uis/landing)
 ```
@@ -79,7 +102,7 @@ npm install
 npm run dev      # http://localhost:3002
 ```
 
-Para `/proveedores` hace falta la API arrancada ([`services/api`](../../services/api/README.md), puerto 8000) y la
+Para `/proveedores` e `/incidencias` hace falta la API arrancada ([`services/api`](../../services/api/README.md), puerto 8000) y la
 URL en `.env.local` (Next.js la incrusta al compilar: tras cambiarla, reinicia `npm run dev` o repite el build). En
 Windows PowerShell:
 
@@ -105,11 +128,15 @@ npm run typecheck   # next typegen && tsc --noEmit
 npm run build
 ```
 
-No hay tests automatizados en el repo. Comprobación de la ruta `/` con la skill
-[`validate-delivery`](../../.agents/skills/validate-delivery/SKILL.md):
+No hay tests automatizados en el repo: las pruebas en navegador se ejecutan fuera de él (Edge + `playwright-core`) y
+se registran en la documentación de cada función (p. ej.
+[`docs/pruebas-analizador-incidencias.md`](../../docs/pruebas-analizador-incidencias.md)). Comprobación de las rutas
+con la skill [`validate-delivery`](../../.agents/skills/validate-delivery/SKILL.md):
 
 ```bash
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/ --expect "Backoffice" --expect "Áreas de negocio"
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/proveedores --expect "Directorio de proveedores"
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/incidencias --expect "Análisis de incidencias"
 ```
 
 ## Pendiente / fuera de alcance
@@ -117,9 +144,9 @@ node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://local
 - **Sin autenticación:** hoy está publicada abierta (https://backofficetrackflow.rubenlosada.com/). Solo muestra
   información del briefing, que es ficticia, y el layout lleva `noindex`. Antes de mostrar datos reales hay que
   protegerla (p. ej. Basic Auth en el proxy o un login en la app).
-- **`/proveedores` en producción:** la API solo corre en local, así que en la demo pública la página muestra el
-  aviso “Falta la variable NEXT_PUBLIC_API_BASE_URL”. Publicar la API exigiría antes autenticación, porque permite
-  editar tarifas y estados.
+- **`/proveedores` e `/incidencias` en producción:** la API solo corre en local, así que en la demo pública ambas
+  páginas muestran el aviso “Falta la variable NEXT_PUBLIC_API_BASE_URL”. Publicar la API exigiría antes
+  autenticación, porque permite editar tarifas y estados y subir CSV con correos de clientes.
 - Sin conexión a otros datos reales (inventario, envíos, devoluciones…): llegará con `services/` y los pipelines de
   `data/` cuando existan.
 - Mantener `lib/data/` sincronizado con `CONTEXT.es.md` y `docs/hitos.md` cuando cambien.
