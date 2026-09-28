@@ -1,1 +1,9 @@
 node_modules/
+
+# Python (paquetes y scripts de la raíz; services/api tiene su propio .gitignore)
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# exportación local del analizador de incidencias (python analyze.py … → results.csv)
+scripts/results.csv

@@ -26,7 +26,7 @@
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
-| Analizador de incidencias | 🚧 Fase 1 de 8: rama y `CONTEXT-incidencias.es.md` |
+| Analizador de incidencias | 🚧 Fase 2 de 8: CONTEXT y paquete `packages/analisis-incidencias` (43 tests) |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
@@ -442,6 +442,17 @@ Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/
   (menciona 1.000 filas y la ruta `incidents-analysis/…`; la salida esperada está en inglés): mandan la tabla de
   valores esperados (100 filas) y la decisión de salida en español.
 - Corregido el estado de este fichero: la PR #8 (proveedores) ya estaba fusionada.
+- Commit `9e032ad`.
+
+**Fase 2 — paquete compartido `packages/analisis-incidencias`**
+
+- Copiado desde `HEAD` de la fuente con `git archive` (sin `__pycache__`). Único cambio: las referencias a
+  `CONTEXT.es.md` (en el monorepo es el de la empresa) pasan a `CONTEXT-incidencias.es.md` en el README, `dominio.py`
+  y `validacion.py` (4 líneas; el resto es idéntico a la fuente).
+- `packages/README.md` y `README.es.md`: nueva tabla de paquetes (`shared` y `analisis-incidencias`, con quién los usa).
+- `.gitignore` raíz: `__pycache__/`, `*.py[cod]`, `.pytest_cache/` y `scripts/results.csv` (antes solo
+  `node_modules/`). Comprobado con `git check-ignore` y `git ls-files --others --ignored`.
+- Validación: `python -m pytest packages/analisis-incidencias/tests -q` (desde la raíz) → **43 passed**.
 
 ## Trabajo pendiente
 
