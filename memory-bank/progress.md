@@ -6,14 +6,14 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/supplier-directory` (desde `main` @ `ee34a08`, que ya incluye las PR #3–#7).
+- **Rama de trabajo:** `feature/analizador-incidencias` (desde `main` @ `40ec659`, que ya incluye las PR #3–#8).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
-- **Directorio de proveedores** (sin número de hito todavía; contexto en
-  [`CONTEXT-directorio.md`](../CONTEXT-directorio.md)): en curso en `services/api/` (FastAPI + Pydantic + TinyDB).
-  Hecho: API completa (FastAPI + TinyDB, seeder, 6 endpoints, 118 tests), página `/proveedores` en el backoffice
-  (E2E 47/47), revisión de entrega y de seguridad, documentación y capturas. Entregado por PR a `main` (pendiente
-  de revisión y fusión).
+- **Directorio de proveedores** (práctica sin número de hito; contexto en
+  [`CONTEXT-directorio.md`](../CONTEXT-directorio.md)): entregado, PR #8 fusionada (`40ec659`). API solo local.
+- **Analizador de incidencias** (práctica sin número de hito; contexto en
+  [`CONTEXT-incidencias.es.md`](../CONTEXT-incidencias.es.md)): **en curso**. Se integra en el monorepo desde el
+  repositorio `analizador-incidencias` (construido allí por error; solo lectura), por fases con confirmación.
 - **Última actualización:** 2026-09-28.
 
 | Componente | Estado |
@@ -24,14 +24,16 @@
 | `.agents/skills/validate-delivery/` | ✅ Creada (`SKILL.md` + `check-route.mjs` + `check-hygiene.mjs`) |
 | `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
-| `services/api/` | 🚧 Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
-| `uis/backoffice/proveedores` | 🚧 Implementado y validado en local (E2E 47/47); pendiente de PR |
+| `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
+| `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
+| Analizador de incidencias | 🚧 Fase 1 de 8: rama y `CONTEXT-incidencias.es.md` |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
 | PR #5 `feature/hito-4-cierre` → `main` | ✅ Fusionada: Hito 4 “Entregado”, CEO y facturación en el website |
 | PR #6 `feature/hito-4-demos-produccion` → `main` | ✅ Fusionada (`f11ee15`): enlaces de producción de website y backoffice |
 | PR #7 `feature/propuesta-arquitectura-backend` → `main` | ✅ Fusionada (`ee34a08`) |
+| PR #8 `feature/supplier-directory` → `main` | ✅ Fusionada (`40ec659`) |
 
 ## Estado inicial (antes del Hito 4, `main` @ `50b77bd`)
 
@@ -402,6 +404,45 @@ en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT
   filtro1-2.png` (España + última milla → 4; España → 6).
 - Commit 6 + push de `feature/supplier-directory` + PR a `main` (ver estado).
 
+### 2026-09-28 — Analizador de incidencias (rama `feature/analizador-incidencias`)
+
+**Objetivo:** traer al monorepo el analizador del CSV de incidencias de CX (Valentina Cruz), que se construyó, probó
+y fusionó por error en el repositorio `analizador-incidencias` (PR #1). Se adapta a las convenciones del monorepo, sin
+reconstruirlo ni copiarlo a ciegas. Ese repositorio es **solo lectura**; qué hacer con él se decide al final.
+Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/analyze.py`, endpoints en
+`services/api` y página `/incidencias` en el backoffice. Fases con parada y confirmación antes de cada commit.
+
+**Fase 0 — auditoría (sin cambios)**
+
+- `main` @ `40ec659` al día con `origin/main`. Base: `services/api` `uv lock --check` OK y 118 passed; backoffice
+  `lint`/`typecheck`/`build` → 0. El script de la fuente reproduce los valores esperados del CONTEXT (100/95/5).
+- Choques detectados: `app/main.py` sin `create_app` y con `/health` (no `/api/health`), CORS sin `expose_headers`,
+  sin configuración de logging; `lib/http.ts` fuerza `Content-Type: application/json` y lee siempre JSON (rompe
+  `FormData` y la descarga del CSV). `StatCard` y `PageSection` son idénticos en ambos repos (se reutilizan).
+
+**Decisiones del desarrollador (2026-09-28)**
+
+- **D1:** `CONTEXT-incidencias.es.md` en la raíz, copia literal del `CONTEXT.es.md` de la fuente. El `CONTEXT.es.md`
+  de la empresa no se toca.
+- **D2:** capturas **manuales** del desarrollador (no se reutilizan las generadas de la fuente); se preparan el
+  entorno, los nombres y las carpetas `screenshots/` en la fase de documentación.
+- **D3:** pruebas en navegador fuera del repo (Edge + `playwright-core` en el scratchpad), sin dependencia nueva en
+  el backoffice.
+- **D4:** errores inesperados capturados solo en el router de incidencias (log + 500 `{"detail": "Error interno del
+  servidor."}`); logger `trackflow` a INFO en `main.py` sin tocar el logger raíz.
+- **D5:** CORS con `expose_headers=["Content-Disposition"]` para que la descarga conserve el nombre del fichero.
+- **D6:** práctica **sin número de hito**: commits `Analizador de incidencias — …`; **no** se añade a
+  `docs/hitos.md` ni a `lib/data/milestones.ts` (igual que proveedores). El rastro queda en commits, memory bank,
+  READMEs y `docs/`.
+
+**Fase 1 — rama y CONTEXT**
+
+- Rama `feature/analizador-incidencias` desde `main` @ `40ec659`.
+- `CONTEXT-incidencias.es.md` = copia literal (`cmp` sin diferencias). Contiene inconsistencias propias ya conocidas
+  (menciona 1.000 filas y la ruta `incidents-analysis/…`; la salida esperada está en inglés): mandan la tabla de
+  valores esperados (100 filas) y la decisión de salida en español.
+- Corregido el estado de este fichero: la PR #8 (proveedores) ya estaba fusionada.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -430,9 +471,9 @@ en `services/api/` y una página en `uis/backoffice`. Fuente de verdad: `CONTEXT
 
 ## Siguientes pasos
 
-1. Directorio de proveedores: revisar y fusionar la PR de `feature/supplier-directory`; después `git checkout main`
-   y `git pull`. La demo pública de `/proveedores` mostrará el aviso de API no configurada (API solo local). (incl. `AGENTS.md`, que aún dice que `services/` está vacío y que
-   no hay tests) → PR.
+1. Analizador de incidencias: fases 2–8 (paquete, script, API, página `/incidencias`, documentación y capturas,
+   auditoría y PR, instrucciones de despliegue sin ejecutar). Al final, decidir qué hacer con el repositorio
+   `analizador-incidencias` (dejarlo o archivarlo en GitHub; no borrarlo).
 2. Validar con el desarrollador los supuestos del documento y, tras su aprobación, crear el esqueleto de la fase 1
    en `services/api/` (core, `/health`, `commercial`, `last_mile`, `reverse_logistics`), según
    `docs/ARCHITECTURE_PROPOSAL.md` §15.
