@@ -26,7 +26,7 @@
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
-| Analizador de incidencias | 🚧 Fase 3 de 8: CONTEXT, paquete `packages/analisis-incidencias` y script `scripts/analyze.py` (70 tests) |
+| Analizador de incidencias | 🚧 Fase 4 de 8: CONTEXT, paquete, script (70 tests) y endpoints `/api/incidents` en `services/api` (144 tests) |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
 | PR #3 `feature/agent-memory-bank` → `main` | ✅ Fusionada el 2026-09-21 |
 | PR #4 `feature/hito-4-capturas` → `main` | ✅ Fusionada: solo las dos capturas (website y backoffice) |
@@ -473,6 +473,37 @@ Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/
   - Respuesta no válida → repite la pregunta; `s` exporta; `n` y EOF terminan sin exportar (exit 0); fichero
     inexistente → exit 1; sin argumento → exit 2. En Windows PowerShell 5.1: acentos y caracteres de caja correctos,
     exit 0. `scripts/results.csv` borrado tras la prueba (además está ignorado).
+- Commit `3fee3b0`.
+
+**Fase 4 — API en el servicio existente (`services/api`)**
+
+- `app/routes/incidents.py` (a partir de `routers/incidents.py` de la fuente): `POST /api/incidents/analyze`
+  (multipart, campo `file`) y `GET /api/incidents/results/export`. Errores 400/404/413/415/422; **D4**: los errores
+  inesperados se capturan solo en este router (`logger.exception` + 500 `{"detail": "Error interno del servidor."}`),
+  también al generar la exportación. Se mantiene el prefijo `/api` del enunciado (proveedores usa `/suppliers`).
+- `app/main.py`: registra el router, `app.state.ultimo_analisis = None`, **D5** `expose_headers=["Content-Disposition"]`
+  y logger `trackflow` a INFO con su propio handler (formato alineado con uvicorn; el logger raíz no se toca). Sin
+  `create_app` ni manejador global: proveedores no cambia.
+- `pyproject.toml` con `uv add`: `python-multipart>=0.0.32` y `analisis-incidencias` (`[tool.uv.sources]`, ruta
+  `../../packages/analisis-incidencias`, `editable = true`); `uv.lock` regenerado (+18 líneas); `uv lock --check` OK.
+- `tests/test_incidents.py`: los 23 de la fuente adaptados (app del módulo, fixture `client` del `conftest.py`, estado
+  reiniciado por test con un fixture `autouse`, `/health`, 500 sin `raise_server_exceptions=False`) + 3 nuevos: log
+  del análisis sin correos, 500 al exportar y `Access-Control-Expose-Headers`.
+- Validación:
+  - `uv run pytest -q -W error::DeprecationWarning` → **144 passed** (118 proveedores + 26 incidencias).
+  - Mutaciones: sin `expose_headers` falla el test de CORS; sin el `except Exception` falla el test del 500.
+    Restaurado → 144 passed.
+  - `uv run uvicorn app.main:app --port 8000` + `curl`: `/health` 200; `/suppliers?country=Spain` 200 (6); export sin
+    análisis 404; sin fichero 400; `.xlsx` 415; vacío 422; 5 MB + 1 byte 413; CSV de prueba 200
+    (`application/json; charset=utf-8`) con todos los valores esperados (100/95/5, inválidos por línea e ID,
+    categorías, estados, países, satisfacción 3.06 y 6/11/15/14/6, US 2.96 · ES 3.17) y sin `@`; export 200
+    `text/csv; charset=utf-8`, `attachment; filename="results.csv"`, `Access-Control-Expose-Headers:
+    Content-Disposition`, **idéntico byte a byte** al `results.csv` del script; un 422 posterior no sustituye el
+    último análisis. Preflight CORS: `:3002` permitido, otro origen rechazado; preflight `PATCH /suppliers/1/rate`
+    sigue permitido.
+  - Log: línea de resumen `trackflow.api.incidents: Análisis de 'incidents-trackflow.csv': 100 registros (95 válidos,
+    5 inválidos)`, 0 `@`, 0 errores. Al redirigir el log a un fichero en Windows, las tildes salen en cp1252
+    (limitación ya conocida de la fuente; en consola se ven bien).
 
 ## Trabajo pendiente
 
