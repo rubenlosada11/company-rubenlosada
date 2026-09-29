@@ -13,6 +13,25 @@
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+/* Pantalla de login: ruta animada entre almacenes y entrada suave de la tarjeta. */
+@theme {
+  --animate-route: route-dash 1.4s linear infinite;
+  --animate-fade-up: fade-up 0.45s ease-out both;
+
+  @keyframes route-dash {
+    to {
+      stroke-dashoffset: -40;
+    }
+  }
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   html {
     scroll-behavior: smooth;

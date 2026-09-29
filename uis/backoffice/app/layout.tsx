@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, Manrope } from "next/font/google";
-import { Sidebar } from "@/components/Sidebar";
-import { Topbar } from "@/components/Topbar";
+import { AuthProvider } from "@/components/auth/AuthProvider";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -34,15 +33,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           Saltar al contenido
         </a>
-        <div className="lg:grid lg:min-h-screen lg:grid-cols-[264px_minmax(0,1fr)]">
-          <Sidebar />
-          <div className="flex min-w-0 flex-col">
-            <Topbar />
-            <main id="contenido" className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-              {children}
-            </main>
-          </div>
-        </div>
+        {/* El panel va en app/(panel)/layout.tsx y el login en app/login: ambos comparten la sesión. */}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
