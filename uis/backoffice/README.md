@@ -3,7 +3,8 @@
 Aplicación interna de TrackFlow Tech. Muestra la estructura del negocio, el backlog de iniciativas de TrackFlow
 Tech y el estado de los hitos del proyecto **a partir del contexto de empresa** (ruta `/`), el **directorio de
 proveedores** (ruta `/proveedores`) y el **analizador de incidencias** de CX (ruta `/incidencias`), estos dos
-conectados a la API [`services/api`](../../services/api/README.md).
+conectados a la API [`services/api`](../../services/api/README.md). **Se entra con login** (ruta `/login`): usuario y
+contraseña de la API, con un token JWT (ver [Acceso](#acceso-login)).
 
 Next.js (App Router) + React + TypeScript + Tailwind CSS, con las mismas versiones y herramientas que
 [`talent-pipeline-tracker`](../talent-pipeline-tracker/README.md). Sin librerías de estado ni de UI.
@@ -14,8 +15,27 @@ Next.js (App Router) + React + TypeScript + Tailwind CSS, con las mismas version
 ## Demo pública
 
 - URL: https://backofficetrackflow.rubenlosada.com/
-- Publicada **sin autenticación**: solo muestra datos del briefing (ficticios, ejercicio de bootcamp) y lleva
-  `noindex`. Ver “Pendiente / fuera de alcance”.
+- La versión publicada es **anterior al login** y lleva `noindex`. **No se debe redesplegar esta versión sin publicar
+  antes la API**: el login la necesita y, sin ella, el panel queda inaccesible. Ver
+  [`docs/despliegue-api.md`](../../docs/despliegue-api.md).
+
+## Acceso (login)
+
+Pantalla propia en `/login` (no el popup del navegador): panel de marca en escritorio y tarjeta de acceso con
+email y contraseña, mostrar/ocultar contraseña, estado «Entrando…» y mensajes de la API en español (credenciales
+incorrectas, cuenta desactivada, API caída, sesión caducada, sesión cerrada).
+
+| Pieza | Qué hace |
+| --- | --- |
+| [`app/login/page.tsx`](./app/login/page.tsx) + [`components/auth/LoginScreen.tsx`](./components/auth/LoginScreen.tsx) | `POST /auth/login` y después `GET /auth/me`. Vuelve a la página de `?next=` (solo rutas internas). |
+| [`app/(panel)/layout.tsx`](./app/(panel)/layout.tsx) + [`components/auth/AuthGate.tsx`](./components/auth/AuthGate.tsx) | `/`, `/proveedores` e `/incidencias` solo se muestran con sesión; si no, llevan a `/login?next=…`. Las URLs no cambian (grupo de rutas). |
+| [`components/auth/AuthProvider.tsx`](./components/auth/AuthProvider.tsx) | Estado de la sesión compartido. La cierra al caducar el token o si la API responde 401. |
+| [`lib/session.ts`](./lib/session.ts) · [`lib/http.ts`](./lib/http.ts) | Token en `sessionStorage` (dura lo que la pestaña, sin cookies) y cabecera `Authorization: Bearer` en cada llamada a la API. |
+| [`components/auth/UserMenu.tsx`](./components/auth/UserMenu.tsx) | Barra superior: iniciales, nombre del perfil, rol y **Cerrar sesión**. |
+
+Para entrar hace falta un usuario de la API: el primero se crea con `uv run --env-file .env create-admin <email>` en
+`services\api`. Detalle, permisos y verificación: [`docs/autenticacion.md`](../../docs/autenticacion.md). La
+comprobación del backoffice es de interfaz: los datos los protege la API, que valida el token en cada petición.
 
 ## Qué muestra la ruta `/`
 
@@ -71,25 +91,31 @@ aviso en el formulario. Capturas con el CSV de prueba: [resumen](./screenshots/s
 ```text
 backoffice/
 ├── app/
-│   ├── layout.tsx        # layout propio: sidebar + barra superior; `noindex` (herramienta interna)
-│   ├── page.tsx          # ruta `/`
-│   ├── proveedores/page.tsx  # ruta `/proveedores`
-│   ├── incidencias/page.tsx  # ruta `/incidencias`
-│   └── globals.css
+│   ├── layout.tsx        # fuentes, `noindex` (herramienta interna) y AuthProvider
+│   ├── login/page.tsx    # ruta `/login`
+│   ├── (panel)/          # grupo de rutas protegido (no cambia las URLs)
+│   │   ├── layout.tsx    # AuthGate + sidebar + barra superior
+│   │   ├── page.tsx      # ruta `/`
+│   │   ├── proveedores/page.tsx  # ruta `/proveedores`
+│   │   └── incidencias/page.tsx  # ruta `/incidencias`
+│   └── globals.css       # + animaciones del login (ruta y entrada)
 ├── components/           # Sidebar, Topbar, NavLink (cliente: enlace activo), Overview, Explorer (cliente: filtros),
 │   │                     # AreaCard, Milestones, PageSection, StatCard, Badge,
 │   │                     # SupplierDirectory, SupplierForm, SupplierRow (cliente: directorio de proveedores)
-│   └── incidencias/      # AnalizadorIncidencias (cliente), SelectorCsv (cliente), ResultadosAnalisis, ListaBarras,
-│                         # TablaCruce, TablaSatisfaccion, RegistrosInvalidos
+│   ├── incidencias/      # AnalizadorIncidencias (cliente), SelectorCsv (cliente), ResultadosAnalisis, ListaBarras,
+│   │                     # TablaCruce, TablaSatisfaccion, RegistrosInvalidos
+│   └── auth/             # AuthProvider, AuthGate, LoginScreen, UserMenu (cliente)
 ├── lib/
 │   ├── data/             # areas.ts, initiatives.ts, milestones.ts, baseline.ts, suppliers.ts (valores del CONTEXT)
 │   ├── initiatives.ts    # lógica pura: filterInitiatives, countByArea, countByStatus
-│   ├── http.ts           # cliente HTTP de la API: fetchApi (URL base y errores) y http (JSON; errores 422 por campo)
+│   ├── http.ts           # cliente HTTP de la API: fetchApi (URL base, Bearer y errores) y http (JSON; errores 422 por campo)
+│   ├── session.ts        # token en sessionStorage, caducidad (`exp`) y `next` seguro
+│   ├── auth.ts           # /auth/login, /auth/me, etiquetas de rol, iniciales
 │   ├── suppliers.ts      # llamadas a /suppliers, validación del formulario y formato de tarifas y fechas
 │   ├── incidencias.ts    # subida del CSV (FormData) y descarga de results.csv (blob)
 │   ├── formato.ts        # formato es-ES del analizador (enteros, porcentajes, medias, semanas ISO)
 │   └── nav.ts
-├── types/                # index.ts (BusinessArea, Initiative, Milestone, Supplier…) e incidencias.ts (respuesta del análisis)
+├── types/                # index.ts (BusinessArea, Initiative, Milestone, Supplier…), incidencias.ts y auth.ts (usuario y token)
 ├── .env.example          # NEXT_PUBLIC_API_BASE_URL
 └── public/logo/          # logo (copiado de uis/landing)
 ```
@@ -102,8 +128,8 @@ npm install
 npm run dev      # http://localhost:3002
 ```
 
-Para `/proveedores` e `/incidencias` hace falta la API arrancada ([`services/api`](../../services/api/README.md), puerto 8000) y la
-URL en `.env.local` (Next.js la incrusta al compilar: tras cambiarla, reinicia `npm run dev` o repite el build). En
+Para entrar (y para `/proveedores` e `/incidencias`) hace falta la API arrancada
+([`services/api`](../../services/api/README.md), puerto 8000, con su `.env` y un usuario creado) y la URL en `.env.local` (Next.js la incrusta al compilar: tras cambiarla, reinicia `npm run dev` o repite el build). En
 Windows PowerShell:
 
 ```powershell
@@ -130,23 +156,27 @@ npm run build
 
 No hay tests automatizados en el repo: las pruebas en navegador se ejecutan fuera de él (Edge + `playwright-core`) y
 se registran en la documentación de cada función (p. ej.
-[`docs/pruebas-analizador-incidencias.md`](../../docs/pruebas-analizador-incidencias.md)). Comprobación de las rutas
-con la skill [`validate-delivery`](../../.agents/skills/validate-delivery/SKILL.md):
+[`docs/pruebas-analizador-incidencias.md`](../../docs/pruebas-analizador-incidencias.md) y
+[`docs/autenticacion.md`](../../docs/autenticacion.md#navegador-backoffice)). Comprobación de las rutas con la skill
+[`validate-delivery`](../../.agents/skills/validate-delivery/SKILL.md). El HTML del panel solo trae el aviso
+«Comprobando tu sesión…» (el contenido aparece tras validar el token en el navegador), así que los textos se
+comprueban en `/login`:
 
 ```bash
-node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/ --expect "Backoffice" --expect "Áreas de negocio"
-node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/proveedores --expect "Directorio de proveedores"
-node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/incidencias --expect "Análisis de incidencias"
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/login --expect "Inicia sesión" --expect "Entrar al backoffice"
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/ --expect "Comprobando tu sesión"
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/proveedores
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/incidencias
 ```
 
 ## Pendiente / fuera de alcance
 
-- **Sin autenticación:** hoy está publicada abierta (https://backofficetrackflow.rubenlosada.com/). Solo muestra
-  información del briefing, que es ficticia, y el layout lleva `noindex`. Antes de mostrar datos reales hay que
-  protegerla (p. ej. Basic Auth en el proxy o un login en la app).
-- **`/proveedores` e `/incidencias` en producción:** la API solo corre en local, así que en la demo pública ambas
-  páginas muestran el aviso “Falta la variable NEXT_PUBLIC_API_BASE_URL”. Publicar la API exigiría antes
-  autenticación, porque permite editar tarifas y estados y subir CSV con correos de clientes.
+- **Producción:** la API solo corre en local. Para publicar el login hay que desplegar antes la API, con su
+  `SECRET_KEY` y un administrador, y quitar el Basic Auth del proxy delante de la API (usa la misma cabecera
+  `Authorization`). Pasos en [`docs/despliegue-api.md`](../../docs/despliegue-api.md).
+- **Registro:** no hay pantalla de alta. Los usuarios se crean con `POST /users` (público en la API) o
+  `create-admin`, y los roles los cambia un `admin` con `PUT /users/{id}`. Riesgos pendientes en
+  [`docs/autenticacion.md`](../../docs/autenticacion.md#auditoría-de-seguridad).
 - Sin conexión a otros datos reales (inventario, envíos, devoluciones…): llegará con `services/` y los pipelines de
   `data/` cuando existan.
 - Mantener `lib/data/` sincronizado con `CONTEXT.es.md` y `docs/hitos.md` cuando cambien.
