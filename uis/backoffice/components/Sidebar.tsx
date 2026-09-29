@@ -1,10 +1,11 @@
 import Image from "next/image";
 import { NAV_ITEMS } from "@/lib/nav";
+import { SidebarAccount } from "./auth/SidebarAccount";
 import { NavLink } from "./NavLink";
 
 export function Sidebar() {
   return (
-    <aside className="hidden bg-blue-950 text-blue-100 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:gap-8 lg:p-5">
+    <aside className="hidden bg-blue-950 text-blue-100 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:gap-8 lg:overflow-y-auto lg:p-5">
       <div className="rounded-xl bg-white p-3">
         <Image
           src="/logo/TrackFlow_Logo1_Full.png"
@@ -34,10 +35,13 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      <p className="mt-auto px-3 text-xs leading-relaxed text-blue-300">
-        TrackFlow Tech · Uso interno. El resumen procede de CONTEXT.es.md; el directorio de proveedores y el análisis
-        de incidencias usan la API local de TrackFlow.
-      </p>
+      <div className="mt-auto space-y-4">
+        <SidebarAccount />
+        <p className="px-3 text-xs leading-relaxed text-blue-300">
+          TrackFlow Tech · Uso interno. El resumen procede de CONTEXT.es.md; el directorio de proveedores y el
+          análisis de incidencias usan la API de TrackFlow.
+        </p>
+      </div>
     </aside>
   );
 }

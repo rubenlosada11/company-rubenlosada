@@ -31,7 +31,8 @@ incorrectas, cuenta desactivada, API caída, sesión caducada, sesión cerrada).
 | [`app/(panel)/layout.tsx`](./app/(panel)/layout.tsx) + [`components/auth/AuthGate.tsx`](./components/auth/AuthGate.tsx) | `/`, `/proveedores` e `/incidencias` solo se muestran con sesión; si no, llevan a `/login?next=…`. Las URLs no cambian (grupo de rutas). |
 | [`components/auth/AuthProvider.tsx`](./components/auth/AuthProvider.tsx) | Estado de la sesión compartido. La cierra al caducar el token o si la API responde 401. |
 | [`lib/session.ts`](./lib/session.ts) · [`lib/http.ts`](./lib/http.ts) | Token en `sessionStorage` (dura lo que la pestaña, sin cookies) y cabecera `Authorization: Bearer` en cada llamada a la API. |
-| [`components/auth/UserMenu.tsx`](./components/auth/UserMenu.tsx) | Barra superior: iniciales, nombre del perfil, rol y **Cerrar sesión**. |
+| [`components/auth/SidebarAccount.tsx`](./components/auth/SidebarAccount.tsx) | Escritorio: tarjeta al pie del sidebar con iniciales, nombre, email, rol y **Cerrar sesión**. |
+| [`components/auth/UserMenu.tsx`](./components/auth/UserMenu.tsx) | Móvil y tablet (sin sidebar): iniciales, nombre y rol en la barra superior y botón **Salir**. |
 
 Para entrar hace falta un usuario de la API: el primero se crea con `uv run --env-file .env create-admin <email>` en
 `services\api`. Detalle, permisos y verificación: [`docs/autenticacion.md`](../../docs/autenticacion.md). La
@@ -104,7 +105,7 @@ backoffice/
 │   │                     # SupplierDirectory, SupplierForm, SupplierRow (cliente: directorio de proveedores)
 │   ├── incidencias/      # AnalizadorIncidencias (cliente), SelectorCsv (cliente), ResultadosAnalisis, ListaBarras,
 │   │                     # TablaCruce, TablaSatisfaccion, RegistrosInvalidos
-│   └── auth/             # AuthProvider, AuthGate, LoginScreen, UserMenu (cliente)
+│   └── auth/             # AuthProvider, AuthGate, LoginScreen, SidebarAccount, UserMenu (cliente), LogoutIcon
 ├── lib/
 │   ├── data/             # areas.ts, initiatives.ts, milestones.ts, baseline.ts, suppliers.ts (valores del CONTEXT)
 │   ├── initiatives.ts    # lógica pura: filterInitiatives, countByArea, countByStatus

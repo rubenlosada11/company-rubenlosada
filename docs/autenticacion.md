@@ -178,7 +178,9 @@ El backoffice tiene ahora una pantalla propia en `/login`. Sustituye al popup de
 - **Sesión:** el token se guarda en `sessionStorage` (dura lo que la pestaña) y viaja en `Authorization: Bearer`
   en cada llamada a la API. Sin cookies. La sesión se cierra sola cuando caduca el token o cuando la API responde 401
   (usuario desactivado o borrado).
-- **Barra superior:** avatar con iniciales, nombre del perfil, rol y **Cerrar sesión**.
+- **Cerrar sesión**, un solo botón por pantalla: en escritorio, una tarjeta al pie del sidebar izquierdo con
+  iniciales, nombre, email, rol y el botón (`SidebarAccount`); en móvil y tablet, donde el sidebar no se muestra, en
+  la barra superior con el texto «Salir» (`UserMenu`).
 
 > La comprobación del backoffice es de interfaz. Lo que protege los datos es la API, que valida el token en cada
 > petición. El contenido estático de `/` sale de `CONTEXT.es.md` y viaja en el JavaScript de la página.
@@ -285,7 +287,7 @@ services/api/
 uis/backoffice/
 ├── app/login/page.tsx        # /login
 ├── app/(panel)/layout.tsx    # panel protegido (AuthGate + sidebar + barra superior)
-├── components/auth/          # AuthProvider, AuthGate, LoginScreen, UserMenu
+├── components/auth/          # AuthProvider, AuthGate, LoginScreen, SidebarAccount, UserMenu, LogoutIcon
 ├── lib/session.ts            # token en sessionStorage, caducidad, `next` seguro
 ├── lib/auth.ts               # /auth/login, /auth/me, etiquetas de rol
 └── lib/http.ts               # + Authorization: Bearer y cierre de sesión ante 401
