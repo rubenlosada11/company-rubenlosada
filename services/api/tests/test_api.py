@@ -282,9 +282,11 @@ def test_data_survives_api_restart(client, db_path):
     """Otro proceso con una instancia nueva de la API lee lo creado y modificado en este."""
     created = client.post("/suppliers", json=NEW_SUPPLIER).json()
     updated = client.patch(f"/suppliers/{created['id']}/rate", json={"rate_per_shipment": 4.1}).json()
+    # El token sigue valiendo en el otro proceso: misma SECRET_KEY y misma base de usuarios (variables de entorno).
+    authorization = client.headers["Authorization"]
     code = (
         "import sys; from fastapi.testclient import TestClient; from app.main import app\n"
-        f"r = TestClient(app).get('/suppliers/{created['id']}')\n"
+        f"r = TestClient(app).get('/suppliers/{created['id']}', headers={{'Authorization': '{authorization}'}})\n"
         "sys.stdout.buffer.write(r.content)"
     )
     result = subprocess.run(

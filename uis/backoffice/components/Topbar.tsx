@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { NAV_ITEMS } from "@/lib/nav";
+import { UserMenu } from "./auth/UserMenu";
 import { NavLink } from "./NavLink";
 
 export function Topbar() {
@@ -14,13 +15,14 @@ export function Topbar() {
             height={264}
             className="h-7 w-auto lg:hidden"
           />
-          <span className="rounded-full bg-blue-700 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
+          <span className="shrink-0 rounded-full bg-blue-700 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
             Backoffice
           </span>
         </div>
-        <p className="hidden text-sm font-semibold text-slate-500 sm:block">
-          Panel interno · TrackFlow Tech
-        </p>
+        <div className="flex min-w-0 items-center gap-5">
+          <p className="hidden text-sm font-semibold text-slate-500 xl:block">Panel interno · TrackFlow Tech</p>
+          <UserMenu />
+        </div>
       </div>
 
       <nav

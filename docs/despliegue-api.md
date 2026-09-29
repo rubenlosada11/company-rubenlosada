@@ -4,6 +4,11 @@ Instrucciones para el agente del servidor. Publicar la API permite usar en produ
 incidencias** (`/incidencias`) y el **directorio de proveedores** (`/proveedores`) del backoffice, que hoy solo
 funcionan en local.
 
+> **Autenticación (2026-09-29):** la API ya tiene login JWT y el backoffice una pantalla `/login`
+> ([`docs/autenticacion.md`](./autenticacion.md)). **Consecuencia:** el backoffice de `main` necesita la API para
+> dejar entrar. Si se redespliega sin la API publicada, el panel queda inaccesible. Despliega primero la API
+> (secciones 1–2) y después el backoffice.
+
 > **Estado: documentado, NO ejecutado.** Todo lo que toca infraestructura, DNS (`rubenlosada.com`), proxy o secretos
 > requiere confirmación previa del desarrollador ([`AGENTS.md`](../AGENTS.md) §4). Antes de empezar, el desarrollador
 > debe decidir los puntos de [Decisiones pendientes](#decisiones-pendientes).
@@ -17,16 +22,19 @@ funcionan en local.
 
 ## Decisiones pendientes
 
-1. **Autenticación (bloqueante).** El backoffice no tiene login y la API tampoco. Con la API publicada, cualquiera
-   podría subir ficheros, descargar el último resultado agregado y editar tarifas y estados de proveedores. El CSV real
-   de incidencias contiene correos de clientes (la API no los devuelve ni los guarda, pero se suben a ella). **Hay que
-   proteger backoffice y API antes de publicar**, p. ej. con Cloudflare Access o autenticación básica en el proxy.
+1. **Autenticación.** Resuelta en la aplicación con JWT Bearer ([`docs/autenticacion.md`](./autenticacion.md)).
+   Faltan dos decisiones antes de publicar:
+   - **Registro abierto:** `POST /users` es público y cualquier usuario autenticado puede editar proveedores y subir
+     CSV. Opciones: cerrar el registro (solo `admin`) o exigir `admin`/`manager` en esas rutas.
+   - **Basic Auth del proxy** (el popup actual del navegador): usa la misma cabecera `Authorization` que el Bearer.
+     Delante de la API la bloquearía, así que hay que quitarlo al menos de las rutas de la API (opción B) o del todo:
+     el login de la app lo sustituye. Opcional: límite de intentos en `/auth/login` y `/auth/token` en el proxy.
 2. **Topología** (condiciona cómo se protege):
 
    | Opción | Cómo | Autenticación | Cambios de código |
    | --- | --- | --- | --- |
-   | **A. Subdominio propio** (p. ej. `apitrackflow.rubenlosada.com`) | El navegador llama a otro origen; la API responde con CORS (`CORS_ALLOWED_ORIGINS`). | Delicada: una petición entre orígenes a una API protegida con Cloudflare Access o Basic Auth no envía credenciales por defecto y el preflight `OPTIONS` falla. Exigiría `credentials: "include"` en el backoffice, `allow_credentials` en la API y configurar CORS en Access. | Ninguno sin autenticación; **sí** con autenticación (no probado). |
-   | **B. Mismo host** (recomendada si se protege) | El proxy de `backofficetrackflow.rubenlosada.com` envía `/health`, `/suppliers` y `/api/incidents/` a la API local (`127.0.0.1:8000`) y el resto a Next.js. `NEXT_PUBLIC_API_BASE_URL=https://backofficetrackflow.rubenlosada.com`. | Una sola regla (Access o Basic Auth) protege a la vez la página y la API; sin CORS. | Ninguno (no probado en un servidor real; el backoffice no tiene rutas propias con esos prefijos). |
+   | **A. Subdominio propio** (p. ej. `apitrackflow.rubenlosada.com`) | El navegador llama a otro origen; la API responde con CORS (`CORS_ALLOWED_ORIGINS`, que ya admite la cabecera `Authorization`). | JWT Bearer de la app: funciona entre orígenes sin cookies ni `allow_credentials` (probado en local, `localhost:3002` → `:8000`). | Ninguno. |
+   | **B. Mismo host** | El proxy de `backofficetrackflow.rubenlosada.com` envía `/health`, `/auth/`, `/users`, `/profiles/`, `/suppliers` y `/api/incidents/` a la API local (`127.0.0.1:8000`) y el resto a Next.js. `NEXT_PUBLIC_API_BASE_URL=https://backofficetrackflow.rubenlosada.com`. | JWT Bearer de la app; sin CORS. El backoffice usa `/login` (no `/auth`), así que no choca con esos prefijos. | Ninguno (no probado en un servidor real). |
 
 3. **Subdominio** (solo opción A) y su registro DNS en Cloudflare.
 
@@ -53,6 +61,9 @@ uv sync --locked --no-dev
 
 - `--locked`: instala exactamente `uv.lock` (falla si no coincide con `pyproject.toml`). `--no-dev`: sin pytest ni
   httpx2.
+- **Usuarios:** igual que los proveedores, usar una ruta fuera del código con `AUTH_DB_PATH` (p. ej.
+  `/var/lib/trackflow-api/auth.json`) y crear el primer administrador una vez, con las variables cargadas:
+  `uv run --no-sync create-admin <email>` (pide la contraseña).
 - **Datos de proveedores:** TinyDB guarda por defecto en `services/api/db/suppliers.json`, que no está en git. Para
   que una nueva extracción no pueda borrarlo, usar una ruta fuera del código con `SUPPLIERS_DB_PATH` (p. ej.
   `/var/lib/trackflow-api/suppliers.json`). La primera vez, cargar los 15 proveedores iniciales con la API parada:
@@ -79,6 +90,9 @@ After=network.target
 WorkingDirectory=/srv/trackflow-api/services/api
 Environment=CORS_ALLOWED_ORIGINS=https://backofficetrackflow.rubenlosada.com
 Environment=SUPPLIERS_DB_PATH=/var/lib/trackflow-api/suppliers.json
+Environment=AUTH_DB_PATH=/var/lib/trackflow-api/auth.json
+# SECRET_KEY no va en la unidad: en un fichero solo legible por el servicio (chmod 600).
+EnvironmentFile=/etc/trackflow-api/secret.env
 ExecStart=/usr/local/bin/uv run --no-sync uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 Restart=on-failure
 
@@ -92,6 +106,9 @@ WantedBy=multi-user.target
 | --- | --- | --- | --- |
 | API | `CORS_ALLOWED_ORIGINS` | `https://backofficetrackflow.rubenlosada.com` | Al arrancar. Necesaria en la opción A; inocua en la B. Sin ella, el valor por defecto solo admite `localhost:3002`. |
 | API | `SUPPLIERS_DB_PATH` | ruta persistente fuera del código | Al arrancar y al ejecutar `seed`. |
+| API | `SECRET_KEY` | clave aleatoria de 32+ caracteres (`python -c "import secrets; print(secrets.token_urlsafe(48))"`), **distinta de la local** y fuera de git | Al arrancar: sin ella la API no arranca. Cambiarla invalida todos los tokens emitidos. |
+| API | `ACCESS_TOKEN_EXPIRE_MINUTES` | p. ej. `30` | Al arrancar (opcional). |
+| API | `AUTH_DB_PATH` | ruta persistente fuera del código | Al arrancar y al ejecutar `create-admin`. |
 | Backoffice | `NEXT_PUBLIC_API_BASE_URL` | A: `https://<dominio-api>` · B: `https://backofficetrackflow.rubenlosada.com` | **Antes de `npm run build`**: Next.js la incrusta en el JavaScript al compilar; cambiarla después no tiene efecto hasta recompilar. |
 
 Recompilar el backoffice en su carpeta del servidor con la variable (el `.env.local` de desarrollo no está en git):
@@ -116,15 +133,18 @@ Ejemplo nginx, opción B (mismo host; orientativo):
 
 ```nginx
 location = /health          { proxy_pass http://127.0.0.1:8000; }
+location /auth/             { proxy_pass http://127.0.0.1:8000; }
+location /users             { proxy_pass http://127.0.0.1:8000; }
+location /profiles/         { proxy_pass http://127.0.0.1:8000; }
 location /suppliers         { proxy_pass http://127.0.0.1:8000; }
 location /api/incidents/    { proxy_pass http://127.0.0.1:8000; client_max_body_size 6m; }
-# el resto (/, /_next/, /proveedores, /incidencias…) sigue yendo a Next.js
+# el resto (/, /_next/, /login, /proveedores, /incidencias…) sigue yendo a Next.js
 ```
 
 ## 4. Riesgo que decidir antes de publicar
 
-Ver [Decisiones pendientes](#decisiones-pendientes), punto 1. Resumen: **no exponer la API sin proteger antes backoffice
-y API**. Aunque el análisis devuelve solo agregados (sin correos), cualquiera podría subir ficheros, descargar el
+Ver [Decisiones pendientes](#decisiones-pendientes), punto 1. Resumen: la API ya exige token, pero **el registro es
+público** y cualquier cuenta puede operar proveedores e incidencias: decide cómo limitarlo antes de publicar. Aunque el análisis devuelve solo agregados (sin correos), cualquiera podría subir ficheros, descargar el
 último resultado y modificar proveedores. Además, el último análisis es **compartido** por todos los usuarios (un solo
 resultado en memoria).
 
@@ -145,7 +165,9 @@ páginas. Recordar ejecutar el seeder la primera vez (ver sección 1).
 4. `/proveedores` muestra los 15 proveedores y deja cambiar una tarifa.
 5. Log de la API: una línea `trackflow.api.incidents: Análisis de 'incidents-trackflow.csv': 100 registros …` por
    análisis, sin correos ni trazas.
-6. Si se protegió: sin sesión, backoffice y API deben pedir autenticación.
+6. Sin sesión: el backoffice redirige a `/login` y `curl https://<dominio-api>/suppliers` → 401.
+7. Login con el administrador creado con `create-admin` → el panel muestra su nombre y rol; **Cerrar sesión** vuelve a
+   `/login`.
 
 ## Comprobado en local (2026-09-28)
 

@@ -6,7 +6,7 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/analizador-incidencias-cierre` (desde `main` @ `8dc3993`, que ya incluye las PR #3–#9).
+- **Rama de trabajo:** `feature/auth-api` (desde `main` @ `c1bd69e`, que ya incluye las PR #3–#10).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (práctica sin número de hito; contexto en
@@ -15,7 +15,9 @@
   [`CONTEXT-incidencias.es.md`](../CONTEXT-incidencias.es.md)): **entregado**, PR #9 fusionada (`8dc3993`). Integrado
   desde el repositorio `analizador-incidencias` (construido allí por error). API solo local: despliegue documentado
   en `docs/despliegue-api.md`, sin ejecutar.
-- **Última actualización:** 2026-09-28.
+- **Autenticación JWT y protección de rutas (AUTH-01)** (práctica sin número de hito): implementada en
+  `feature/auth-api`, con API y login del backoffice (PR pendiente de fusionar). Documentación en `docs/autenticacion.md`.
+- **Última actualización:** 2026-09-29.
 
 | Componente | Estado |
 | --- | --- |
@@ -26,6 +28,7 @@
 | `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
+| Autenticación (AUTH-01) | ✅ API: `User`/`Profile` en TinyDB, JWT, `/auth`, `/users`, `/profiles` y 8 rutas existentes protegidas (269 tests). Backoffice: `/login` y panel protegido (E2E 34/34). Solo local |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
 | Analizador de incidencias | ✅ Entregado (PR #9): paquete + script (70 tests), API (144 tests), `/incidencias` (navegador 19/19), capturas; en producción muestra el aviso de API no configurada |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
@@ -600,6 +603,73 @@ Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/
 - Este fichero pasa el analizador a “entregado” (antes decía “falta auditoría final, push y PR”, escrito antes de
   crear la PR). Solo documentación.
 
+### 2026-09-29 — Autenticación JWT y protección de rutas (rama `feature/auth-api`)
+
+Ticket AUTH-01 (prompt operativo del curso). Práctica sin número de hito: commits `Autenticación JWT — …`; no va a
+`docs/hitos.md`.
+
+**Decisiones del desarrollador (2026-09-29)**
+
+- Además del backend, **login propio en el backoffice**: una pantalla cuidada, no el popup del navegador. El backoffice
+  publicado hoy pide credenciales con el popup del navegador (autenticación HTTP en el servidor, fuera del repo).
+- Proteger las **8 rutas existentes** (las 6 de `/suppliers` y las 2 de `/api/incidents`); solo `/health` queda pública.
+- Autorizados: `python-jose[cryptography]` y `libpass[bcrypt]`, y crear `services/api/.env.example`.
+- Commits y PR con la convención del repo (español, `<Proyecto> — <cambio>`), no con `feat(auth): …` del ticket.
+
+**Hechos del repo frente al ticket**
+
+- No hay Supabase/PostgreSQL ni `user_uuid`: `User` y `Profile` van solo a TinyDB (`db/auth.json`) y no hay nada que
+  evitar en SQL. El `id` del usuario (UUID) es el `sub` del JWT y el futuro `user_uuid` de otros módulos.
+- `libpass` 1.9.3 instala el módulo `passlib`: `CryptContext(schemes=["bcrypt"])` funciona con bcrypt 5.0.0 sin avisos
+  (comprobado). bcrypt 5 lanza `ValueError` con más de 72 bytes: se valida en el schema y el login lo trata como
+  contraseña incorrecta (antes daba 500; test).
+- FastAPI 0.141 anida los routers incluidos (`_IncludedRouter`): la tabla de rutas protegidas se saca del esquema
+  OpenAPI (`security`), no de `app.routes`.
+
+**Trabajo realizado**
+
+- API: `app/auth_models.py`, `app/security.py`, `app/dependencies.py` (`get_current_user`), `app/services/`
+  (usuarios y perfiles), routers `auth`, `users` y `profiles`, `auth_db()` en `database.py` con candado propio,
+  `create-admin`, comprobación de `SECRET_KEY` al arrancar (lifespan), CORS con `Authorization` y `PUT`. Las rutas
+  existentes se protegen con `dependencies=[Depends(get_current_user)]` en su router.
+- Tests: `conftest.py` con `SECRET_KEY` y base de usuarios temporales en todos los tests, y `client` autenticado, de
+  modo que los 144 anteriores sirven de regresión. `tests/test_auth.py` añade 125.
+- Backoffice: `/login` (`LoginScreen`), grupo `app/(panel)/` con `AuthGate`, `AuthProvider`, `UserMenu`,
+  `lib/session.ts` y `lib/auth.ts`, y Bearer en `lib/http.ts`.
+- Docs: `docs/autenticacion.md` (nuevo), READMEs de `services/api` y `uis/backoffice`, `docs/despliegue-api.md`.
+
+**Validaciones**
+
+- `services/api`: `uv run pytest -q` → 269 passed · `uv lock --check` OK. Raíz: `python -m pytest scripts/tests
+  packages/analisis-incidencias/tests` → 70 passed.
+- Prueba de mutación: sin la dependencia en el router de proveedores fallan 18 tests.
+- Manual contra `uvicorn` (`.env` y TinyDB en el scratchpad): 35/35 (flujo del ticket, 401 sin token, malformado y
+  caducado, 403 ajeno, 409, escalada `role=admin` → 422, sin `Set-Cookie`, arranque con `change-me` → la API no
+  arranca).
+- `uis/backoffice`: `npm run lint` 0 · `npm run typecheck` 0 · `npm run build` OK (`/login` dinámica, resto estático).
+  `check-route.mjs`: `/login` 3/3, `/` («Comprobando tu sesión»), `/proveedores` → 200.
+- Navegador (Edge + playwright-core en el scratchpad) contra la API y `npm run start`: 34/34 (ver
+  `docs/autenticacion.md`), incluido Authorize en `/docs` → `GET /auth/me` 200. Capturas revisadas a 1440 y 390 px.
+
+**Problemas encontrados y resueltos**
+
+- Posible bloqueo mutuo: las rutas de proveedores retienen el candado de TinyDB durante toda la petición y validan el
+  token (leen usuarios). Por eso la base de usuarios tiene un candado propio y los servicios abren la base en cada
+  operación, sin dependencia con `yield`.
+- bcrypt dentro del candado bloqueaba la base unos 0,25 s por alta: el hash se calcula antes.
+- `typecheck` falló por tipos obsoletos de `next dev` en `.next/dev/types` (rutas antiguas). Se borraron (artefacto
+  ignorado).
+- Barra superior en móvil: el avatar tapaba la etiqueta «Backoffice». En móvil, «Cerrar sesión» queda solo con icono y
+  con `aria-label`.
+- Falsos fallos de mi QA (no del código): el anunciador de rutas de Next también es `role="alert"`, un token metido
+  antes de la hidratación y selectores de Swagger UI.
+
+**Pendiente**
+
+- PR `feature/auth-api` → `main` (capturas manuales del desarrollador, si las quiere).
+- Antes de publicar: ver los riesgos de `docs/autenticacion.md` (registro abierto, sin límite de intentos) y el orden
+  de despliegue (API primero) en `docs/despliegue-api.md`.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -612,8 +682,12 @@ Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/
 
 **Decisiones abiertas (requieren confirmación; ver `projectbrief.md`)**
 
-- Despliegue de la API (`docs/despliegue-api.md`): autenticación de backoffice y API antes de publicar, topología
-  (A subdominio / B mismo host) y, si es A, el subdominio y su DNS.
+- Despliegue de la API (`docs/despliegue-api.md`): topología (A subdominio / B mismo host) y, si es A, el subdominio
+  y su DNS; quitar el Basic Auth del proxy delante de la API (choca con el Bearer). **Desplegar la API antes que el
+  backoffice de `main`**: sin API, el login deja el panel inaccesible.
+- Autenticación: registro público + cualquier usuario autenticado puede operar proveedores e incidencias. Antes de
+  publicar, decidir entre cerrar el registro (solo `admin`) o exigir `admin`/`manager` en esas rutas; y un límite de
+  intentos de login.
 - Repositorio `analizador-incidencias`: dejarlo como está o archivarlo en GitHub (no borrarlo).
 
 - Supuestos de `docs/ARCHITECTURE_PROPOSAL.md` (base de datos, dominio de la API, staging, autenticación, moneda):
@@ -622,8 +696,8 @@ Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/
 **Deuda técnica conocida**
 
 - Sin tests automatizados ni CI en todo el repo; las validaciones dependen del flujo de `AGENTS.md` y de la skill.
-- Backoffice publicado **sin autenticación** (`noindex`; los datos son ficticios). Protegerlo (Basic Auth en el
-  proxy o login en la app) antes de mostrar datos reales.
+- El backoffice publicado es anterior al login (protegido hoy con el popup de autenticación HTTP del servidor). El
+  login de la app llega a `main` con la PR de `feature/auth-api`, pero necesita la API desplegada.
 - Logo, favicon e imagen duplicados por app (patrón ya usado por el tracker). Si crece, valorar `packages/`
   (requiere confirmación).
 - El `README.es.md` raíz sigue nombrando `CONTEXT.md` en varios sitios (plantilla); el fichero real es
@@ -640,6 +714,6 @@ Piezas: paquete Python compartido `packages/analisis-incidencias`, CLI `scripts/
    `docs/ARCHITECTURE_PROPOSAL.md` §15.
 3. Siguientes hitos del curso (README raíz: Telemetría, RAG, Agentes, Workflows, Tiempo real): cada uno debe
    arrancar leyendo este memory bank y cerrar actualizando `progress.md`.
-4. Conectar el backoffice a la API **solo después** de añadir autenticación (riesgo R5 del documento) y sustituir
-   los “datos de partida” estáticos de `lib/data/`.
+4. Autenticación hecha (`feature/auth-api`): decidir los riesgos pendientes de `docs/autenticacion.md`, desplegar la
+   API y luego el backoffice, y más adelante sustituir los “datos de partida” estáticos de `lib/data/`.
 5. Valorar añadir un runner de tests y CI (requiere confirmación) y automatizar `validate-delivery` en CI.

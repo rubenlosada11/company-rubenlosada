@@ -1,7 +1,10 @@
-"""Persistencia del directorio de proveedores en TinyDB (un fichero JSON en disco).
+"""Persistencia en TinyDB (ficheros JSON en disco).
 
-Ruta por defecto: `services/api/db/suppliers.json` (ignorada en git). Se puede cambiar con la variable de entorno
-`SUPPLIERS_DB_PATH` (los tests la apuntan a un fichero temporal).
+- Directorio de proveedores: `services/api/db/suppliers.json`, variable `SUPPLIERS_DB_PATH`.
+- Usuarios y perfiles (autenticación): `services/api/db/auth.json`, variable `AUTH_DB_PATH`. Es la única fuente de
+  verdad de `User` y `Profile`: no hay tablas de usuarios en ninguna otra base de datos.
+
+Los ficheros están ignorados en git; los tests apuntan las variables a ficheros temporales.
 """
 
 import os
@@ -44,3 +47,28 @@ def get_suppliers_table() -> Iterator[Table]:
     """Dependencia de FastAPI: `table: Table = Depends(get_suppliers_table)`."""
     with suppliers_table() as table:
         yield table
+
+
+DEFAULT_AUTH_DB_PATH = Path(__file__).resolve().parent.parent / "db" / "auth.json"
+
+# Candado propio: las rutas de proveedores retienen `_lock` durante toda la petición (dependencia con `yield`) y
+# también validan el token, que lee usuarios. Con un único candado no reentrante se bloquearían a sí mismas.
+_auth_lock = threading.Lock()
+
+
+def get_auth_db_path() -> Path:
+    return Path(os.environ.get("AUTH_DB_PATH", DEFAULT_AUTH_DB_PATH))
+
+
+@contextmanager
+def auth_db() -> Iterator[TinyDB]:
+    """Abre la base de usuarios (tablas `users` y `profiles`) y la cierra al terminar.
+
+    Se entrega la base completa para que crear o borrar un usuario y su perfil ocurra bajo el mismo candado.
+    """
+    with _auth_lock:
+        db = TinyDB(get_auth_db_path(), create_dirs=True, encoding="utf-8", ensure_ascii=False, indent=2)
+        try:
+            yield db
+        finally:
+            db.close()

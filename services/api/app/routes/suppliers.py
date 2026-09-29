@@ -1,4 +1,7 @@
-"""Endpoints del directorio de proveedores (`/suppliers`)."""
+"""Endpoints del directorio de proveedores (`/suppliers`).
+
+Todos requieren un usuario autenticado (Bearer JWT): tarifas negociadas y contactos son datos comerciales internos.
+"""
 
 from typing import Annotated
 
@@ -6,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from tinydb.table import Document, Table
 
 from app.database import get_suppliers_table
+from app.dependencies import get_current_user
 from app.models import (
     Category,
     Country,
@@ -16,7 +20,12 @@ from app.models import (
     utc_now,
 )
 
-router = APIRouter(prefix="/suppliers", tags=["suppliers"])
+router = APIRouter(
+    prefix="/suppliers",
+    tags=["suppliers"],
+    dependencies=[Depends(get_current_user)],
+    responses={401: {"description": "Sin token o con un token no válido o caducado"}},
+)
 
 SuppliersTable = Annotated[Table, Depends(get_suppliers_table)]
 

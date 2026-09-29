@@ -4,6 +4,8 @@
  * `NEXT_PUBLIC_API_BASE_URL` se incrusta al compilar. Si falta, las peticiones fallan con un mensaje claro en la
  * interfaz (no se lanza al importar, para no romper `next build` en entornos sin la variable).
  */
+import { clearToken, readToken, UNAUTHORIZED_EVENT } from "@/lib/session";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "");
 
 /** Clave de `fieldErrors` para los errores que no son de un campo concreto (p. ej. moneda y país incoherentes). */
@@ -59,8 +61,10 @@ async function toApiError(res: Response): Promise<ApiError> {
 }
 
 /**
- * Petición a la API sin tocar cabeceras ni cuerpo: URL base, error de conexión y respuestas de error como `ApiError`.
- * Devuelve la respuesta sin leer, para cuerpos que no son JSON (subida con `FormData`, descarga de un CSV).
+ * Petición a la API sin tocar el cuerpo: URL base, token Bearer, error de conexión y respuestas de error como
+ * `ApiError`. Devuelve la respuesta sin leer, para cuerpos que no son JSON (subida con `FormData`, descarga de un CSV).
+ *
+ * Si la API rechaza el token (401), se borra y se avisa con `UNAUTHORIZED_EVENT` para volver al login.
  */
 export async function fetchApi(path: string, init?: RequestInit): Promise<Response> {
   if (!API_BASE_URL) {
@@ -70,9 +74,13 @@ export async function fetchApi(path: string, init?: RequestInit): Promise<Respon
     );
   }
 
+  const token = readToken();
+  const headers = new Headers(init?.headers);
+  if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, init);
+    res = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
     throw new ApiError(
@@ -81,6 +89,10 @@ export async function fetchApi(path: string, init?: RequestInit): Promise<Respon
     );
   }
 
+  if (res.status === 401 && token) {
+    clearToken();
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+  }
   if (!res.ok) throw await toApiError(res);
   return res;
 }

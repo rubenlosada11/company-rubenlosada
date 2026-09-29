@@ -18,7 +18,7 @@ JS es autónomo, con su propio `package.json` y `package-lock.json`, y se opera 
 | `uis/backoffice/` | Hito 4. Aplicación interna (Next.js). |
 | `packages/shared/` | `@repo/shared-types`: tipos de dominio (`Carrier`, `Shipment`, `ReturnRequest`, `Client`) y utilidades TS puras. `dist/` está versionado. |
 | `packages/analisis-incidencias/` | Paquete Python (solo biblioteca estándar, `uv_build`, `src/`): carga, validación, métricas y exportación del CSV de incidencias de CX. Lo usan `scripts/analyze.py` y `services/api`. Contexto: `CONTEXT-incidencias.es.md`. |
-| `services/api/` | **FastAPI + Pydantic + TinyDB**, Python gestionado con **uv** (`pyproject.toml` + `uv.lock` propios), tests con `pytest`. Directorio de proveedores (`/suppliers`, contexto `CONTEXT-directorio.md`) y analizador de incidencias (`/api/incidents`, contexto `CONTEXT-incidencias.es.md`). |
+| `services/api/` | **FastAPI + Pydantic + TinyDB**, Python gestionado con **uv** (`pyproject.toml` + `uv.lock` propios), tests con `pytest`. Directorio de proveedores (`/suppliers`, contexto `CONTEXT-directorio.md`), analizador de incidencias (`/api/incidents`, contexto `CONTEXT-incidencias.es.md`) y autenticación JWT (`/auth`, `/users`, `/profiles`; `docs/autenticacion.md`). |
 | `scripts/` | `analyze.py`: CLI del analizador de incidencias (+ `incidents-trackflow.csv` de prueba y `tests/`). |
 | `agents/`, `skills/`, `mcps/`, `workflows/`, `data/`, `infra/`, `internal/`, `shared/` | Solo README/plantillas (`agents/_template`, `skills/_template`). |
 | `docs/` | `hitos.md` (registro de hitos), `ARCHITECTURE_PROPOSAL.md` (propuesta de backend; no es un hito) + READMEs. |
@@ -38,7 +38,8 @@ El `.gitignore` raíz contiene `node_modules/`, los cachés de Python (`__pycach
   `eslint-config-next` (`core-web-vitals` + `typescript`), alias `@/*` → raíz de la app. Sin librerías de estado
   externas: hooks de React. Fuentes vía `next/font/google`.
 - **Backend:** `services/api/` — Python ≥ 3.12 (máquina: 3.14.6), **uv** 0.12, FastAPI 0.141, Pydantic 2.13,
-  TinyDB 4.9, uvicorn, `python-multipart` (subida de ficheros) y el paquete local `analisis-incidencias` (editable,
+  TinyDB 4.9, uvicorn, `python-multipart` (subida de ficheros), `python-jose[cryptography]` 3.5 (JWT),
+  `libpass[bcrypt]` 1.9.3 (módulo `passlib`, bcrypt 5.0) y el paquete local `analisis-incidencias` (editable,
   `[tool.uv.sources]`); desarrollo: pytest 9 + `httpx2` (Starlette 1.7 marca obsoleto `httpx` en `TestClient`).
   Paquete `app/` sin `src/` (`uv_build` con `module-root = ""`), entrypoint `app.main:app`. Solo local por ahora.
   Además, `talent-pipeline-tracker` consume la API pública de Talent Tracker
@@ -80,7 +81,7 @@ cabecera `server: cloudflare`).
 | `uis/script-automatizacion` | https://scriptsautotrackflow.rubenlosada.com/ |
 | `uis/talent-pipeline-tracker` | https://talent-pipeline-tracker.rubenlosada.com/ |
 | `uis/website` | https://websitetrackflow.rubenlosada.com/ |
-| `uis/backoffice` | https://backofficetrackflow.rubenlosada.com/ (**sin autenticación**, con `noindex`) |
+| `uis/backoffice` | https://backofficetrackflow.rubenlosada.com/ (versión anterior al login, con `noindex`; hoy tras el popup de autenticación del navegador en el proxy) |
 
 Método de despliegue indicado al agente del servidor para website y backoffice: extraer exactamente `uis/website` y
 `uis/backoffice` del tarball de GitHub (`codeload.github.com/rubenlosada11/company-rubenlosada/tar.gz/main`) en la
@@ -118,8 +119,10 @@ tienen: las pruebas en navegador se hacen fuera del repo (Edge + `playwright-cor
 | Acción | Comando |
 | --- | --- |
 | Instalar dependencias (crea `.venv`) | `uv sync` |
+| Crear `.env` (la primera vez; pegar una `SECRET_KEY` generada) | `Copy-Item .env.example .env` |
 | Cargar proveedores iniciales (idempotente) | `uv run seed` |
-| Arrancar la API | `uv run uvicorn app.main:app --reload --port 8000` |
+| Crear o promover el primer administrador | `uv run --env-file .env create-admin <email>` |
+| Arrancar la API (no arranca sin `SECRET_KEY`) | `uv run --env-file .env uvicorn app.main:app --reload --port 8000` |
 | Tests | `uv run pytest -q` |
 
 Analizador de incidencias (Python ≥ 3.11 del sistema, sin instalar nada):
@@ -176,6 +179,29 @@ Analizador de incidencias (Python ≥ 3.11 del sistema, sin instalar nada):
 | Sin la variable, `lib/http.ts` no lanza al importar: error en la UI | Un `throw` en módulo rompería `next build` en el servidor de producción (sin `.env.local`). |
 | Backoffice: tests E2E fuera del repo (Edge + playwright-core en el scratchpad) | Sin runner de tests JS en el repo (no acordado); mismo método que el Hito 4. |
 | Seeder `app/seed.py` → `[project.scripts] seed = "app.seed:main"` | Requisito `uv run seed`. Clave natural `(name casefold, country)`; no modifica existentes; valida con `SupplierCreate`; `stdout` en UTF-8 (en tuberías Windows usa cp1252). |
+
+## Decisiones técnicas de la autenticación (AUTH-01)
+
+Contexto: ticket AUTH-01. Documentación: `docs/autenticacion.md`. Rama `feature/auth-api` (2026-09-29).
+
+| Decisión | Motivo |
+| --- | --- |
+| `User` y `Profile` solo en TinyDB (`db/auth.json`, `AUTH_DB_PATH`); `id` UUID = `sub` del JWT = `user_uuid` | Requisito del ticket; en el repo no hay Supabase/PostgreSQL. UUID: no enumerable, a diferencia del `doc_id` de proveedores. |
+| JWT HS256 (`python-jose`), `sub` + `iat` + `exp`, `algorithms=["HS256"]` fijo, `require_sub`/`require_exp` | Firma y caducidad obligatorias; evita `alg: none` y la confusión de algoritmos. |
+| `SECRET_KEY` obligatoria (≥ 32 caracteres, distinta de `change-me`), comprobada en el `lifespan` | La API no arranca con una clave insegura. Sin `pydantic-settings`: el repo lee `os.environ`, y se lee en cada uso para que los tests la cambien. |
+| `.env` cargado con `uv run --env-file .env` | uv lo admite de serie; sin añadir `python-dotenv`. |
+| bcrypt vía `libpass` (`passlib.context.CryptContext`), contraseña de 8 caracteres a 72 bytes | Dependencia pedida por el ticket; límite real de bcrypt 5. |
+| `POST /users` con `extra: forbid`: siempre `role=user`; primer admin con `uv run create-admin` | Registro público sin escalada de privilegios. |
+| Permisos explícitos en `routes/users.py`; se comprueban **antes** que la existencia | 403 frente a 404 sin revelar qué ids existen. |
+| Login con el mismo 401 para email inexistente y contraseña mala, con verificación bcrypt de relleno; inactivo → 403 solo con la contraseña correcta | No revelar qué emails están registrados. |
+| `get_current_user` relee el usuario en cada petición | Borrar o desactivar un usuario invalida sus tokens al momento. |
+| `POST /auth/login` (JSON) + `POST /auth/token` (formulario OAuth2, `tokenUrl`) | El ticket pide `email`/`password`; el botón Authorize de Swagger necesita el formulario OAuth2. |
+| Rutas existentes protegidas con `dependencies=[...]` en su `APIRouter` | Cambio mínimo; los endpoints y sus contratos no cambian. |
+| Candado propio para la base de usuarios; los servicios abren y cierran la base en cada operación | Evita el bloqueo mutuo con el candado de proveedores, que retiene su dependencia con `yield`. |
+| CORS: `Authorization` y `PUT`, sin `allow_credentials` | Bearer sin cookies. |
+| Backoffice: `/login` propio, grupo `app/(panel)/` con `AuthGate`, token en `sessionStorage`, `next` saneado | Login cuidado en lugar del popup (decisión del desarrollador); sin cookies (ticket); sin redirecciones abiertas. |
+| `/login` dinámica (`searchParams` en el servidor) | Leer `next`/`motivo` sin `useSearchParams` + `Suspense`, que dejaría el formulario fuera del HTML prerenderizado. |
+| Commits `Autenticación JWT — …`, sin entrada en `docs/hitos.md` | Práctica sin hito (convención del desarrollador). |
 
 ## Decisiones técnicas del analizador de incidencias
 
