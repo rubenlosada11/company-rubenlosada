@@ -1,11 +1,14 @@
 import logging
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.routes import incidents, suppliers
+from app.routes import auth, incidents, profiles, suppliers, users
+from app.security import check_auth_config
 
 # Orígenes del navegador autorizados (lista separada por comas). Por defecto, el backoffice local (puerto 3002).
 DEFAULT_CORS_ORIGINS = "http://localhost:3002,http://127.0.0.1:3002"
@@ -24,11 +27,22 @@ class UTF8JSONResponse(JSONResponse):
     media_type = "application/json; charset=utf-8"
 
 
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    # Sin SECRET_KEY válida la API no arranca: mejor un error claro al iniciar que un 500 en el primer login.
+    check_auth_config()
+    yield
+
+
 app = FastAPI(
     title="TrackFlow API",
-    description="Directorio de proveedores de TrackFlow (USA + Spain) y analizador de incidencias de CX.",
+    description=(
+        "Directorio de proveedores de TrackFlow (USA + Spain) y analizador de incidencias de CX. "
+        "Autenticación con Bearer JWT: `POST /auth/login` (o el botón «Authorize»)."
+    ),
     version="0.1.0",
     default_response_class=UTF8JSONResponse,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -38,8 +52,9 @@ app.add_middleware(
         for origin in os.environ.get("CORS_ALLOWED_ORIGINS", DEFAULT_CORS_ORIGINS).split(",")
         if origin.strip()
     ],
-    allow_methods=["GET", "POST", "PATCH", "DELETE"],
-    allow_headers=["Content-Type"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    # `Authorization`: el backoffice envía el Bearer token. Sin cookies: no hace falta `allow_credentials`.
+    allow_headers=["Content-Type", "Authorization"],
     # Sin esto, el navegador no deja leer el nombre del fichero en la descarga de /api/incidents/results/export.
     expose_headers=["Content-Disposition"],
 )
@@ -47,6 +62,9 @@ app.add_middleware(
 # Último análisis de incidencias correcto. Vive en memoria mientras la API está en marcha (un solo proceso).
 app.state.ultimo_analisis = None
 
+app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(profiles.router)
 app.include_router(suppliers.router)
 app.include_router(incidents.router)
 

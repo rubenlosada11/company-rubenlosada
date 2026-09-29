@@ -2,6 +2,8 @@
 
 Toda la validación y el cálculo se delegan en el paquete compartido `analisis-incidencias`, el mismo que usa
 `scripts/analyze.py`. Contexto: CONTEXT-incidencias.es.md.
+
+Ambos requieren un usuario autenticado (Bearer JWT): el CSV contiene correos de clientes.
 """
 
 import logging
@@ -15,13 +17,20 @@ from analisis_incidencias import (
     decodificar_csv,
     generar_csv_bytes,
 )
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import Response
+
+from app.dependencies import get_current_user
 
 logger = logging.getLogger("trackflow.api.incidents")
 
 # Rutas del enunciado del ejercicio (con prefijo /api, a diferencia de /suppliers).
-router = APIRouter(prefix="/api/incidents", tags=["incidents"])
+router = APIRouter(
+    prefix="/api/incidents",
+    tags=["incidents"],
+    dependencies=[Depends(get_current_user)],
+    responses={401: {"description": "Sin token o con un token no válido o caducado"}},
+)
 
 TAMANO_MAXIMO = 5 * 1024 * 1024  # 5 MB: el CSV de un mes ocupa ~15 KB por cada 100 filas
 NOMBRE_EXPORTACION = "results.csv"
