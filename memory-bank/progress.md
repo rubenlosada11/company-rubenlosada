@@ -6,7 +6,7 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/auth-api` (desde `main` @ `c1bd69e`, que ya incluye las PR #3–#10).
+- **Rama de trabajo:** `feature/auth-cerrar-sesion` (desde `main` @ `f9f2a1e`, que ya incluye las PR #3–#11).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (práctica sin número de hito; contexto en
@@ -16,8 +16,9 @@
   desde el repositorio `analizador-incidencias` (construido allí por error). API solo local: despliegue documentado
   en `docs/despliegue-api.md`, sin ejecutar.
 - **Autenticación JWT y protección de rutas (AUTH-01)** (práctica sin número de hito): implementada en
-  `feature/auth-api`, con API y login del backoffice (PR pendiente de fusionar). Documentación en `docs/autenticacion.md`.
-- **Última actualización:** 2026-09-29.
+  `feature/auth-api`, con API y login del backoffice; PR #11 fusionada el 2026-09-29. Documentación en
+  `docs/autenticacion.md`. Mejora posterior: botón de cerrar sesión en el sidebar (`feature/auth-cerrar-sesion`).
+- **Última actualización:** 2026-09-30.
 
 | Componente | Estado |
 | --- | --- |
@@ -669,6 +670,23 @@ Ticket AUTH-01 (prompt operativo del curso). Práctica sin número de hito: comm
 - PR `feature/auth-api` → `main` (capturas manuales del desarrollador, si las quiere).
 - Antes de publicar: ver los riesgos de `docs/autenticacion.md` (registro abierto, sin límite de intentos) y el orden
   de despliegue (API primero) en `docs/despliegue-api.md`.
+
+### 2026-09-30 — Cerrar sesión en el sidebar (rama `feature/auth-cerrar-sesion`)
+
+Petición del desarrollador: un botón de cerrar sesión visible arriba a la derecha o en el sidebar. Ya existía arriba a
+la derecha, pero en pantallas estrechas solo mostraba un icono y era fácil no verlo.
+
+- Escritorio: tarjeta de cuenta al pie del sidebar (`components/auth/SidebarAccount.tsx`) con iniciales, nombre,
+  email, rol y **Cerrar sesión**. El menú de la barra superior pasa a `lg:hidden`, así que hay un solo botón por
+  pantalla.
+- Móvil y tablet: la barra superior mantiene el menú, con el botón en texto «Salir» en lugar de solo icono.
+- Icono compartido en `LogoutIcon.tsx`. La nota del sidebar dice «API de TrackFlow» en lugar de «API local», porque
+  se va a desplegar.
+- Validaciones: `npm run lint` 0 · `npm run typecheck` 0 · `npm run build` OK. E2E en navegador **41/41** (las 34
+  anteriores + colocación del botón en escritorio y móvil, un solo botón visible y «Salir» cierra la sesión). Se
+  ejecutó en instancias aisladas (API :8001 con TinyDB del scratchpad y una copia del backoffice en :3003), porque el
+  desarrollador tenía su API en :8000 y `next dev` en :3002. Un primer intento fue contra esas instancias: solo hizo
+  logins fallidos y ninguna escritura. `check-route.mjs` en `/login` y `/` → 200.
 
 ## Trabajo pendiente
 

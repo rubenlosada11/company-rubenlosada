@@ -2,14 +2,18 @@
 
 import { displayName, initials, ROLE_LABELS } from "@/lib/auth";
 import { useAuth } from "./AuthProvider";
+import { LogoutIcon } from "./LogoutIcon";
 
-/** Usuario conectado (nombre, rol) y botón de cerrar sesión, en la barra superior. */
+/**
+ * Usuario conectado y botón de cerrar sesión en la barra superior, solo en móvil y tablet (`lg:hidden`): en
+ * escritorio están al pie del sidebar (`SidebarAccount`).
+ */
 export function UserMenu() {
   const { user, logout } = useAuth();
   if (!user) return null;
 
   return (
-    <div className="flex items-center gap-2 sm:gap-3">
+    <div className="flex items-center gap-2 sm:gap-3 lg:hidden">
       <div className="flex items-center gap-2.5">
         <span
           aria-hidden="true"
@@ -31,21 +35,11 @@ export function UserMenu() {
         type="button"
         onClick={() => logout("logout")}
         aria-label="Cerrar sesión"
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-300 bg-white p-2 sm:px-3 sm:py-1.5 text-sm font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
       >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-          className="size-4"
-        >
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-        </svg>
-        {/* En móvil solo el icono: el nombre accesible lo da `aria-label`. */}
+        <LogoutIcon />
+        {/* Texto corto en móvil para que no se confunda con un icono decorativo. */}
+        <span className="sm:hidden">Salir</span>
         <span className="hidden sm:inline">Cerrar sesión</span>
       </button>
     </div>
