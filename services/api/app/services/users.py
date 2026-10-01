@@ -44,7 +44,8 @@ def create_user(data: UserCreate, role: Role = Role.USER) -> tuple[User, Profile
             role=role,
             created_at=datetime.now(UTC),
         )
-        db.table(USERS_TABLE).insert(user.model_dump(mode="json"))
+        # `password_changed_at` solo se guarda a partir del primer cambio de contraseña.
+        db.table(USERS_TABLE).insert(user.model_dump(mode="json", exclude={"password_changed_at"}))
         profile = insert_profile(db, user.id, data.model_dump(include={"name", "phone", "address"}))
     return user, profile
 
@@ -68,10 +69,8 @@ def list_users() -> list[User]:
 
 
 def update_user(user_id: str, changes: dict[str, Any]) -> User | None:
-    """Aplica `changes` (email, password, role, is_active). `password` se guarda como `hashed_password`."""
+    """Aplica `changes` (email, role, is_active). La contraseña tiene su propia función: `change_password`."""
     changes = dict(changes)
-    if "password" in changes:
-        changes["hashed_password"] = hash_password(changes.pop("password"))
     if "role" in changes:
         changes["role"] = Role(changes["role"]).value
 
@@ -82,6 +81,18 @@ def update_user(user_id: str, changes: dict[str, Any]) -> User | None:
             owner = _find_by_email(db, changes["email"])
             if owner is not None and owner["id"] != user_id:
                 raise EmailAlreadyRegistered(changes["email"])
+        db.table(USERS_TABLE).update(changes, Query().id == user_id)
+        return User.model_validate(_find_by_id(db, user_id))
+
+
+def change_password(user_id: str, hashed_password: str) -> User | None:
+    """Guarda la contraseña (ya hasheada) y la fecha del cambio, que invalida los JWT emitidos antes (AUTH-03)."""
+    # Mismo formato que `model_dump(mode="json")`: UTC con `Z`.
+    changed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    with auth_db() as db:
+        if _find_by_id(db, user_id) is None:
+            return None
+        changes = {"hashed_password": hashed_password, "password_changed_at": changed_at}
         db.table(USERS_TABLE).update(changes, Query().id == user_id)
         return User.model_validate(_find_by_id(db, user_id))
 

@@ -3,7 +3,9 @@
 - `User`: credenciales y estado (email, hash de la contraseña, rol, activo). Sin datos personales.
 - `Profile`: datos visibles y de contacto (nombre, teléfono, dirección). Uno por usuario (`user_id`).
 
-Ambos se guardan solo en TinyDB (`app/database.py:auth_db`). Los modelos persistidos (`User`, `Profile`) nunca se
+- `PasswordResetToken`: enlaces de recuperación de contraseña (AUTH-03), de un solo uso y con caducidad.
+
+Se guardan solo en TinyDB (`app/database.py:auth_db`). Los modelos persistidos (`User`, `Profile`) nunca se
 devuelven tal cual: las respuestas usan `UserPublic`, `ProfilePublic` y `MeResponse`, que no tienen `hashed_password`.
 """
 
@@ -93,6 +95,24 @@ class User(BaseModel):
     is_active: bool
     role: Role
     created_at: datetime
+    # Último cambio o restablecimiento de contraseña (UTC). Los JWT emitidos antes dejan de valer. No existe hasta el
+    # primer cambio: los usuarios anteriores a AUTH-03 se leen igual.
+    password_changed_at: datetime | None = None
+
+
+class PasswordResetToken(BaseModel):
+    """Enlace de recuperación de contraseña (tabla `password_reset_tokens` de TinyDB).
+
+    Solo se guarda el SHA-256 del token: el token en claro únicamente viaja en el email. `used_at` vale `None` mientras
+    el enlace no se ha usado.
+    """
+
+    id: str
+    user_id: str
+    token_hash: str
+    created_at: datetime
+    expires_at: datetime
+    used_at: datetime | None = None
 
 
 class Profile(BaseModel):
@@ -124,26 +144,27 @@ class UserCreate(ProfileFields):
 
 
 class UserUpdate(BaseModel):
-    """`PUT /users/{id}`: solo cambian los campos enviados. Quién puede cambiar cada uno lo decide el router."""
+    """`PUT /users/{id}`: solo cambian los campos enviados. Quién puede cambiar cada uno lo decide el router.
+
+    No admite `password` (AUTH-03): la contraseña solo se cambia con `POST /auth/change-password`, que exige la actual,
+    o con un enlace de recuperación. Cambiar el `email` exige `current_password`: si no, con un token robado se podría
+    poner un email propio y pedir un enlace de recuperación para quedarse con la cuenta.
+    """
 
     model_config = {"extra": "forbid"}
 
     email: str | None = None
-    password: str | None = None
     role: Role | None = None
     is_active: bool | None = None
+    # Solo confirma el cambio de email; no es un campo que se modifique.
+    current_password: str | None = Field(default=None, max_length=200)
 
     _check_email = field_validator("email", mode="before")(check_email)
 
-    @field_validator("password")
-    @classmethod
-    def validate_password(cls, value: str | None) -> str | None:
-        return None if value is None else check_password(value)
-
     @model_validator(mode="after")
     def at_least_one_field(self) -> "UserUpdate":
-        if not self.model_fields_set:
-            raise ValueError("Envía al menos un campo: email, password, role o is_active")
+        if not self.model_fields_set - {"current_password"}:
+            raise ValueError("Envía al menos un campo: email, role o is_active")
         for field in self.model_fields_set:
             if getattr(self, field) is None:
                 raise ValueError(f"{field} no puede ser null")
@@ -171,6 +192,40 @@ class LoginRequest(BaseModel):
         return normalize_email(value) if isinstance(value, str) else value
 
 
+class ForgotPasswordRequest(BaseModel):
+    """`POST /auth/forgot-password`. Solo se valida el formato: un 422 no dice nada sobre si el email existe."""
+
+    email: str = Field(max_length=254)
+
+    _check_email = field_validator("email", mode="before")(check_email)
+
+
+class ResetPasswordRequest(BaseModel):
+    """`POST /auth/reset-password`: el token del enlace del email y la contraseña nueva (mismas reglas que el alta)."""
+
+    # Los tokens miden 43 caracteres; el límite solo evita cuerpos enormes.
+    token: str = Field(max_length=512)
+    new_password: str
+
+    _check_password = field_validator("new_password")(check_password)
+
+
+class ChangePasswordRequest(BaseModel):
+    """`POST /auth/change-password` (con sesión): la contraseña actual y la nueva, que debe ser distinta."""
+
+    # Sin reglas de formato: una contraseña actual mal escrita es simplemente incorrecta (400), no un 422.
+    current_password: str = Field(max_length=200)
+    new_password: str
+
+    _check_password = field_validator("new_password")(check_password)
+
+    @model_validator(mode="after")
+    def new_differs_from_current(self) -> "ChangePasswordRequest":
+        if self.new_password == self.current_password:
+            raise ValueError("La nueva contraseña debe ser distinta de la actual")
+        return self
+
+
 # --- Salida ----------------------------------------------------------------------------------------------------
 
 
@@ -194,6 +249,10 @@ class UserWithProfile(UserPublic):
     """Respuesta de `POST /users` y `GET /auth/me`."""
 
     profile: ProfilePublic
+
+
+class MessageResponse(BaseModel):
+    message: str
 
 
 class Token(BaseModel):

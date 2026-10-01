@@ -1,7 +1,8 @@
 """Dependencias de autenticación: `get_current_user` y el esquema Bearer de `/docs`.
 
-Cualquier fallo de autenticación responde 401 con `WWW-Authenticate: Bearer`. Los fallos de permisos (usuario
-autenticado que actúa sobre algo ajeno) son 403 y los decide cada router.
+Cualquier fallo de autenticación responde 401 con `WWW-Authenticate: Bearer`, también un token emitido antes del
+último cambio de contraseña del usuario. Los fallos de permisos (usuario autenticado que actúa sobre algo ajeno) son
+403 y los decide cada router.
 """
 
 from typing import Annotated
@@ -47,7 +48,22 @@ def get_current_user(token: Annotated[str | None, Depends(oauth2_scheme)]) -> Us
     # Usuario borrado o desactivado después de emitir el token: el token deja de servir.
     if user is None or not user.is_active:
         raise unauthorized(INVALID_TOKEN)
+    if not issued_after_password_change(claims.get("iat"), user):
+        raise unauthorized(INVALID_TOKEN)
     return user
+
+
+def issued_after_password_change(issued_at: object, user: User) -> bool:
+    """`False` si el token se emitió antes del último cambio o restablecimiento de contraseña (AUTH-03).
+
+    Así, cambiar la contraseña cierra todas las sesiones abiertas, también la de quien hubiera robado un token. `iat`
+    va en segundos enteros: un token emitido en el mismo segundo que el cambio sigue valiendo (margen de 1 s).
+    """
+    if user.password_changed_at is None:
+        return True
+    if isinstance(issued_at, bool) or not isinstance(issued_at, int | float):
+        return False
+    return issued_at >= int(user.password_changed_at.timestamp())
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]

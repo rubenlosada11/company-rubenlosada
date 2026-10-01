@@ -1,8 +1,9 @@
-# Autenticación JWT y protección de rutas (AUTH-01 y AUTH-02)
+# Autenticación JWT y protección de rutas (AUTH-01, AUTH-02 y AUTH-03)
 
-Autenticación de la API [`services/api`](../services/api/README.md) (AUTH-01) y flujos de autenticación del
+Autenticación de la API [`services/api`](../services/api/README.md) (AUTH-01), flujos de autenticación del
 [backoffice](../uis/backoffice/README.md): login, registro, perfil, logout y vistas protegidas (AUTH-02, ver
-[Backoffice](#backoffice-auth-02)). Práctica sin número de hito.
+[Backoffice](#backoffice-auth-02)), y recuperación y cambio de contraseña con emails reales (AUTH-03, ver
+[Recuperación y cambio de contraseña](#recuperación-y-cambio-de-contraseña-auth-03)). Práctica sin número de hito.
 
 - **Identidad:** `User` (credenciales) y `Profile` (datos de contacto), 1 a 1, guardados **solo en TinyDB**.
 - **Autenticación:** JWT firmado (HS256, `python-jose`) enviado como `Authorization: Bearer <token>`. Sin sesiones en el
@@ -15,8 +16,9 @@ Autenticación de la API [`services/api`](../services/api/README.md) (AUTH-01) y
 ## Almacenamiento
 
 ```text
-User    -> TinyDB (services/api/db/auth.json, tabla users)
-Profile -> TinyDB (services/api/db/auth.json, tabla profiles)
+User               -> TinyDB (services/api/db/auth.json, tabla users)
+Profile            -> TinyDB (services/api/db/auth.json, tabla profiles)
+PasswordResetToken -> TinyDB (services/api/db/auth.json, tabla password_reset_tokens)   # AUTH-03
 ```
 
 No se ha creado ninguna tabla de usuarios, perfiles ni autenticación en Supabase/PostgreSQL. El repositorio no usa
@@ -30,6 +32,10 @@ el valor que otros módulos pueden guardar como `user_uuid` para referenciar al 
 `User` no tiene nombre, teléfono ni dirección, y `Profile` no tiene credenciales. Hay un test que comprueba las claves
 exactas guardadas en TinyDB.
 
+AUTH-03 añade a `User` el campo opcional `password_changed_at` (solo existe tras el primer cambio de contraseña) y la
+tabla `password_reset_tokens` (`id`, `user_id`, `token_hash`, `created_at`, `expires_at`, `used_at`). TinyDB no tiene
+esquema ni migraciones: la tabla se crea en el primer uso y los usuarios anteriores se leen igual.
+
 ## Configuración
 
 Variables de entorno de la API (plantilla en [`services/api/.env.example`](../services/api/.env.example)):
@@ -40,6 +46,10 @@ Variables de entorno de la API (plantilla en [`services/api/.env.example`](../se
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | no | `30` | Validez de cada token, en minutos enteros y mayor que 0. Se cambia sin tocar código. |
 | `AUTH_DB_PATH` | no | `services/api/db/auth.json` | Fichero TinyDB de usuarios y perfiles (ignorado en git). |
 | `REGISTRATION_CODE` | no (**sí antes de publicar**) | — (registro abierto) | *Mejora adicional de AUTH-02, fuera del enunciado.* Código de invitación que exige `POST /users`. Mínimo 12 caracteres: si es más corto, **la API no arranca**. Vacío o sin definir = registro abierto (desarrollo local). |
+| `RESEND_API_KEY` | no (sí para enviar emails) | — | AUTH-03. Clave de [Resend](https://resend.com) (basta permiso *Sending access*). Sin ella la API arranca, pero no envía emails de recuperación y lo avisa en el log. Solo en `.env`: nunca en git ni en el frontend. |
+| `MAIL_FROM` | sí, si hay `RESEND_API_KEY` | — | AUTH-03. Remitente `direccion@dominio` o `Nombre <direccion@dominio>`, de un dominio verificado en Resend. **Entre comillas dobles** en el `.env` (`MAIL_FROM="TrackFlow <no-reply@dominio>"`): sin ellas `uv run --env-file` descarta esa línea y las siguientes. Con clave y sin un remitente válido, **la API no arranca**. |
+| `FRONTEND_BASE_URL` | no | `http://localhost:3002` | AUTH-03. URL pública del backoffice: el email enlaza a `<FRONTEND_BASE_URL>/reset-password?token=…`. Debe empezar por `http://` o `https://`; si no, la API no arranca. |
+| `RESET_TOKEN_EXPIRE_MINUTES` | no | `30` | AUTH-03. Validez de los enlaces de recuperación, entre 15 y 60 minutos; fuera de ese rango la API no arranca. |
 
 En local, desde `services\api` y en Windows PowerShell (un comando por línea):
 
@@ -124,10 +134,13 @@ curl.exe -s -H "Authorization: Bearer $($login.access_token)" http://localhost:8
 | POST | `/auth/login` | pública | — |
 | POST | `/auth/token` | pública | — (formulario OAuth2 para Swagger) |
 | GET | `/auth/me` | **Bearer** | el propio usuario (email, rol y perfil) |
+| POST | `/auth/forgot-password` | pública | AUTH-03 · siempre 200 con el mismo mensaje; solo envía el enlace si el email es de un usuario activo |
+| POST | `/auth/reset-password` | pública | AUTH-03 · con el token del email; un solo uso; cierra todas las sesiones del usuario |
+| POST | `/auth/change-password` | **Bearer** | AUTH-03 · el propio usuario (sin id en la petición); exige la contraseña actual; devuelve un token nuevo |
 | POST | `/users` | pública | siempre crea `role=user`; con `REGISTRATION_CODE`, exige `invitation_code` |
 | GET | `/users` | **Bearer** | `admin` o `manager`; `user` → 403 |
 | GET | `/users/{id}` | **Bearer** | el propio usuario, `admin` o `manager`; otro → 403 |
-| PUT | `/users/{id}` | **Bearer** | email/contraseña: solo el propio usuario · `role`/`is_active`: solo `admin` · otro → 403 |
+| PUT | `/users/{id}` | **Bearer** | email: solo el propio usuario y **con `current_password`** (AUTH-03) · `role`/`is_active`: solo `admin` · otro → 403 · ya **no** admite `password` (422) |
 | DELETE | `/users/{id}` | **Bearer** | el propio usuario (baja) o `admin`; borra también su perfil; otro → 403 |
 | GET | `/profiles/me` | **Bearer** | solo el perfil del token (no hay ruta con `user_id`) |
 | PUT | `/profiles/me` | **Bearer** | solo `name`, `phone`, `address` del propio perfil |
@@ -141,7 +154,7 @@ curl.exe -s -H "Authorization: Bearer $($login.access_token)" http://localhost:8
 | GET | `/api/incidents/results/export` | **Bearer** | usuario autenticado |
 | GET | `/health` | pública | — (comprobación de vida) |
 
-La tabla sale del esquema OpenAPI de la API: las 15 rutas marcadas como Bearer llevan `security` en `/openapi.json`.
+La tabla sale del esquema OpenAPI de la API: las 16 rutas marcadas como Bearer llevan `security` en `/openapi.json`.
 
 **Por qué se protegen esas 8 rutas existentes:**
 
@@ -159,7 +172,11 @@ contratos no cambian y siguen funcionando con un token válido: los 144 tests an
 
 | Código | Cuándo | `detail` |
 | --- | --- | --- |
+| 400 | `POST /auth/reset-password` con un enlace inexistente, manipulado, caducado, ya usado o de una cuenta desactivada (AUTH-03) | `El enlace para restablecer la contraseña no es válido o ha caducado. Solicita uno nuevo.` (un solo mensaje: no da pistas) |
+| 400 | `POST /auth/change-password` o cambio de email con la contraseña actual incorrecta (AUTH-03) | `La contraseña actual no es correcta.` (400 y no 401: la sesión es válida y el backoffice no la cierra) |
+| 400 | Cambio de email sin `current_password` (AUTH-03) | `Para cambiar el email, indica tu contraseña actual (current_password).` |
 | 401 | Sin cabecera `Authorization` o sin `Bearer` | `No autenticado. Inicia sesión y envía el token…` |
+| 401 | Token emitido antes del último cambio o restablecimiento de contraseña (AUTH-03) | `Token no válido.` |
 | 401 | Token malformado, firma incorrecta, `alg: none`, sin `sub` o sin `exp` | `Token no válido.` |
 | 401 | Usuario del token borrado o desactivado | `Token no válido.` (no revela el motivo) |
 | 401 | Token caducado | `El token ha caducado. Inicia sesión de nuevo.` |
@@ -169,7 +186,7 @@ contratos no cambian y siguen funcionando con un token válido: los 144 tests an
 | 403 | Usuario autenticado sobre un usuario ajeno o sin el rol necesario | p. ej. `No puedes modificar otros usuarios.` |
 | 404 | `admin`/`manager` sobre un id que no existe | `Usuario no encontrado.` |
 | 409 | Email ya registrado (alta o cambio de email) | `Ya existe un usuario con ese email.` |
-| 422 | Email sin formato, contraseña de menos de 8 caracteres o de más de 72 bytes (límite de bcrypt), rol fuera de `admin`/`manager`/`user`, campos no permitidos | formato de validación de FastAPI |
+| 422 | Email sin formato, contraseña de menos de 8 caracteres o de más de 72 bytes (límite de bcrypt), rol fuera de `admin`/`manager`/`user`, campos no permitidos (también `password` en `PUT /users/{id}`), contraseña nueva igual a la actual | formato de validación de FastAPI |
 
 Los 401 llevan `WWW-Authenticate: Bearer`. Los permisos se comprueban **antes** que la existencia: un `user` recibe 403
 también con un id que no existe, y así no puede averiguar qué ids hay.
@@ -249,6 +266,80 @@ registro abierto, si se publica la demo, cualquiera puede crearse una cuenta y e
 
 > La comprobación del backoffice es de interfaz. Lo que protege los datos es la API, que valida el token en cada
 > petición. El contenido estático de `/` sale de `CONTEXT.es.md` y viaja en el JavaScript de la página.
+
+## Recuperación y cambio de contraseña (AUTH-03)
+
+AUTH-03 (2026-10-01/02) añade recuperar una contraseña olvidada con un enlace temporal enviado por email y cambiarla
+estando autenticado. Trabajo por fases con parada y confirmación del desarrollador. Solo cambian `services/api` y
+`uis/backoffice`; **`uis/website` y `uis/landing` siguen públicas y sin cambios**.
+
+```text
+/login → «¿Olvidaste tu contraseña?» → /forgot-password → POST /auth/forgot-password → 200 (mensaje genérico)
+      → email (Resend) → /reset-password?token=… → POST /auth/reset-password → enlace usado → /login?motivo=restablecida
+
+/account/change-password (con sesión) → POST /auth/change-password (actual + nueva) → token nuevo → sigue dentro
+```
+
+### Decisiones de seguridad
+
+| Decisión | Motivo |
+| --- | --- |
+| `forgot-password` responde **siempre** 200 con el mismo cuerpo y cabeceras; el email sale en `BackgroundTasks` | No revelar qué emails existen, tampoco por el tiempo de respuesta (medianas con pausas: 51 ms existe / 47 ms no existe). Un fallo de Resend no cambia la respuesta. |
+| El mensaje del backoffice es **fijo en el frontend** | La pantalla no puede revelar nada aunque cambie la respuesta de la API. |
+| Token **opaco** (`secrets.token_urlsafe(32)`, 256 bits), no un JWT; en TinyDB solo su **SHA-256** | Un JWT con `exp` no se puede invalidar. SHA-256 basta para un valor aleatorio de 256 bits (bcrypt es para contraseñas) y permite buscarlo. |
+| 30 minutos (`RESET_TOKEN_EXPIRE_MINUTES`, 15–60), **un solo uso**, el último enlace anula los anteriores | Requisitos del ticket. |
+| Uso atómico: comprobar el token, marcar `used_at` y cambiar la contraseña bajo `_auth_lock`; bcrypt antes, fuera del candado | Dos peticiones simultáneas con el mismo token no pueden pasar las dos (4 y 8 en paralelo: una sola gana). El candado es de proceso: **un solo worker**, como ya exigía TinyDB. |
+| Comprobación rápida del token antes de bcrypt en `reset-password` | Un token inventado no gasta ~0,25 s de CPU (denegación de servicio barata). |
+| 400 con **un único mensaje** para cualquier enlace no válido | No dar pistas sobre si caducó, se usó o no existe. |
+| Límite silencioso: 1 enlace por usuario cada 60 s (sigue el 200) | Que la API no sirva para inundar la bandeja de nadie. Usuarios desactivados: nunca reciben enlace. |
+| **`password_changed_at`**: `get_current_user` rechaza los JWT con `iat` anterior (margen de 1 s) | Restablecer o cambiar la contraseña **cierra todas las sesiones abiertas**, también la de quien hubiera robado un token. `change-password` devuelve un token nuevo para que la sesión desde la que se cambia continúe. |
+| `change-password` responde **400** (no 401) si la contraseña actual es incorrecta | El backoffice cierra la sesión ante un 401; aquí la sesión es válida. |
+| `PUT /users/{id}` ya **no** admite `password` (422) | Antes un token robado bastaba para cambiar la contraseña sin la actual (decisión D1). |
+| Cambiar el **email** con `PUT /users/{id}` exige `current_password` y anula los enlaces pendientes | Con la recuperación por email, cambiar el email con solo un token permitía quedarse con la cuenta: token robado → email del atacante → pedir enlace → nueva contraseña. Detectado en la fase 7 y cerrado (decisión D7). |
+| Logs sin token, enlace, clave, destinatario ni mensaje de error de Resend | Solo propósito, id de usuario y tipo de error (`validation_error 403`…). |
+
+### Email (Resend)
+
+- `app/services/email.py`: interfaz `EmailSender` y dependencia `get_email_sender`. `ResendSender` llama a
+  `POST https://api.resend.com/emails` con `urllib` (sin dependencias nuevas), `Idempotency-Key` (`password-reset/<id>`),
+  `User-Agent` propio y 10 s de timeout. Sin `RESEND_API_KEY` se usa `DisabledSender` (no envía y avisa). Los tests
+  sustituyen el emisor por uno falso: **ningún test envía emails**.
+- `app/email_templates.py`: HTML con tablas y estilos en línea, 600 px que se adaptan al móvil, sin imágenes externas,
+  URL escapada con `html.escape`, más versión de texto plano. Revisado a 900, 390 y 320 px.
+- **Dominio propio:** `rubenlosada.com` verificado en Resend (registros `send` MX/TXT y `resend._domainkey` TXT en
+  Cloudflare, *DNS only*). No afectan al correo de Hostinger de la raíz. Sin dominio, Resend solo entrega al titular de
+  la cuenta. Clave de solo envío; remitente `TrackFlow <no-reply@rubenlosada.com>`.
+
+### Backoffice
+
+| Ruta | Acceso | Qué hace |
+| --- | --- | --- |
+| `/forgot-password` | pública | Email → «Revisa tu correo» con el mensaje genérico. Sin envíos dobles; errores sin datos del email. |
+| `/reset-password?token=…` | pública | Dinámica (lee el token en el servidor) con `referrer: no-referrer`. Sin token: «Falta el enlace». Nueva + confirmación (deben coincidir; sin llamar a la API si no). 400 → «Este enlace ya no sirve» + «Volver a recuperar contraseña». Éxito → borra la sesión local y `router.replace` a `/login?motivo=restablecida` (aviso verde; el token sale del historial). |
+| `/login` | pública | Enlace «¿Olvidaste tu contraseña?» bajo el campo de contraseña (orden del tabulador: email → contraseña → enlace → botón). |
+| `/account/change-password` | **privada** | Actual + nueva + confirmación. 400 en «Contraseña actual»; 401 lo gestiona `lib/http.ts` (login). `AuthProvider.changePassword` guarda el token nuevo y **reprograma el temporizador de caducidad** (`tokenVersion`): sin eso la sesión se cerraba al caducar el token antiguo. Acceso desde la tarjeta «Seguridad» de Mi perfil. |
+
+Reglas de email y contraseña compartidas en `lib/authRules.ts` (las mismas que la API) y `FieldError` en `AuthShell`.
+
+### Verificación AUTH-03
+
+- **API:** `uv run pytest -q -W error::DeprecationWarning` → **473 passed** (287 anteriores + 186: persistencia,
+  email, los tres endpoints, revocación de sesiones y cambio de email). Pruebas de mutación en cada pieza crítica (uso
+  único, caducidad, atomicidad, escapado del HTML, filtrado de errores del proveedor, enumeración, revocación, filtro
+  previo a bcrypt, contraseña actual, cambio de email): todas detectadas.
+- **Servidor real** (`uvicorn` con el `.env` real y TinyDB temporal): envíos reales a `delivered…@resend.dev`
+  (`last_event: delivered`), `forgot-password` 10 respuestas idénticas, `reset-password` 10/10, `change-password` 13/13,
+  cambio de email 6/6.
+- **Navegador** (Edge + `playwright-core`, copia aislada del backoffice en `:3003`): `/forgot-password` 39/39,
+  `/reset-password` 51/51, enlace del login 26/26, `/account/change-password` 42/42 (con tokens de 1 minuto para probar
+  la caducidad), y **flujos A–F de punta a punta 33/33** con el enlace real del email capturado al enviarlo.
+- **Regresión de AUTH-02** con sus baterías originales: 23 + 29 + 42 + 4 + 38 + 28 y 48/50 en protección de rutas
+  (los 2 fallos son de la landing estática: `serve` redirige `application.html` → `application`; ni login, ni
+  almacenamiento, ni llamadas a la API; `uis/landing` sin cambios).
+- **Calidad:** `lint`, `typecheck` y `build` del backoffice; 7 rutas con `check-route.mjs`; 0 avisos de hidratación en
+  `next dev`; `uv lock --check`; tests de `scripts` y del paquete (70).
+- **Seguridad:** sin `.env` versionados; ninguna clave en código, historial, logs ni bundle del frontend; tokens solo
+  como SHA-256 y contraseñas como bcrypt en la base.
 
 ## Verificación (2026-09-29)
 
@@ -362,33 +453,49 @@ comprobación en el router fallan 8 tests.
    publicada deja el panel inaccesible, porque el login necesita la API.
 6. **Los 422 de FastAPI devuelven el valor recibido** (`input`), también la contraseña cuando no cumple las reglas. Va
    solo a quien la envió y el backoffice no lo muestra ni lo registra, pero un proxy que guarde cuerpos de respuesta
-   la vería. Comportamiento por defecto de FastAPI; cambiarlo requiere un manejador de errores propio.
+   la vería. Comportamiento por defecto de FastAPI; cambiarlo requiere un manejador de errores propio. Afecta también a
+   `new_password` en `reset-password` y `change-password` (AUTH-03).
+7. **AUTH-03 — sin límite por IP** en `forgot-password` (solo 1 enlace por usuario cada 60 s) ni de intentos en
+   `change-password`: mismo pendiente que el login (proxy o API antes de publicar).
+8. **AUTH-03 — un solo worker:** el uso único del enlace se garantiza con un candado de proceso.
+9. **AUTH-03 — señal de tiempo residual:** una petición que llega mientras otro email se envía en segundo plano puede
+   tardar unos milisegundos más. Señal débil y con mucho ruido.
+10. **AUTH-03 — margen de 1 s:** un JWT emitido en el mismo segundo que el cambio de contraseña sigue valiendo (`iat`
+    va en segundos enteros).
 
 ## Ficheros
 
 ```text
 services/api/
-├── .env.example              # SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES y REGISTRATION_CODE (placeholders)
+├── .env.example              # SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES, REGISTRATION_CODE, RESEND_API_KEY, MAIL_FROM… (sin valores)
 ├── app/
-│   ├── auth_models.py        # Role, User, Profile y schemas de entrada/salida (+ invitation_code en el alta)
-│   ├── security.py           # configuración, bcrypt, JWT y código de invitación
-│   ├── dependencies.py       # OAuth2PasswordBearer + get_current_user
+│   ├── auth_models.py        # Role, User, Profile, PasswordResetToken y schemas de entrada/salida
+│   ├── security.py           # configuración, bcrypt, JWT, código de invitación, token y enlace de recuperación
+│   ├── dependencies.py       # OAuth2PasswordBearer + get_current_user (+ revocación por password_changed_at)
 │   ├── create_admin.py       # `uv run create-admin <email>`
 │   ├── database.py           # + auth_db() (TinyDB de usuarios, candado propio)
-│   ├── services/users.py     # CRUD de usuarios (alta y baja junto con el perfil)
+│   ├── email_templates.py    # AUTH-03: email de recuperación (HTML + texto)
+│   ├── services/users.py     # CRUD de usuarios (alta y baja junto con el perfil) y change_password
 │   ├── services/profiles.py  # CRUD de perfiles
+│   ├── services/password_reset.py  # AUTH-03: emitir, consultar, usar (atómico) y revocar enlaces
+│   ├── services/email.py     # AUTH-03: EmailSender, ResendSender, DisabledSender y deliver
 │   └── routes/auth.py · users.py · profiles.py
-└── tests/test_auth.py        # 143 tests
+└── tests/test_auth.py · test_password_reset.py · test_email.py
 
 uis/backoffice/
 ├── app/login/page.tsx        # /login
 ├── app/register/page.tsx     # /register
 ├── app/(panel)/layout.tsx    # panel protegido (AuthGate + sidebar + barra superior)
-├── app/(panel)/account/profile/page.tsx  # /account/profile
+├── app/(panel)/account/profile/page.tsx  # /account/profile (+ tarjeta «Seguridad»)
+├── app/(panel)/account/change-password/page.tsx  # AUTH-03: /account/change-password
+├── app/forgot-password/page.tsx  # AUTH-03: /forgot-password
+├── app/reset-password/page.tsx   # AUTH-03: /reset-password?token=…
 ├── components/auth/          # AuthProvider, AuthGate, AuthShell, LoginScreen, RegisterScreen, ProfileEditor,
-│                             # SidebarAccount, UserMenu, LogoutIcon
+│                             # SidebarAccount, UserMenu, LogoutIcon, ForgotPasswordScreen, ResetPasswordScreen,
+│                             # ChangePasswordForm
 ├── lib/session.ts            # token en localStorage, caducidad, `next` seguro
-├── lib/auth.ts               # /auth/login, /users, /auth/me, /profiles/me, etiquetas de rol
+├── lib/auth.ts               # /auth/login, /users, /auth/me, /profiles/me, recuperación y cambio de contraseña
+├── lib/authRules.ts          # AUTH-03: reglas de email y contraseña (las mismas que la API)
 ├── lib/authErrors.ts         # errores de la API en español para los formularios de cuenta
 └── lib/http.ts               # Authorization: Bearer en las peticiones protegidas y cierre de sesión ante 401
 ```

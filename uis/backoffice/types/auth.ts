@@ -37,6 +37,11 @@ export interface ProfileUpdate {
   address: string | null;
 }
 
+/** Respuesta de `POST /auth/forgot-password` y `POST /auth/reset-password`. */
+export interface MessageResponse {
+  message: string;
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: "bearer";

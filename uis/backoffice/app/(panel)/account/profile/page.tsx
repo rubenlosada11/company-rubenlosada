@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ProfileEditor } from "@/components/auth/ProfileEditor";
+import { CHANGE_PASSWORD_PATH } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Mi perfil | TrackFlow Tech",
@@ -19,6 +21,23 @@ export default function ProfilePage() {
       </header>
 
       <ProfileEditor />
+
+      <section aria-labelledby="seguridad-title" className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <h2 id="seguridad-title" className="font-heading text-xl tracking-tight text-slate-900">
+          Seguridad
+        </h2>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
+          <p className="max-w-md text-sm text-slate-600">
+            Cambia tu contraseña. Se cerrarán las sesiones abiertas en otros navegadores y dispositivos.
+          </p>
+          <Link
+            href={CHANGE_PASSWORD_PATH}
+            className="inline-flex items-center rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-800 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+          >
+            Cambiar contraseña
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }

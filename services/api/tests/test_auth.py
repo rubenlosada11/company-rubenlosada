@@ -447,20 +447,28 @@ def test_staff_can_get_other_users_and_gets_404_for_missing(anon_client, manager
     assert anon_client.get("/users/no-existe", headers=bearer(manager)).status_code == 404
 
 
-def test_user_can_change_own_email_and_password(anon_client, ana):
+def test_user_can_change_own_email(anon_client, ana):
     response = anon_client.put(
-        f"/users/{ana.id}", json={"email": "ana.w@trackflow.test", "password": "otra-contraseña"}, headers=bearer(ana)
+        f"/users/{ana.id}", json={"email": "ana.w@trackflow.test", "current_password": PASSWORD}, headers=bearer(ana)
     )
     assert response.status_code == 200 and response.json()["email"] == "ana.w@trackflow.test"
-    assert login(anon_client, "ana.w@trackflow.test", "otra-contraseña").status_code == 200
-    assert login(anon_client, "ana.w@trackflow.test", PASSWORD).status_code == 401
-    assert login(anon_client, "ana@trackflow.test", "otra-contraseña").status_code == 401
+    assert login(anon_client, "ana.w@trackflow.test").status_code == 200
+    assert login(anon_client, "ana@trackflow.test").status_code == 401
+
+
+@pytest.mark.parametrize(
+    "payload", [{"password": "otra-contraseña"}, {"email": "a@trackflow.test", "password": "x" * 9}]
+)
+def test_password_cannot_be_changed_with_put_users(anon_client, ana, payload):
+    # AUTH-03: la contraseña solo cambia con POST /auth/change-password (exige la actual) o con un enlace por email.
+    assert anon_client.put(f"/users/{ana.id}", json=payload, headers=bearer(ana)).status_code == 422
+    assert login(anon_client, ana.email).status_code == 200  # ni la contraseña ni el email cambiaron
 
 
 def test_user_cannot_modify_another_user(anon_client, ana, carlos):
-    response = anon_client.put(f"/users/{carlos.id}", json={"password": "hackeada-123"}, headers=bearer(ana))
+    response = anon_client.put(f"/users/{carlos.id}", json={"email": "robado@trackflow.test"}, headers=bearer(ana))
     assert response.status_code == 403
-    assert login(anon_client, carlos.email).status_code == 200  # la contraseña de Carlos no cambió
+    assert login(anon_client, carlos.email).status_code == 200  # Carlos sigue con su email y su contraseña
 
 
 @pytest.mark.parametrize("change", [{"role": "admin"}, {"is_active": False}])
@@ -482,8 +490,9 @@ def test_admin_can_change_role_and_deactivate(anon_client, admin, ana):
 
 
 def test_admin_cannot_change_other_users_credentials(anon_client, admin, ana):
-    response = anon_client.put(f"/users/{ana.id}", json={"password": "cambiada-por-admin"}, headers=bearer(admin))
+    response = anon_client.put(f"/users/{ana.id}", json={"email": "cambiado@trackflow.test"}, headers=bearer(admin))
     assert response.status_code == 403
+    assert users_service.get_user(ana.id).email == ana.email
 
 
 def test_admin_update_of_missing_user_is_404(anon_client, admin):
@@ -491,7 +500,9 @@ def test_admin_update_of_missing_user_is_404(anon_client, admin):
 
 
 def test_update_to_taken_email_is_409(anon_client, ana, carlos):
-    response = anon_client.put(f"/users/{ana.id}", json={"email": carlos.email}, headers=bearer(ana))
+    response = anon_client.put(
+        f"/users/{ana.id}", json={"email": carlos.email, "current_password": PASSWORD}, headers=bearer(ana)
+    )
     assert response.status_code == 409
 
 

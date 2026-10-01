@@ -26,6 +26,11 @@ interface AuthContextValue {
   logout: (reason?: Exclude<EndReason, null>) => void;
   /** Sustituye el perfil del usuario conectado tras `PUT /profiles/me` (sidebar y barra superior al día). */
   setProfile: (profile: Profile) => void;
+  /**
+   * `POST /auth/change-password` y guarda el token nuevo que devuelve la API (las sesiones anteriores, también la de
+   * este navegador, dejan de valer). Un 400 (contraseña actual incorrecta) o 422 llegan como `ApiError`.
+   */
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   retry: () => void;
 }
 
@@ -37,6 +42,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [endReason, setEndReason] = useState<EndReason>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  /** Cambia cuando se guarda un token nuevo sin pasar por el login (cambio de contraseña): reprograma la caducidad. */
+  const [tokenVersion, setTokenVersion] = useState(0);
 
   const logout = useCallback((reason: Exclude<EndReason, null> = "logout") => {
     clearToken();
@@ -114,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (expiry === null) return;
     const timer = window.setTimeout(() => logout("expired"), Math.max(expiry - Date.now(), 0));
     return () => window.clearTimeout(timer);
-  }, [status, logout]);
+  }, [status, logout, tokenVersion]);
 
   // El login es público (`auth: false`): no hace falta borrar antes el token, y no hacerlo evita que las demás pestañas
   // vean un cierre de sesión momentáneo. El token solo se guarda si la API lo emite.
@@ -145,6 +152,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [login]
   );
 
+  // El usuario no cambia: solo el token. Las demás pestañas reciben el evento `storage` y revalidan con el token nuevo.
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    const { access_token } = await authApi.changePassword(currentPassword, newPassword);
+    saveToken(access_token);
+    setTokenVersion((n) => n + 1);
+  }, []);
+
   const setProfile = useCallback((profile: Profile) => {
     setUser((current) => (current ? { ...current, profile } : current));
   }, []);
@@ -156,8 +170,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ status, user, endReason, connectionError, login, register, logout, setProfile, retry }),
-    [status, user, endReason, connectionError, login, register, logout, setProfile, retry]
+    () => ({ status, user, endReason, connectionError, login, register, logout, setProfile, changePassword, retry }),
+    [status, user, endReason, connectionError, login, register, logout, setProfile, changePassword, retry]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

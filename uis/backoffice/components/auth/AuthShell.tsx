@@ -4,8 +4,9 @@ import Image from "next/image";
 import { useState } from "react";
 
 /**
- * Piezas comunes de las pantallas públicas del backoffice (`/login` y `/register`): layout a pantalla completa con el
- * panel de marca, campo de contraseña con mostrar/ocultar, clases de los inputs e iconos.
+ * Piezas comunes de las pantallas de cuenta del backoffice (`/login`, `/register`, `/forgot-password`,
+ * `/reset-password` y los formularios de `/account`): layout a pantalla completa con el panel de marca, campo de
+ * contraseña con mostrar/ocultar, error de campo, clases de los inputs e iconos.
  */
 
 const MODULES = [
@@ -65,6 +66,8 @@ export function AuthShell({ children, footnote }: AuthShellProps) {
 
 interface PasswordInputProps {
   id: string;
+  /** `password` por defecto; los formularios con varias contraseñas dan a cada campo el suyo. */
+  name?: string;
   value: string;
   onChange: (value: string) => void;
   autoComplete: "current-password" | "new-password";
@@ -75,14 +78,24 @@ interface PasswordInputProps {
 }
 
 /** Campo de contraseña con icono y botón de mostrar/ocultar. */
-export function PasswordInput({ id, value, onChange, autoComplete, disabled, invalid, describedBy, ref }: PasswordInputProps) {
+export function PasswordInput({
+  id,
+  name = "password",
+  value,
+  onChange,
+  autoComplete,
+  disabled,
+  invalid,
+  describedBy,
+  ref,
+}: PasswordInputProps) {
   const [shown, setShown] = useState(false);
   return (
     <div className="relative">
       <input
         ref={ref}
         id={id}
-        name="password"
+        name={name}
         type={shown ? "text" : "password"}
         autoComplete={autoComplete}
         required
@@ -106,6 +119,17 @@ export function PasswordInput({ id, value, onChange, autoComplete, disabled, inv
         {shown ? <EyeOffIcon className="size-[18px]" /> : <EyeIcon className="size-[18px]" />}
       </button>
     </div>
+  );
+}
+
+/** Error bajo un campo del formulario (enlazado al input con `aria-describedby`). */
+export function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={id} className="flex items-start gap-1.5 text-sm font-semibold text-red-700">
+      <AlertIcon className="mt-0.5 size-4 shrink-0" />
+      {message}
+    </p>
   );
 }
 
