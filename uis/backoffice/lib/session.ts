@@ -1,18 +1,20 @@
 /**
  * Token de acceso del backoffice (JWT de `services/api`).
  *
- * Se guarda en `sessionStorage`: dura lo que la pestaña y no se envía solo a ningún servidor (la API autentica
- * únicamente con la cabecera `Authorization: Bearer`, sin cookies). Módulo sin React para que `lib/http.ts` lo use.
+ * Se guarda en `localStorage` (requisito de AUTH-02): sobrevive a recargas y a cerrar el navegador, se comparte entre
+ * las pestañas del mismo origen y no se envía solo a ningún servidor (la API autentica únicamente con la cabecera
+ * `Authorization: Bearer`, sin cookies). Su vida la limita el `exp` del JWT. Solo se lee en el navegador (efectos y
+ * eventos), nunca durante el render en el servidor. Módulo sin React para que `lib/http.ts` lo use.
  */
-const TOKEN_KEY = "trackflow.backoffice.token";
+export const TOKEN_KEY = "trackflow.backoffice.token";
 
-/** Evento que emite `lib/http.ts` cuando la API responde 401 a una petición con token (caducado o revocado). */
+/** Evento que emite `lib/http.ts` cuando la API responde 401 a una petición autenticada (token caducado o revocado). */
 export const UNAUTHORIZED_EVENT = "trackflow:unauthorized";
 
 export function readToken(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return window.sessionStorage.getItem(TOKEN_KEY);
+    return window.localStorage.getItem(TOKEN_KEY);
   } catch {
     return null;
   }
@@ -20,7 +22,7 @@ export function readToken(): string | null {
 
 export function saveToken(token: string): void {
   try {
-    window.sessionStorage.setItem(TOKEN_KEY, token);
+    window.localStorage.setItem(TOKEN_KEY, token);
   } catch {
     // Almacenamiento bloqueado (modo privado estricto): la sesión dura hasta recargar la página.
   }
@@ -28,7 +30,7 @@ export function saveToken(token: string): void {
 
 export function clearToken(): void {
   try {
-    window.sessionStorage.removeItem(TOKEN_KEY);
+    window.localStorage.removeItem(TOKEN_KEY);
   } catch {
     // Nada que limpiar.
   }
@@ -52,6 +54,9 @@ export function tokenExpiry(token: string): number | null {
 /** Ruta interna segura a la que volver tras el login (evita redirecciones abiertas como `//otro-dominio`). */
 export function safeNextPath(value: string | null): string {
   // `/\` también es una URL a otro dominio para los navegadores.
-  if (!value || !value.startsWith("/") || /^\/[/\\]/.test(value) || value.startsWith("/login")) return "/";
+  // `/login` y `/register` no son destinos: volver a ellos ya con sesión no tiene sentido.
+  if (!value || !value.startsWith("/") || /^\/[/\\]/.test(value) || /^\/(login|register)(?![^/?#])/.test(value)) {
+    return "/";
+  }
   return value;
 }

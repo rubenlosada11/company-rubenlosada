@@ -60,13 +60,23 @@ async function toApiError(res: Response): Promise<ApiError> {
   return new ApiError(res.statusText || `Error ${res.status}`, res.status);
 }
 
+export interface ApiOptions {
+  /**
+   * `true` (por defecto): petición protegida; envía el Bearer token y un 401 cierra la sesión.
+   * `false`: endpoint público (login, registro); sin token, y su 401/403 es un error normal del formulario.
+   */
+  auth?: boolean;
+}
+
 /**
  * Petición a la API sin tocar el cuerpo: URL base, token Bearer, error de conexión y respuestas de error como
  * `ApiError`. Devuelve la respuesta sin leer, para cuerpos que no son JSON (subida con `FormData`, descarga de un CSV).
  *
- * Si la API rechaza el token (401), se borra y se avisa con `UNAUTHORIZED_EVENT` para volver al login.
+ * Si la API responde 401 a una petición protegida (token caducado, revocado o ausente), se borra el token y se avisa
+ * con `UNAUTHORIZED_EVENT` para volver al login. También sin token: así no queda un estado «autenticado» falso si el
+ * token desaparece con la aplicación abierta.
  */
-export async function fetchApi(path: string, init?: RequestInit): Promise<Response> {
+export async function fetchApi(path: string, init?: RequestInit, { auth = true }: ApiOptions = {}): Promise<Response> {
   if (!API_BASE_URL) {
     throw new ApiError(
       "Falta la variable NEXT_PUBLIC_API_BASE_URL. Crea uis/backoffice/.env.local a partir de .env.example y reinicia el backoffice.",
@@ -74,7 +84,7 @@ export async function fetchApi(path: string, init?: RequestInit): Promise<Respon
     );
   }
 
-  const token = readToken();
+  const token = auth ? readToken() : null;
   const headers = new Headers(init?.headers);
   if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
 
@@ -89,7 +99,7 @@ export async function fetchApi(path: string, init?: RequestInit): Promise<Respon
     );
   }
 
-  if (res.status === 401 && token) {
+  if (res.status === 401 && auth) {
     clearToken();
     window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
   }
@@ -97,21 +107,27 @@ export async function fetchApi(path: string, init?: RequestInit): Promise<Respon
   return res;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetchApi(path, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...init?.headers,
+async function request<T>(path: string, init?: RequestInit, options?: ApiOptions): Promise<T> {
+  const res = await fetchApi(
+    path,
+    {
+      ...init,
+      headers: {
+        Accept: "application/json",
+        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        ...init?.headers,
+      },
     },
-  });
+    options
+  );
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
 export const http = {
   get: <T>(path: string, signal?: AbortSignal) => request<T>(path, { method: "GET", signal }),
-  post: <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body: JSON.stringify(body) }),
+  post: <T>(path: string, body: unknown, options?: ApiOptions) =>
+    request<T>(path, { method: "POST", body: JSON.stringify(body) }, options),
+  put: <T>(path: string, body: unknown) => request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
   patch: <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
 };

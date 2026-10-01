@@ -3,8 +3,9 @@
 Aplicación interna de TrackFlow Tech. Muestra la estructura del negocio, el backlog de iniciativas de TrackFlow
 Tech y el estado de los hitos del proyecto **a partir del contexto de empresa** (ruta `/`), el **directorio de
 proveedores** (ruta `/proveedores`) y el **analizador de incidencias** de CX (ruta `/incidencias`), estos dos
-conectados a la API [`services/api`](../../services/api/README.md). **Se entra con login** (ruta `/login`): usuario y
-contraseña de la API, con un token JWT (ver [Acceso](#acceso-login)).
+conectados a la API [`services/api`](../../services/api/README.md). **Se entra con login** (ruta `/login`) o creando
+una cuenta (ruta `/register`), con un token JWT; cada usuario edita sus datos de contacto en `/account/profile` (ver
+[Acceso](#acceso-login-registro-y-perfil)).
 
 Next.js (App Router) + React + TypeScript + Tailwind CSS, con las mismas versiones y herramientas que
 [`talent-pipeline-tracker`](../talent-pipeline-tracker/README.md). Sin librerías de estado ni de UI.
@@ -19,24 +20,31 @@ Next.js (App Router) + React + TypeScript + Tailwind CSS, con las mismas version
   antes la API**: el login la necesita y, sin ella, el panel queda inaccesible. Ver
   [`docs/despliegue-api.md`](../../docs/despliegue-api.md).
 
-## Acceso (login)
+## Acceso (login, registro y perfil)
 
-Pantalla propia en `/login` (no el popup del navegador): panel de marca en escritorio y tarjeta de acceso con
-email y contraseña, mostrar/ocultar contraseña, estado «Entrando…» y mensajes de la API en español (credenciales
-incorrectas, cuenta desactivada, API caída, sesión caducada, sesión cerrada).
+| Ruta | Acceso | Qué hace |
+| --- | --- | --- |
+| `/login` | pública | Email y contraseña → `POST /auth/login` → token en `localStorage` → `GET /auth/me` → vuelve a `?next=` (solo rutas internas) o a `/`. Mensajes de la API en español (credenciales incorrectas, cuenta desactivada, API caída, sesión caducada o cerrada). |
+| `/register` | pública | Email, contraseña, nombre, teléfono y dirección (opcionales) y código de invitación → `POST /users` → login automático → `/`. Errores por campo (los de la API, traducidos); 409 con enlace al login; 403 si el código no es válido. |
+| `/`, `/proveedores`, `/incidencias` | **privada** | Panel. Sin sesión → `/login?next=<ruta>`. |
+| `/account/profile` | **privada** | `GET /auth/me`: email y rol (solo lectura) y nombre, teléfono y dirección editables con `PUT /profiles/me`. |
 
 | Pieza | Qué hace |
 | --- | --- |
-| [`app/login/page.tsx`](./app/login/page.tsx) + [`components/auth/LoginScreen.tsx`](./components/auth/LoginScreen.tsx) | `POST /auth/login` y después `GET /auth/me`. Vuelve a la página de `?next=` (solo rutas internas). |
-| [`app/(panel)/layout.tsx`](./app/(panel)/layout.tsx) + [`components/auth/AuthGate.tsx`](./components/auth/AuthGate.tsx) | `/`, `/proveedores` e `/incidencias` solo se muestran con sesión; si no, llevan a `/login?next=…`. Las URLs no cambian (grupo de rutas). |
-| [`components/auth/AuthProvider.tsx`](./components/auth/AuthProvider.tsx) | Estado de la sesión compartido. La cierra al caducar el token o si la API responde 401. |
-| [`lib/session.ts`](./lib/session.ts) · [`lib/http.ts`](./lib/http.ts) | Token en `sessionStorage` (dura lo que la pestaña, sin cookies) y cabecera `Authorization: Bearer` en cada llamada a la API. |
-| [`components/auth/SidebarAccount.tsx`](./components/auth/SidebarAccount.tsx) | Escritorio: tarjeta al pie del sidebar con iniciales, nombre, email, rol y **Cerrar sesión**. |
-| [`components/auth/UserMenu.tsx`](./components/auth/UserMenu.tsx) | Móvil y tablet (sin sidebar): iniciales, nombre y rol en la barra superior y botón **Salir**. |
+| [`components/auth/LoginScreen.tsx`](./components/auth/LoginScreen.tsx) · [`RegisterScreen.tsx`](./components/auth/RegisterScreen.tsx) · [`AuthShell.tsx`](./components/auth/AuthShell.tsx) | Pantallas públicas; `AuthShell` es el layout común (panel de marca), el campo de contraseña y los iconos. |
+| [`app/(panel)/layout.tsx`](./app/(panel)/layout.tsx) + [`components/auth/AuthGate.tsx`](./components/auth/AuthGate.tsx) | Muestra el panel solo con sesión. Además, en cada cambio de ruta y al volver a la pestaña comprueba que el token sigue guardado. Las URLs no cambian (grupo de rutas). |
+| [`components/auth/AuthProvider.tsx`](./components/auth/AuthProvider.tsx) | Estado de la sesión (`useAuth`): login, registro, logout y perfil. La cierra al caducar el token, si la API responde 401 o si otra pestaña cierra sesión. |
+| [`lib/session.ts`](./lib/session.ts) | Token en **`localStorage`** (sobrevive a recargas y se comparte entre pestañas; sin cookies), caducidad (`exp`) y `next` seguro. |
+| [`lib/http.ts`](./lib/http.ts) | Cliente único: `Authorization: Bearer` en las peticiones protegidas; un 401 borra el token y lleva a `/login?motivo=caducada`. Login y registro van marcados como públicos. |
+| [`lib/authErrors.ts`](./lib/authErrors.ts) | Traducción al español de los errores de la API en los formularios de cuenta (un mensaje desconocido se muestra tal cual). |
+| [`components/auth/ProfileEditor.tsx`](./components/auth/ProfileEditor.tsx) | Formulario de `/account/profile`. |
+| [`components/auth/SidebarAccount.tsx`](./components/auth/SidebarAccount.tsx) · [`UserMenu.tsx`](./components/auth/UserMenu.tsx) | Escritorio: tarjeta al pie del sidebar con **Mi perfil** y **Cerrar sesión**. Móvil: el avatar lleva al perfil y **Salir** cierra la sesión. |
 
-Para entrar hace falta un usuario de la API: el primero se crea con `uv run --env-file .env create-admin <email>` en
-`services\api`. Detalle, permisos y verificación: [`docs/autenticacion.md`](../../docs/autenticacion.md). La
-comprobación del backoffice es de interfaz: los datos los protege la API, que valida el token en cada petición.
+**Mejora adicional (fuera del enunciado de AUTH-02):** si la API tiene `REGISTRATION_CODE`, el registro exige ese
+código de invitación; sin él, el registro es abierto, como pide el ticket y como funciona en local. El
+primer administrador se crea con `uv run --env-file .env create-admin <email>` en `services\api`. Detalle, permisos y
+verificación: [`docs/autenticacion.md`](../../docs/autenticacion.md). La comprobación del backoffice es de interfaz:
+los datos los protege la API, que valida el token en cada petición.
 
 ## Qué muestra la ruta `/`
 
@@ -94,24 +102,28 @@ backoffice/
 ├── app/
 │   ├── layout.tsx        # fuentes, `noindex` (herramienta interna) y AuthProvider
 │   ├── login/page.tsx    # ruta `/login`
+│   ├── register/page.tsx # ruta `/register`
 │   ├── (panel)/          # grupo de rutas protegido (no cambia las URLs)
 │   │   ├── layout.tsx    # AuthGate + sidebar + barra superior
 │   │   ├── page.tsx      # ruta `/`
 │   │   ├── proveedores/page.tsx  # ruta `/proveedores`
-│   │   └── incidencias/page.tsx  # ruta `/incidencias`
+│   │   ├── incidencias/page.tsx  # ruta `/incidencias`
+│   │   └── account/profile/page.tsx  # ruta `/account/profile`
 │   └── globals.css       # + animaciones del login (ruta y entrada)
 ├── components/           # Sidebar, Topbar, NavLink (cliente: enlace activo), Overview, Explorer (cliente: filtros),
 │   │                     # AreaCard, Milestones, PageSection, StatCard, Badge,
 │   │                     # SupplierDirectory, SupplierForm, SupplierRow (cliente: directorio de proveedores)
 │   ├── incidencias/      # AnalizadorIncidencias (cliente), SelectorCsv (cliente), ResultadosAnalisis, ListaBarras,
 │   │                     # TablaCruce, TablaSatisfaccion, RegistrosInvalidos
-│   └── auth/             # AuthProvider, AuthGate, LoginScreen, SidebarAccount, UserMenu (cliente), LogoutIcon
+│   └── auth/             # AuthProvider, AuthGate, AuthShell, LoginScreen, RegisterScreen, ProfileEditor,
+│                         # SidebarAccount, UserMenu (cliente), LogoutIcon
 ├── lib/
 │   ├── data/             # areas.ts, initiatives.ts, milestones.ts, baseline.ts, suppliers.ts (valores del CONTEXT)
 │   ├── initiatives.ts    # lógica pura: filterInitiatives, countByArea, countByStatus
 │   ├── http.ts           # cliente HTTP de la API: fetchApi (URL base, Bearer y errores) y http (JSON; errores 422 por campo)
-│   ├── session.ts        # token en sessionStorage, caducidad (`exp`) y `next` seguro
-│   ├── auth.ts           # /auth/login, /auth/me, etiquetas de rol, iniciales
+│   ├── session.ts        # token en localStorage, caducidad (`exp`) y `next` seguro
+│   ├── auth.ts           # /auth/login, /users, /auth/me, /profiles/me, etiquetas de rol, iniciales
+│   ├── authErrors.ts     # errores de la API en español para los formularios de cuenta
 │   ├── suppliers.ts      # llamadas a /suppliers, validación del formulario y formato de tarifas y fechas
 │   ├── incidencias.ts    # subida del CSV (FormData) y descarga de results.csv (blob)
 │   ├── formato.ts        # formato es-ES del analizador (enteros, porcentajes, medias, semanas ISO)
@@ -165,7 +177,9 @@ comprueban en `/login`:
 
 ```bash
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/login --expect "Inicia sesión" --expect "Entrar al backoffice"
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/register --expect "Crea tu cuenta" --expect "Código de invitación"
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/ --expect "Comprobando tu sesión"
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/account/profile --expect "Comprobando tu sesión"
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/proveedores
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/incidencias
 ```
@@ -175,9 +189,11 @@ node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://local
 - **Producción:** la API solo corre en local. Para publicar el login hay que desplegar antes la API, con su
   `SECRET_KEY` y un administrador, y quitar el Basic Auth del proxy delante de la API (usa la misma cabecera
   `Authorization`). Pasos en [`docs/despliegue-api.md`](../../docs/despliegue-api.md).
-- **Registro:** no hay pantalla de alta. Los usuarios se crean con `POST /users` (público en la API) o
-  `create-admin`, y los roles los cambia un `admin` con `PUT /users/{id}`. Riesgos pendientes en
+- **Registro:** `/register` crea siempre usuarios con rol `user`; los roles los cambia un `admin` con
+  `PUT /users/{id}` (sin pantalla). **Antes de publicar, definir `REGISTRATION_CODE` en la API** para que no se pueda
+  registrar cualquiera. Riesgos pendientes en
   [`docs/autenticacion.md`](../../docs/autenticacion.md#auditoría-de-seguridad).
+- Cambiar el email o la contraseña: la API lo permite (`PUT /users/{id}`), pero no hay pantalla.
 - Sin conexión a otros datos reales (inventario, envíos, devoluciones…): llegará con `services/` y los pipelines de
   `data/` cuando existan.
 - Mantener `lib/data/` sincronizado con `CONTEXT.es.md` y `docs/hitos.md` cuando cambien.

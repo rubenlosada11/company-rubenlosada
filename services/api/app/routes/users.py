@@ -10,6 +10,8 @@ Permisos:
 | `PUT /users/{id}`      | email y contraseña             | `role` e `is_active` de todos | 403 si es ajeno | 403    |
 | `DELETE /users/{id}`   | sí (baja propia)               | sí                           | 403 si es ajeno | 403    |
 
+Con `REGISTRATION_CODE` definida, `POST /users` exige además `invitation_code` (403 si falta o no coincide).
+
 Los permisos se comprueban antes que la existencia: quien no puede ver otros usuarios recibe 403 también con un id
 inexistente, y así no puede averiguar qué ids existen.
 """
@@ -18,6 +20,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.auth_models import ProfilePublic, Role, User, UserCreate, UserPublic, UserUpdate, UserWithProfile
 from app.dependencies import CurrentUser
+from app.security import invitation_code_is_valid
 from app.services import users as users_service
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -30,6 +33,7 @@ CREDENTIAL_FIELDS = {"email", "password"}
 
 USER_NOT_FOUND = "Usuario no encontrado."
 EMAIL_TAKEN = "Ya existe un usuario con ese email."
+INVALID_INVITATION = "Código de invitación no válido."
 
 AUTH_RESPONSES = {
     401: {"description": "Sin token o con un token no válido o caducado"},
@@ -53,9 +57,22 @@ def get_or_404(user_id: str) -> User:
     return user
 
 
-@router.post("", status_code=status.HTTP_201_CREATED, responses={409: {"description": EMAIL_TAKEN}})
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        403: {"description": "Falta el código de invitación o no es válido (solo con `REGISTRATION_CODE`)"},
+        409: {"description": EMAIL_TAKEN},
+    },
+)
 def register(payload: UserCreate) -> UserWithProfile:
-    """Registro público. Crea el usuario (rol `user`, activo) y su perfil con `name`, `phone` y `address` opcionales."""
+    """Registro público. Crea el usuario (rol `user`, activo) y su perfil con `name`, `phone` y `address` opcionales.
+
+    Si la API tiene `REGISTRATION_CODE`, exige `invitation_code`. Se comprueba antes que el email: sin el código no se
+    puede averiguar qué emails están registrados.
+    """
+    if not invitation_code_is_valid(payload.invitation_code):
+        raise forbidden(INVALID_INVITATION)
     try:
         user, profile = users_service.create_user(payload)
     except users_service.EmailAlreadyRegistered:

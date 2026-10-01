@@ -56,12 +56,13 @@ uv run --env-file .env uvicorn app.main:app --reload --port 8000
 - API: http://localhost:8000 · Swagger UI (botón **Authorize** con tu email y contraseña): http://localhost:8000/docs
 - Comprobación rápida: http://localhost:8000/health → `{"status":"ok"}`
 - Sin `SECRET_KEY` válida (falta, tiene menos de 32 caracteres o vale `change-me`) la API **no arranca** y explica
-  cómo generarla.
+  cómo generarla. Tampoco arranca con un `REGISTRATION_CODE` de menos de 12 caracteres.
 
 | Variable | Por defecto | Para qué |
 | --- | --- | --- |
 | `SECRET_KEY` | — (**obligatoria**) | Clave de firma de los JWT, de al menos 32 caracteres |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | Minutos de validez de cada token |
+| `REGISTRATION_CODE` | — (registro abierto) | Código de invitación que exige `POST /users` (≥ 12 caracteres). Mejora adicional de AUTH-02, fuera del enunciado ([detalle](../../docs/autenticacion.md#mejora-adicional-código-de-invitación-registration_code)). **Defínelo antes de publicar la API** |
 | `AUTH_DB_PATH` | `services/api/db/auth.json` | Fichero de TinyDB de usuarios y perfiles |
 | `SUPPLIERS_DB_PATH` | `services/api/db/suppliers.json` | Fichero de TinyDB de proveedores |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3002,http://127.0.0.1:3002` | Orígenes del navegador autorizados (el backoffice). Admite la cabecera `Authorization` y expone `Content-Disposition` para las descargas |
@@ -113,7 +114,7 @@ Resumen. El detalle (permisos, errores, verificación y auditoría) está en
 
 | Método y ruta | Acceso |
 | --- | --- |
-| `POST /users` | pública: registro, siempre con rol `user` |
+| `POST /users` | pública: registro, siempre con rol `user`; con `REGISTRATION_CODE`, exige `invitation_code` (si no, 403) |
 | `POST /auth/login` · `POST /auth/token` | pública: JSON `{email, password}` · formulario OAuth2 de Swagger |
 | `GET /auth/me` | Bearer: email, rol y perfil |
 | `GET /users` · `GET /users/{id}` | Bearer: `admin`/`manager`, o el propio usuario en `/{id}` |
@@ -343,8 +344,8 @@ Swagger UI (`/docs`, botón “Try it out” y selector de fichero).
 uv run pytest -q
 ```
 
-269 tests con pytest y `TestClient`: 118 del directorio de proveedores (cada uno sobre una base TinyDB temporal; nunca
-tocan `db/suppliers.json`), 26 del analizador de incidencias y 125 de autenticación. No hace falta `.env`:
+287 tests con pytest y `TestClient`: 118 del directorio de proveedores (cada uno sobre una base TinyDB temporal; nunca
+tocan `db/suppliers.json`), 26 del analizador de incidencias y 143 de autenticación. No hace falta `.env`:
 [`tests/conftest.py`](./tests/conftest.py) pone una `SECRET_KEY` de pruebas y una base de usuarios temporal en cada
 test, y el fixture `client` va autenticado. Así los tests anteriores comprueban que las rutas protegidas siguen
 funcionando con un token válido.
@@ -356,7 +357,7 @@ funcionando con un token válido.
 | [`tests/test_seed.py`](./tests/test_seed.py) | Seed idéntico al CONTEXT, 1.ª y 2.ª ejecución, inserción parcial, no sobrescribe, salida por consola |
 | [`tests/test_api.py`](./tests/test_api.py) | Los 6 endpoints: 201/200/204, filtros y combinación, 404, 422, `updated_at`, persistencia al reiniciar (otro proceso), CORS, UTF-8 |
 | [`tests/test_incidents.py`](./tests/test_incidents.py) | Valores esperados del CONTEXT, equivalencia con el script y exportación idéntica byte a byte, 400/404/413/415/422/500, último análisis, sin correos en JSON/log/exportación, CORS y `Content-Disposition` expuesto |
-| [`tests/test_auth.py`](./tests/test_auth.py) | Usuarios y perfiles en TinyDB, bcrypt, roles, login, JWT (válido, malformado, caducado, otra firma, `alg: none`, sin claims, usuario borrado o desactivado), configuración, 401/403/404/409, ownership, las 8 rutas existentes protegidas, `create-admin` |
+| [`tests/test_auth.py`](./tests/test_auth.py) | Usuarios y perfiles en TinyDB, bcrypt, roles, login, JWT (válido, malformado, caducado, otra firma, `alg: none`, sin claims, usuario borrado o desactivado), configuración, código de invitación (`REGISTRATION_CODE`), 401/403/404/409, ownership, las 8 rutas existentes protegidas, `create-admin` |
 
 ## Persistencia
 
@@ -379,12 +380,12 @@ El acceso está en [`app/database.py`](./app/database.py): cada uso abre el fich
 services/api/
 ├── pyproject.toml        # dependencias (incl. ../../packages/analisis-incidencias), scripts `seed` y `create-admin`
 ├── uv.lock
-├── .env.example          # SECRET_KEY y ACCESS_TOKEN_EXPIRE_MINUTES (copiar a .env, ignorado)
+├── .env.example          # SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES y REGISTRATION_CODE (copiar a .env, ignorado)
 ├── app/
 │   ├── main.py           # FastAPI, CORS, JSON UTF-8, logger `trackflow`, /health, comprobación de SECRET_KEY
 │   ├── models.py         # modelos Pydantic de proveedores y valores válidos del CONTEXT
 │   ├── auth_models.py    # User, Profile, Role y schemas de entrada/salida de autenticación
-│   ├── security.py       # bcrypt y JWT (configuración desde el entorno)
+│   ├── security.py       # bcrypt, JWT y código de invitación (configuración desde el entorno)
 │   ├── dependencies.py   # OAuth2PasswordBearer + get_current_user
 │   ├── database.py       # TinyDB (proveedores y usuarios)
 │   ├── seed.py           # `uv run seed`
@@ -417,8 +418,9 @@ Las del backoffice (proveedores con filtros y análisis de incidencias) están e
 
 ## Limitaciones conocidas
 
-- Autenticación: registro público y cualquier usuario autenticado puede operar proveedores e incidencias; sin límite
-  de intentos de login ni *refresh tokens* (ver riesgos en [`docs/autenticacion.md`](../../docs/autenticacion.md)).
+- Autenticación: el registro es público salvo que se defina `REGISTRATION_CODE`, y cualquier usuario autenticado
+  puede operar proveedores e incidencias; sin límite de intentos de login ni *refresh tokens* (ver riesgos en
+  [`docs/autenticacion.md`](../../docs/autenticacion.md)).
 - Si se borra el proveedor con el `id` más alto, TinyDB reutiliza ese `id` en el siguiente alta (calcula el siguiente
   como máximo + 1).
 - Un único `updated_at` por proveedor (última actualización de tarifa): no se guarda el histórico de tarifas
