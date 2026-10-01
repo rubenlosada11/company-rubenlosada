@@ -4,8 +4,11 @@ Configuración por variables de entorno (ver `.env.example`), leída en cada uso
 
 - `SECRET_KEY` (obligatoria): clave de firma de los JWT, de al menos 32 caracteres.
 - `ACCESS_TOKEN_EXPIRE_MINUTES` (opcional, 30 por defecto): validez de cada token.
+- `REGISTRATION_CODE` (opcional): si está definida, `POST /users` exige `invitation_code` igual a este valor. Sin ella,
+  el registro es abierto (desarrollo local).
 """
 
+import hmac
 import os
 from datetime import UTC, datetime, timedelta
 
@@ -16,6 +19,7 @@ ALGORITHM = "HS256"
 DEFAULT_EXPIRE_MINUTES = 30
 SECRET_KEY_MIN_LENGTH = 32
 PLACEHOLDER_SECRET = "change-me"
+REGISTRATION_CODE_MIN_LENGTH = 12
 
 # `libpass` (fork mantenido de passlib) instala el módulo `passlib`; el esquema es bcrypt con 12 rondas.
 _password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -55,10 +59,31 @@ def get_access_token_expire_minutes() -> int:
     return minutes
 
 
+def get_registration_code() -> str | None:
+    """Código de invitación exigido para registrarse, o `None` si el registro es abierto."""
+    code = os.environ.get("REGISTRATION_CODE", "").strip()
+    if not code:
+        return None
+    # Sin límite de intentos, un código corto se adivina por fuerza bruta.
+    if len(code) < REGISTRATION_CODE_MIN_LENGTH:
+        raise ConfigError(f"REGISTRATION_CODE debe tener al menos {REGISTRATION_CODE_MIN_LENGTH} caracteres.")
+    return code
+
+
+def invitation_code_is_valid(candidate: str | None) -> bool:
+    """`True` si el registro es abierto o si `candidate` coincide con `REGISTRATION_CODE` (en tiempo constante)."""
+    expected = get_registration_code()
+    if expected is None:
+        return True
+    # En bytes: `compare_digest` no admite `str` con caracteres que no sean ASCII.
+    return hmac.compare_digest((candidate or "").encode("utf-8"), expected.encode("utf-8"))
+
+
 def check_auth_config() -> None:
     """Falla al arrancar la API si la configuración no es válida, en lugar de en el primer login."""
     get_secret_key()
     get_access_token_expire_minutes()
+    get_registration_code()
 
 
 def hash_password(password: str) -> str:

@@ -119,7 +119,7 @@ tienen: las pruebas en navegador se hacen fuera del repo (Edge + `playwright-cor
 | Acción | Comando |
 | --- | --- |
 | Instalar dependencias (crea `.venv`) | `uv sync` |
-| Crear `.env` (la primera vez; pegar una `SECRET_KEY` generada) | `Copy-Item .env.example .env` |
+| Crear `.env` (la primera vez; pegar una `SECRET_KEY` generada; `REGISTRATION_CODE` opcional, ≥ 12 caracteres) | `Copy-Item .env.example .env` |
 | Cargar proveedores iniciales (idempotente) | `uv run seed` |
 | Crear o promover el primer administrador | `uv run --env-file .env create-admin <email>` |
 | Arrancar la API (no arranca sin `SECRET_KEY`) | `uv run --env-file .env uvicorn app.main:app --reload --port 8000` |
@@ -199,9 +199,29 @@ Contexto: ticket AUTH-01. Documentación: `docs/autenticacion.md`. Rama `feature
 | Rutas existentes protegidas con `dependencies=[...]` en su `APIRouter` | Cambio mínimo; los endpoints y sus contratos no cambian. |
 | Candado propio para la base de usuarios; los servicios abren y cierran la base en cada operación | Evita el bloqueo mutuo con el candado de proveedores, que retiene su dependencia con `yield`. |
 | CORS: `Authorization` y `PUT`, sin `allow_credentials` | Bearer sin cookies. |
-| Backoffice: `/login` propio, grupo `app/(panel)/` con `AuthGate`, token en `sessionStorage`, `next` saneado | Login cuidado en lugar del popup (decisión del desarrollador); sin cookies (ticket); sin redirecciones abiertas. |
+| Backoffice: `/login` propio, grupo `app/(panel)/` con `AuthGate`, token en `sessionStorage`, `next` saneado | Login cuidado en lugar del popup (decisión del desarrollador); sin cookies (ticket); sin redirecciones abiertas. **AUTH-02 cambia el almacenamiento a `localStorage`** (ver abajo). |
 | `/login` dinámica (`searchParams` en el servidor) | Leer `next`/`motivo` sin `useSearchParams` + `Suspense`, que dejaría el formulario fuera del HTML prerenderizado. |
 | Commits `Autenticación JWT — …`, sin entrada en `docs/hitos.md` | Práctica sin hito (convención del desarrollador). |
+
+## Decisiones técnicas de los flujos de autenticación del frontend (AUTH-02)
+
+Contexto: ticket AUTH-02. Rama `feature/auth-frontend` (2026-10-01). Documentación: `docs/autenticacion.md`
+(sección «Backoffice (AUTH-02)»). Solo `uis/backoffice` y `services/api`; `website` y `landing` sin cambios.
+
+| Decisión | Motivo |
+| --- | --- |
+| Token en **`localStorage`** (misma clave `trackflow.backoffice.token`), leído solo en efectos/eventos | Requisito del ticket (D1). Sin lecturas en el render del servidor → sin problemas de hidratación. |
+| Sin middleware de Next.js ni cookies | El middleware corre en el servidor y no ve `localStorage`; la API valida el token. |
+| `lib/http.ts`: peticiones autenticadas por defecto, `{ auth: false }` en login y registro; un 401 autenticado cierra la sesión **aunque no hubiera token** | Un solo punto para el Bearer y el 401; el 401 de credenciales no expulsa a nadie; sin estado autenticado falso. |
+| Sincronización entre pestañas con el evento `storage` | Con `localStorage` la sesión es compartida: logout/login en una pestaña se refleja en las demás. |
+| `AuthGate` comprueba que el token sigue guardado en cada cambio de ruta y al volver a la pestaña | El evento `storage` no avisa a la propia pestaña: sin esto, un token borrado dejaba el panel visible en páginas sin llamadas a la API (reproducido). |
+| Registro en `/register` (pública) y perfil en `/account/profile` (dentro de `(panel)`) | Rutas del ticket; el grupo protege el perfil sin código extra. |
+| **`REGISTRATION_CODE` en la API** (opcional; ≥ 12 caracteres o la API no arranca; `hmac.compare_digest` en bytes; se comprueba antes que el email → 403, nunca 409) | **Mejora adicional, fuera del enunciado del ticket** (D2): evitar registros aleatorios en la demo pública. Validarlo en el cliente no protegería nada. Sin la variable, registro abierto como pide el ticket (local y tests). |
+| `lib/authErrors.ts`: traducción de los mensajes reales de la API solo en los formularios de cuenta; lo desconocido se muestra tal cual | D4. Tabla hecha a partir de las respuestas reales de la API; proveedores no cambia. |
+| `AuthShell` extraído de `LoginScreen` | Login y registro comparten layout, campo de contraseña e iconos sin duplicar. |
+| Foco tras error con un efecto posterior al render | Durante el envío los inputs están `disabled` y no aceptan foco (fallo heredado de AUTH-01 en el login, corregido). |
+| Perfil: se envían siempre `name`, `phone` y `address` (vacío → `null`) | `PUT /profiles/me` exige al menos un campo y `null` borra el dato. Email y rol de solo lectura. |
+| Commit `Autenticación JWT — …`, sin `docs/hitos.md` | Práctica sin hito (D6). |
 
 ## Decisiones técnicas del analizador de incidencias
 

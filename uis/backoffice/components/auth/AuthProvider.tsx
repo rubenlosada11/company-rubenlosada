@@ -1,10 +1,10 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { authApi } from "@/lib/auth";
+import { AccountCreatedError, authApi } from "@/lib/auth";
 import { ApiError } from "@/lib/http";
-import { clearToken, readToken, saveToken, tokenExpiry, UNAUTHORIZED_EVENT } from "@/lib/session";
-import type { CurrentUser } from "@/types/auth";
+import { clearToken, readToken, saveToken, TOKEN_KEY, tokenExpiry, UNAUTHORIZED_EVENT } from "@/lib/session";
+import type { CurrentUser, Profile, RegisterPayload } from "@/types/auth";
 
 /**
  * - `loading`: comprobando el token guardado contra `GET /auth/me`.
@@ -21,7 +21,11 @@ interface AuthContextValue {
   /** Mensaje del error de conexión cuando `status === "unreachable"`. */
   connectionError: string | null;
   login: (email: string, password: string) => Promise<void>;
+  /** `POST /users` y, si va bien, login automático. Si solo falla el login lanza `AccountCreatedError`. */
+  register: (payload: RegisterPayload) => Promise<void>;
   logout: (reason?: Exclude<EndReason, null>) => void;
+  /** Sustituye el perfil del usuario conectado tras `PUT /profiles/me` (sidebar y barra superior al día). */
+  setProfile: (profile: Profile) => void;
   retry: () => void;
 }
 
@@ -41,7 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStatus("anonymous");
   }, []);
 
-  // Al cargar (y al reintentar): valida el token guardado en esta pestaña.
+  // Al cargar (y al reintentar): valida el token guardado en este navegador. `localStorage` solo se lee aquí, en un
+  // efecto (nunca en el render del servidor), así que el primer render es igual en servidor y cliente: `loading`.
   useEffect(() => {
     const controller = new AbortController();
 
@@ -50,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const expiry = token ? tokenExpiry(token) : null;
       if (!token || (expiry !== null && expiry <= Date.now())) {
         if (token) clearToken();
+        setUser(null);
         setEndReason(token ? "expired" : null);
         setStatus("anonymous");
         return;
@@ -61,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         if (controller.signal.aborted) return;
         if (error instanceof ApiError && error.status === 401) {
+          setUser(null);
           setEndReason("expired");
           setStatus("anonymous");
         } else {
@@ -74,11 +81,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => controller.abort();
   }, [attempt]);
 
-  // Cualquier 401 de la API con token (caducado, usuario desactivado o borrado) cierra la sesión.
+  // Cualquier 401 de una petición protegida (token caducado, ausente, o usuario desactivado o borrado) cierra la sesión.
   useEffect(() => {
     const onUnauthorized = () => logout("expired");
     window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  }, [logout]);
+
+  // Sesión compartida entre pestañas (`localStorage`): el navegador avisa a las demás pestañas cuando cambia el token.
+  // Si otra pestaña cierra sesión, esta también; si otra inicia sesión, esta revalida el token nuevo con `/auth/me`.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== TOKEN_KEY && event.key !== null) return; // `null`: localStorage.clear()
+      if (readToken()) {
+        setStatus("loading");
+        setConnectionError(null);
+        setAttempt((n) => n + 1);
+      } else {
+        const previous = event.oldValue ? tokenExpiry(event.oldValue) : null;
+        logout(previous !== null && previous <= Date.now() ? "expired" : "logout");
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, [logout]);
 
   // Cierre automático cuando caduca el token, aunque no se haga ninguna petición.
@@ -91,8 +116,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(timer);
   }, [status, logout]);
 
+  // El login es público (`auth: false`): no hace falta borrar antes el token, y no hacerlo evita que las demás pestañas
+  // vean un cierre de sesión momentáneo. El token solo se guarda si la API lo emite.
   const login = useCallback(async (email: string, password: string) => {
-    clearToken();
     const { access_token } = await authApi.login(email, password);
     saveToken(access_token);
     try {
@@ -107,6 +133,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const register = useCallback(
+    async (payload: RegisterPayload) => {
+      await authApi.register(payload);
+      try {
+        await login(payload.email, payload.password);
+      } catch (error) {
+        throw new AccountCreatedError(error);
+      }
+    },
+    [login]
+  );
+
+  const setProfile = useCallback((profile: Profile) => {
+    setUser((current) => (current ? { ...current, profile } : current));
+  }, []);
+
   const retry = useCallback(() => {
     setStatus("loading");
     setConnectionError(null);
@@ -114,8 +156,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ status, user, endReason, connectionError, login, logout, retry }),
-    [status, user, endReason, connectionError, login, logout, retry]
+    () => ({ status, user, endReason, connectionError, login, register, logout, setProfile, retry }),
+    [status, user, endReason, connectionError, login, register, logout, setProfile, retry]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -24,8 +24,9 @@ funcionan en local.
 
 1. **Autenticación.** Resuelta en la aplicación con JWT Bearer ([`docs/autenticacion.md`](./autenticacion.md)).
    Faltan dos decisiones antes de publicar:
-   - **Registro abierto:** `POST /users` es público y cualquier usuario autenticado puede editar proveedores y subir
-     CSV. Opciones: cerrar el registro (solo `admin`) o exigir `admin`/`manager` en esas rutas.
+   - **Registro:** `POST /users` es público y cualquier usuario autenticado puede editar proveedores y subir CSV.
+     Desde AUTH-02 basta con definir **`REGISTRATION_CODE`** (ver la tabla de variables) para que solo se registre
+     quien tenga el código. Sigue abierta la opción de exigir `admin`/`manager` en las escrituras.
    - **Basic Auth del proxy** (el popup actual del navegador): usa la misma cabecera `Authorization` que el Bearer.
      Delante de la API la bloquearía, así que hay que quitarlo al menos de las rutas de la API (opción B) o del todo:
      el login de la app lo sustituye. Opcional: límite de intentos en `/auth/login` y `/auth/token` en el proxy.
@@ -108,6 +109,7 @@ WantedBy=multi-user.target
 | API | `SUPPLIERS_DB_PATH` | ruta persistente fuera del código | Al arrancar y al ejecutar `seed`. |
 | API | `SECRET_KEY` | clave aleatoria de 32+ caracteres (`python -c "import secrets; print(secrets.token_urlsafe(48))"`), **distinta de la local** y fuera de git | Al arrancar: sin ella la API no arranca. Cambiarla invalida todos los tokens emitidos. |
 | API | `ACCESS_TOKEN_EXPIRE_MINUTES` | p. ej. `30` | Al arrancar (opcional). |
+| API | `REGISTRATION_CODE` | código de invitación aleatorio de 12+ caracteres (mismo comando que `SECRET_KEY`), fuera de git; se comparte solo con quien deba registrarse | Al arrancar. **Recomendada en producción:** sin ella el registro es abierto; con menos de 12 caracteres la API no arranca. |
 | API | `AUTH_DB_PATH` | ruta persistente fuera del código | Al arrancar y al ejecutar `create-admin`. |
 | Backoffice | `NEXT_PUBLIC_API_BASE_URL` | A: `https://<dominio-api>` · B: `https://backofficetrackflow.rubenlosada.com` | **Antes de `npm run build`**: Next.js la incrusta en el JavaScript al compilar; cambiarla después no tiene efecto hasta recompilar. |
 
@@ -144,7 +146,8 @@ location /api/incidents/    { proxy_pass http://127.0.0.1:8000; client_max_body_
 ## 4. Riesgo que decidir antes de publicar
 
 Ver [Decisiones pendientes](#decisiones-pendientes), punto 1. Resumen: la API ya exige token, pero **el registro es
-público** y cualquier cuenta puede operar proveedores e incidencias: decide cómo limitarlo antes de publicar. Aunque el análisis devuelve solo agregados (sin correos), cualquiera podría subir ficheros, descargar el
+público salvo que se defina `REGISTRATION_CODE`** y cualquier cuenta puede operar proveedores e incidencias: define el
+código (y, si hace falta, restringe por rol) antes de publicar. Aunque el análisis devuelve solo agregados (sin correos), cualquiera podría subir ficheros, descargar el
 último resultado y modificar proveedores. Además, el último análisis es **compartido** por todos los usuarios (un solo
 resultado en memoria).
 

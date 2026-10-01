@@ -19,6 +19,24 @@ export interface CurrentUser {
   profile: Profile;
 }
 
+/** Cuerpo de `POST /users` (registro público). La API siempre crea el usuario con rol `user`. */
+export interface RegisterPayload {
+  email: string;
+  password: string;
+  name?: string;
+  phone?: string;
+  address?: string;
+  /** Obligatorio solo si la API tiene configurada `REGISTRATION_CODE`. */
+  invitation_code?: string;
+}
+
+/** Cuerpo de `PUT /profiles/me`: solo los datos de contacto. `null` vacía el campo. */
+export interface ProfileUpdate {
+  name: string | null;
+  phone: string | null;
+  address: string | null;
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: "bearer";

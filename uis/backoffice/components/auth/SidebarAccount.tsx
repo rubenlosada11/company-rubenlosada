@@ -1,6 +1,7 @@
 "use client";
 
-import { displayName, initials, ROLE_LABELS } from "@/lib/auth";
+import { displayName, initials, PROFILE_PATH, ROLE_LABELS } from "@/lib/auth";
+import { NavLink } from "../NavLink";
 import { useAuth } from "./AuthProvider";
 import { LogoutIcon } from "./LogoutIcon";
 
@@ -26,10 +27,18 @@ export function SidebarAccount() {
           <p className="mt-0.5 text-xs font-semibold text-blue-300">{ROLE_LABELS[user.role]}</p>
         </div>
       </div>
+      <NavLink
+        href={PROFILE_PATH}
+        className="mt-3 flex w-full items-center justify-center rounded-full px-3 py-2 text-sm font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        inactiveClassName="bg-white/10 text-white hover:bg-white/20"
+        activeClassName="bg-white text-blue-950"
+      >
+        Mi perfil
+      </NavLink>
       <button
         type="button"
         onClick={() => logout("logout")}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-white/20 px-3 py-2 text-sm font-bold text-white transition hover:border-white/40 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-white/20 px-3 py-2 text-sm font-bold text-white transition hover:border-white/40 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
       >
         <LogoutIcon />
         Cerrar sesión

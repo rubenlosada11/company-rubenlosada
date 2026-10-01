@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { readToken } from "@/lib/session";
 import { useAuth } from "./AuthProvider";
 
 /**
@@ -14,6 +15,23 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const { status, endReason, connectionError, retry, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+
+  // El token puede desaparecer con la aplicación abierta sin que llegue ningún 401: borrado a mano en esta pestaña (el
+  // evento `storage` solo avisa a las demás) en una página que no llama a la API. Se comprueba en cada cambio de ruta y
+  // al volver a la pestaña. Es una lectura local; la validez del token la decide la API (401 → `lib/http.ts`).
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    const verify = () => {
+      if (!readToken()) logout("expired");
+    };
+    verify();
+    window.addEventListener("focus", verify);
+    document.addEventListener("visibilitychange", verify);
+    return () => {
+      window.removeEventListener("focus", verify);
+      document.removeEventListener("visibilitychange", verify);
+    };
+  }, [status, pathname, logout]);
 
   useEffect(() => {
     if (status !== "anonymous") return;

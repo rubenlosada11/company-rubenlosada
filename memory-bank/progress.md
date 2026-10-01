@@ -6,7 +6,7 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/auth-cerrar-sesion` (desde `main` @ `f9f2a1e`, que ya incluye las PR #3–#11).
+- **Rama de trabajo:** `feature/auth-frontend` (desde `main` @ `f1f5171`, que ya incluye las PR #3–#12).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (práctica sin número de hito; contexto en
@@ -17,8 +17,12 @@
   en `docs/despliegue-api.md`, sin ejecutar.
 - **Autenticación JWT y protección de rutas (AUTH-01)** (práctica sin número de hito): implementada en
   `feature/auth-api`, con API y login del backoffice; PR #11 fusionada el 2026-09-29. Documentación en
-  `docs/autenticacion.md`. Mejora posterior: botón de cerrar sesión en el sidebar (`feature/auth-cerrar-sesion`).
-- **Última actualización:** 2026-09-30.
+  `docs/autenticacion.md`. Mejora posterior: botón de cerrar sesión en el sidebar (PR #12).
+- **Flujos de autenticación del frontend (AUTH-02)** (práctica sin número de hito): implementados y validados en
+  `feature/auth-frontend` (registro, perfil, token en `localStorage`, vistas protegidas y, como mejora adicional,
+  código de invitación en la API). Commit hecho en la rama; pendiente: push y PR (el desarrollador hará cambios
+  menores más adelante).
+- **Última actualización:** 2026-10-01.
 
 | Componente | Estado |
 | --- | --- |
@@ -30,6 +34,7 @@
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | Autenticación (AUTH-01) | ✅ API: `User`/`Profile` en TinyDB, JWT, `/auth`, `/users`, `/profiles` y 8 rutas existentes protegidas (269 tests). Backoffice: `/login` y panel protegido (E2E 34/34). Solo local |
+| Autenticación frontend (AUTH-02) | 🟡 Implementado, validado y con commit en `feature/auth-frontend` (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE`. Falta push y PR |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
 | Analizador de incidencias | ✅ Entregado (PR #9): paquete + script (70 tests), API (144 tests), `/incidencias` (navegador 19/19), capturas; en producción muestra el aviso de API no configurada |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
@@ -688,6 +693,58 @@ la derecha, pero en pantallas estrechas solo mostraba un icono y era fácil no v
   desarrollador tenía su API en :8000 y `next dev` en :3002. Un primer intento fue contra esas instancias: solo hizo
   logins fallidos y ninguna escritura. `check-route.mjs` en `/login` y `/` → 200.
 
+### 2026-10-01 — Flujos de autenticación del frontend (AUTH-02, rama `feature/auth-frontend`)
+
+Ticket AUTH-02 (prompt del curso), ejecutado **por fases con parada y confirmación** del desarrollador. Práctica sin
+hito: commit `Autenticación JWT — …`, sin `docs/hitos.md`.
+
+**Decisiones del desarrollador**
+
+- **D1:** token en `localStorage` (antes `sessionStorage`), con sincronización entre pestañas.
+- **D2:** registro con **código de invitación validado en la API** (`REGISTRATION_CODE`, opción B; validarlo solo en el
+  cliente no protege). Es una **mejora adicional, fuera del enunciado de AUTH-02**, para enriquecer el proyecto: sin la
+  variable, el registro es abierto como pide el ticket. Autorizado añadir `# REGISTRATION_CODE=` (sin valor) a `services/api/.env.example`.
+- **D3:** todo en `uis/backoffice`; `uis/website` (Hito 4) y `uis/landing` (Hito 1) no se tocan y siguen públicas.
+- **D4:** traducir al español los errores de la API, comprobando que no produzcan errores ni mensajes raros.
+- **D5:** pruebas con API y TinyDB en el scratchpad (puerto 8001), sin `.env` en el repo.
+- **D6:** un commit `Autenticación JWT — …`; no es un hito.
+
+**Fases**
+
+- **1 · Auditoría:** AUTH-01 ya tenía login, `AuthProvider`/`useAuth`, `AuthGate`, cliente HTTP con Bearer y 401 y
+  logout. Faltaban `localStorage`, `/register` y `/account/profile`. La API no necesitaba cambios para el ticket.
+- **3 · Infraestructura:** `lib/session.ts` (`localStorage`), `lib/http.ts` (`auth` por defecto, 401 sin token, `put`),
+  `lib/auth.ts` (`register`, `updateProfile`, `AccountCreatedError`), `lib/authErrors.ts` (tabla de 14 respuestas
+  reales de la API), `AuthProvider` (`register`, `setProfile`, evento `storage`). E2E 23/23.
+- **4 · Login:** `AuthShell` extraído de `LoginScreen`; nota «en este navegador». E2E 29/29. Corregido: escudo de la
+  nota en móvil.
+- **5 · Registro:** API con `REGISTRATION_CODE` (18 tests; mutación → 8 fallan; código corto → no arranca) y
+  `/register`. E2E 42/42 con código y 4/4 sin código. Corregidos: foco tras errores de la API (también en el login,
+  fallo heredado de AUTH-01) y hueco bajo «Datos de contacto».
+- **6 · Protección:** reproducido y cerrado un estado autenticado falso (token borrado en la misma pestaña sin
+  llamadas a la API) con la comprobación de `AuthGate`. E2E 50/50, incluidos website y landing sin ningún acceso a
+  `localStorage`/`sessionStorage`.
+- **7 · Perfil:** `/account/profile` (`ProfileEditor`), enlaces en el sidebar y en el avatar de móvil. E2E 38/38.
+  Corregido: email cortado en escritorio.
+- **8 · Logout y ciclo completo:** sin cambios de código. E2E 28/28 (16 llamadas protegidas, todas con Bearer).
+  Documentación: `docs/autenticacion.md`, `docs/despliegue-api.md`, READMEs de `services/api` y `uis/backoffice`, este
+  memory bank.
+- **9 · Validación end-to-end** sobre un entorno limpio (builds sin `.next`, TinyDB nueva, API + backoffice + website +
+  landing a la vez): `check-route` 8/8, toda la batería E2E en verde con y sin `REGISTRATION_CODE`, `check-hygiene` OK.
+- **10 · Calidad y regresión:** 0 avisos de hidratación en `next dev`; una sola petición a `/auth/me` por carga en
+  producción; build sin `NEXT_PUBLIC_API_BASE_URL` sin romperse; 0 secretos en el bundle; tracker y tests Python
+  (70) sin regresiones.
+- **11 · Revisión del diff:** sin `.env`, secretos, depuración ni dependencias nuevas; corregido el docstring de
+  `routes/users.py`.
+- **12 · Commit** `Autenticación JWT — …` en `feature/auth-frontend` (identidad `noreply` de GitHub). `docs/autenticacion.md`
+  separa los requisitos del ticket de la mejora adicional (código de invitación). Documentado también en Notion
+  («Prácticas — Bootcamp» + página de documentación). Push y PR pendientes.
+
+**Problemas conocidos (fuera del alcance)**
+
+- Edge pide a veces `/favicon.ico` (404): el backoffice solo tiene `app/icon.png` desde el Hito 4.
+- Los 422 de FastAPI devuelven el valor recibido (`input`), contraseña incluida (riesgo 6 de `docs/autenticacion.md`).
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -703,9 +760,9 @@ la derecha, pero en pantallas estrechas solo mostraba un icono y era fácil no v
 - Despliegue de la API (`docs/despliegue-api.md`): topología (A subdominio / B mismo host) y, si es A, el subdominio
   y su DNS; quitar el Basic Auth del proxy delante de la API (choca con el Bearer). **Desplegar la API antes que el
   backoffice de `main`**: sin API, el login deja el panel inaccesible.
-- Autenticación: registro público + cualquier usuario autenticado puede operar proveedores e incidencias. Antes de
-  publicar, decidir entre cerrar el registro (solo `admin`) o exigir `admin`/`manager` en esas rutas; y un límite de
-  intentos de login.
+- Autenticación: cualquier usuario autenticado puede operar proveedores e incidencias. El registro se limita con
+  `REGISTRATION_CODE` (AUTH-02): **definirlo al publicar la API**. Pendiente decidir si se exige `admin`/`manager` en
+  las escrituras y un límite de intentos de login y de código.
 - Repositorio `analizador-incidencias`: dejarlo como está o archivarlo en GitHub (no borrarlo).
 
 - Supuestos de `docs/ARCHITECTURE_PROPOSAL.md` (base de datos, dominio de la API, staging, autenticación, moneda):

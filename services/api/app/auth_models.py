@@ -111,10 +111,13 @@ class UserCreate(ProfileFields):
 
     No admite `role`, `is_active` ni `id` (`extra: forbid`): todo usuario nuevo es `user` y está activo. Así nadie
     puede registrarse como administrador.
+
+    `invitation_code` solo se comprueba si la API tiene `REGISTRATION_CODE`; nunca se guarda.
     """
 
     email: str
     password: str
+    invitation_code: str | None = Field(default=None, max_length=200)
 
     _check_email = field_validator("email", mode="before")(check_email)
     _check_password = field_validator("password")(check_password)

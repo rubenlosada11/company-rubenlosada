@@ -128,6 +128,80 @@ def test_register_rejects_invalid_data(anon_client, override, field):
     assert field in [err["loc"][-1] for err in response.json()["detail"]]
 
 
+# --- Código de invitación (REGISTRATION_CODE) --------------------------------------------------------------------
+
+INVITATION = "codigo-de-invitacion-demo-2026"
+
+
+@pytest.fixture
+def invitation_required(monkeypatch):
+    monkeypatch.setenv("REGISTRATION_CODE", INVITATION)
+
+
+@pytest.mark.parametrize("extra", [{}, {"invitation_code": "cualquiera"}, {"invitation_code": None}])
+def test_register_is_open_without_registration_code(anon_client, extra):
+    """Sin `REGISTRATION_CODE` (desarrollo local) el código no hace falta y, si se envía, se ignora."""
+    assert anon_client.post("/users", json={**NEW_USER, **extra}).status_code == 201
+
+
+@pytest.mark.parametrize("code", [None, "", "codigo-equivocado", INVITATION.upper(), INVITATION[:-1], "ñ" * 20])
+def test_register_requires_valid_invitation_code(anon_client, invitation_required, code):
+    body = NEW_USER if code is None else {**NEW_USER, "invitation_code": code}
+    response = anon_client.post("/users", json=body)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Código de invitación no válido."}
+    assert users_service.get_user_by_email("laura.gomez@trackflow.test") is None
+
+
+def test_register_with_valid_invitation_code(anon_client, invitation_required):
+    response = anon_client.post("/users", json={**NEW_USER, "invitation_code": f"  {INVITATION} "})
+    assert response.status_code == 201
+    assert response.json()["role"] == "user"
+    assert "invitation_code" not in response.json()
+    assert login(anon_client, NEW_USER["email"], NEW_USER["password"]).status_code == 200
+
+
+def test_invitation_code_is_never_stored(anon_client, invitation_required, auth_env):
+    anon_client.post("/users", json={**NEW_USER, "invitation_code": INVITATION, "name": "Laura"})
+    stored = auth_env.read_text(encoding="utf-8")
+    assert INVITATION not in stored
+    assert "invitation_code" not in stored
+
+
+def test_non_ascii_invitation_code(anon_client, monkeypatch):
+    monkeypatch.setenv("REGISTRATION_CODE", "código-de-invitación-ñ")
+    assert anon_client.post("/users", json={**NEW_USER, "invitation_code": "código-de-invitación-ñ"}).status_code == 201
+    other = {**NEW_USER, "email": "otra@trackflow.test", "invitation_code": "codigo-de-invitacion-n"}
+    assert anon_client.post("/users", json=other).status_code == 403
+
+
+def test_invitation_code_is_checked_before_duplicate_email(anon_client, make_user, invitation_required):
+    """Sin el código no se puede averiguar si un email existe (403, no 409)."""
+    make_user(NEW_USER["email"])
+    response = anon_client.post("/users", json={**NEW_USER, "invitation_code": "codigo-equivocado"})
+    assert response.status_code == 403
+
+
+def test_invitation_code_too_long_is_rejected(anon_client, invitation_required):
+    response = anon_client.post("/users", json={**NEW_USER, "invitation_code": "x" * 201})
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "invitation_code"]
+
+
+@pytest.mark.parametrize("code", ["corto", "once-chars!"])
+def test_short_registration_code_stops_the_api(monkeypatch, code):
+    monkeypatch.setenv("REGISTRATION_CODE", code)
+    with pytest.raises(ConfigError, match="REGISTRATION_CODE"):
+        check_auth_config()
+
+
+@pytest.mark.parametrize("code", ["", "   "])
+def test_blank_registration_code_means_open_registration(anon_client, monkeypatch, code):
+    monkeypatch.setenv("REGISTRATION_CODE", code)
+    check_auth_config()
+    assert anon_client.post("/users", json=NEW_USER).status_code == 201
+
+
 # --- Roles -----------------------------------------------------------------------------------------------------
 
 
