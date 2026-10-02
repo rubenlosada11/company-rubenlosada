@@ -881,6 +881,15 @@ Fases 12–18 en automático (indicación del desarrollador: «avanza salvo deci
   `next start` en `:3004` + `check-route.mjs` en 7 rutas (200, sin errores en el servidor); 0 avisos de hidratación en
   `next dev` (copia, 8 pantallas). Documentación: `docs/autenticacion.md` (sección AUTH-03, rutas, errores,
   configuración, riesgos 6–10 y ficheros), READMEs de la API y del backoffice, `techContext.md`.
+- **17 · Commit** `108c437` `Autenticación JWT — recuperación y cambio de contraseña con emails reales (AUTH-03)`;
+  **18 ·** texto de la PR preparado (no se abre sin indicación del desarrollador).
+- **Prueba manual del desarrollador (2026-10-02): todo correcto** con su buzón real (Hotmail): «¿Olvidaste tu
+  contraseña?» → email → enlace → contraseña nueva → login. Incidencia previa resuelta: tenía **dos APIs** arrancadas en
+  `:8000`; atendía la de la víspera, lanzada **antes** de añadir `RESEND_API_KEY` al `.env` (`uv run --env-file` solo lee
+  el `.env` al arrancar y `--reload` no lo relee), así que usaba `DisabledSender` y no enviaba (el enlace sí se creaba).
+  Solución: cerrar ambas y arrancar una sola. Documentado en el README de la API y en `docs/despliegue-api.md`, que
+  además recoge ya las variables de AUTH-03 (`RESEND_API_KEY`, `MAIL_FROM`, `FRONTEND_BASE_URL`,
+  `RESET_TOKEN_EXPIRE_MINUTES`) y los pasos de verificación 8–9.
 
 ## Trabajo pendiente
 

@@ -117,7 +117,10 @@ Resumen. El detalle (permisos, errores, verificación y auditoría) está en
   [`app/services/email.py`](./app/services/email.py). Variables: `RESEND_API_KEY` (sin ella no se envían emails),
   `MAIL_FROM` **entre comillas dobles** en el `.env` (`MAIL_FROM="TrackFlow <no-reply@tu-dominio>"`, dominio verificado
   en Resend), `FRONTEND_BASE_URL` (por defecto `http://localhost:3002`) y `RESET_TOKEN_EXPIRE_MINUTES` (15–60, 30 por
-  defecto). Los tests nunca envían emails.
+  defecto). Los tests nunca envían emails. **Si cambias el `.env`, para la API (`Ctrl+C`) y vuelve a arrancarla:**
+  `--reload` recarga el código, pero no las variables. Comprueba también que no queden dos APIs arrancadas: la antigua
+  seguiría ocupando el puerto 8000. Al pedir un enlace, la consola debe mostrar
+  `trackflow.email: Email password_reset … enviado (id …)`.
 
 | Método y ruta | Acceso |
 | --- | --- |
