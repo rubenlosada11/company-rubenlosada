@@ -54,8 +54,10 @@ export function tokenExpiry(token: string): number | null {
 /** Ruta interna segura a la que volver tras el login (evita redirecciones abiertas como `//otro-dominio`). */
 export function safeNextPath(value: string | null): string {
   // `/\` también es una URL a otro dominio para los navegadores.
-  // `/login` y `/register` no son destinos: volver a ellos ya con sesión no tiene sentido.
-  if (!value || !value.startsWith("/") || /^\/[/\\]/.test(value) || /^\/(login|register)(?![^/?#])/.test(value)) {
+  // Las pantallas de acceso no son destinos: volver a ellas ya con sesión no tiene sentido (y `/reset-password`
+  // llevaría un token en la URL).
+  const accessScreen = /^\/(login|register|forgot-password|reset-password)(?![^/?#])/;
+  if (!value || !value.startsWith("/") || /^\/[/\\]/.test(value) || accessScreen.test(value)) {
     return "/";
   }
   return value;

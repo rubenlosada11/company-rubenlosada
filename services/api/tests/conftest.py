@@ -16,11 +16,15 @@ PASSWORD = "contraseña-segura"
 def auth_env(tmp_path, monkeypatch):
     """Clave JWT de pruebas y base de usuarios temporal (nunca toca `db/auth.json`) en todos los tests.
 
-    Registro abierto por defecto: los tests del código de invitación definen `REGISTRATION_CODE` ellos mismos.
+    Registro abierto por defecto: los tests del código de invitación definen `REGISTRATION_CODE` ellos mismos. Sin
+    `RESEND_API_KEY`: ningún test envía un email real.
     """
     monkeypatch.setenv("SECRET_KEY", TEST_SECRET_KEY)
     monkeypatch.delenv("ACCESS_TOKEN_EXPIRE_MINUTES", raising=False)
     monkeypatch.delenv("REGISTRATION_CODE", raising=False)
+    # AUTH-03: valores por defecto y sin envío real de emails, aunque el entorno del desarrollador los tenga.
+    for name in ("RESET_TOKEN_EXPIRE_MINUTES", "FRONTEND_BASE_URL", "RESEND_API_KEY", "MAIL_FROM"):
+        monkeypatch.delenv(name, raising=False)
     path = tmp_path / "db" / "auth.json"
     monkeypatch.setenv("AUTH_DB_PATH", str(path))
     return path

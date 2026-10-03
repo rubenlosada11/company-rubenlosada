@@ -4,8 +4,9 @@ Aplicación interna de TrackFlow Tech. Muestra la estructura del negocio, el bac
 Tech y el estado de los hitos del proyecto **a partir del contexto de empresa** (ruta `/`), el **directorio de
 proveedores** (ruta `/proveedores`) y el **analizador de incidencias** de CX (ruta `/incidencias`), estos dos
 conectados a la API [`services/api`](../../services/api/README.md). **Se entra con login** (ruta `/login`) o creando
-una cuenta (ruta `/register`), con un token JWT; cada usuario edita sus datos de contacto en `/account/profile` (ver
-[Acceso](#acceso-login-registro-y-perfil)).
+una cuenta (ruta `/register`), con un token JWT; cada usuario edita sus datos de contacto en `/account/profile`, cambia
+su contraseña en `/account/change-password` y, si la olvida, la recupera por email desde `/forgot-password` (ver
+[Acceso](#acceso-login-registro-perfil-y-contraseña)).
 
 Next.js (App Router) + React + TypeScript + Tailwind CSS, con las mismas versiones y herramientas que
 [`talent-pipeline-tracker`](../talent-pipeline-tracker/README.md). Sin librerías de estado ni de UI.
@@ -20,24 +21,28 @@ Next.js (App Router) + React + TypeScript + Tailwind CSS, con las mismas version
   antes la API**: el login la necesita y, sin ella, el panel queda inaccesible. Ver
   [`docs/despliegue-api.md`](../../docs/despliegue-api.md).
 
-## Acceso (login, registro y perfil)
+## Acceso (login, registro, perfil y contraseña)
 
 | Ruta | Acceso | Qué hace |
 | --- | --- | --- |
 | `/login` | pública | Email y contraseña → `POST /auth/login` → token en `localStorage` → `GET /auth/me` → vuelve a `?next=` (solo rutas internas) o a `/`. Mensajes de la API en español (credenciales incorrectas, cuenta desactivada, API caída, sesión caducada o cerrada). |
 | `/register` | pública | Email, contraseña, nombre, teléfono y dirección (opcionales) y código de invitación → `POST /users` → login automático → `/`. Errores por campo (los de la API, traducidos); 409 con enlace al login; 403 si el código no es válido. |
 | `/`, `/proveedores`, `/incidencias` | **privada** | Panel. Sin sesión → `/login?next=<ruta>`. |
-| `/account/profile` | **privada** | `GET /auth/me`: email y rol (solo lectura) y nombre, teléfono y dirección editables con `PUT /profiles/me`. |
+| `/account/profile` | **privada** | `GET /auth/me`: email y rol (solo lectura) y nombre, teléfono y dirección editables con `PUT /profiles/me`. Tarjeta «Seguridad» con el acceso al cambio de contraseña. |
+| `/forgot-password` | pública | AUTH-03. Email → `POST /auth/forgot-password` → «Revisa tu correo» con un mensaje **fijo** que no revela si el email existe. Se llega desde «¿Olvidaste tu contraseña?» del login. |
+| `/reset-password?token=…` | pública | AUTH-03. Enlace del email (sin `Referer`). Nueva contraseña + confirmación → `POST /auth/reset-password` → `/login?motivo=restablecida`. Sin token o con un enlace no válido, caducado o usado: aviso y «Volver a recuperar contraseña». |
+| `/account/change-password` | **privada** | AUTH-03. Actual + nueva + confirmación → `POST /auth/change-password`; guarda el token nuevo (la sesión sigue y las demás se cierran). Contraseña actual incorrecta → error en su campo, sin cerrar la sesión. |
 
 | Pieza | Qué hace |
 | --- | --- |
 | [`components/auth/LoginScreen.tsx`](./components/auth/LoginScreen.tsx) · [`RegisterScreen.tsx`](./components/auth/RegisterScreen.tsx) · [`AuthShell.tsx`](./components/auth/AuthShell.tsx) | Pantallas públicas; `AuthShell` es el layout común (panel de marca), el campo de contraseña y los iconos. |
 | [`app/(panel)/layout.tsx`](./app/(panel)/layout.tsx) + [`components/auth/AuthGate.tsx`](./components/auth/AuthGate.tsx) | Muestra el panel solo con sesión. Además, en cada cambio de ruta y al volver a la pestaña comprueba que el token sigue guardado. Las URLs no cambian (grupo de rutas). |
-| [`components/auth/AuthProvider.tsx`](./components/auth/AuthProvider.tsx) | Estado de la sesión (`useAuth`): login, registro, logout y perfil. La cierra al caducar el token, si la API responde 401 o si otra pestaña cierra sesión. |
+| [`components/auth/AuthProvider.tsx`](./components/auth/AuthProvider.tsx) | Estado de la sesión (`useAuth`): login, registro, logout, perfil y cambio de contraseña (guarda el token nuevo y reprograma su caducidad). La cierra al caducar el token, si la API responde 401 o si otra pestaña cierra sesión. |
 | [`lib/session.ts`](./lib/session.ts) | Token en **`localStorage`** (sobrevive a recargas y se comparte entre pestañas; sin cookies), caducidad (`exp`) y `next` seguro. |
 | [`lib/http.ts`](./lib/http.ts) | Cliente único: `Authorization: Bearer` en las peticiones protegidas; un 401 borra el token y lleva a `/login?motivo=caducada`. Login y registro van marcados como públicos. |
 | [`lib/authErrors.ts`](./lib/authErrors.ts) | Traducción al español de los errores de la API en los formularios de cuenta (un mensaje desconocido se muestra tal cual). |
 | [`components/auth/ProfileEditor.tsx`](./components/auth/ProfileEditor.tsx) | Formulario de `/account/profile`. |
+| [`ForgotPasswordScreen.tsx`](./components/auth/ForgotPasswordScreen.tsx) · [`ResetPasswordScreen.tsx`](./components/auth/ResetPasswordScreen.tsx) · [`ChangePasswordForm.tsx`](./components/auth/ChangePasswordForm.tsx) | AUTH-03: recuperación y cambio de contraseña. Reglas compartidas con el registro en [`lib/authRules.ts`](./lib/authRules.ts). |
 | [`components/auth/SidebarAccount.tsx`](./components/auth/SidebarAccount.tsx) · [`UserMenu.tsx`](./components/auth/UserMenu.tsx) | Escritorio: tarjeta al pie del sidebar con **Mi perfil** y **Cerrar sesión**. Móvil: el avatar lleva al perfil y **Salir** cierra la sesión. |
 
 **Mejora adicional (fuera del enunciado de AUTH-02):** si la API tiene `REGISTRATION_CODE`, el registro exige ese
@@ -103,12 +108,15 @@ backoffice/
 │   ├── layout.tsx        # fuentes, `noindex` (herramienta interna) y AuthProvider
 │   ├── login/page.tsx    # ruta `/login`
 │   ├── register/page.tsx # ruta `/register`
+│   ├── forgot-password/page.tsx  # ruta `/forgot-password` (AUTH-03)
+│   ├── reset-password/page.tsx   # ruta `/reset-password?token=…` (AUTH-03)
 │   ├── (panel)/          # grupo de rutas protegido (no cambia las URLs)
 │   │   ├── layout.tsx    # AuthGate + sidebar + barra superior
 │   │   ├── page.tsx      # ruta `/`
 │   │   ├── proveedores/page.tsx  # ruta `/proveedores`
 │   │   ├── incidencias/page.tsx  # ruta `/incidencias`
-│   │   └── account/profile/page.tsx  # ruta `/account/profile`
+│   │   ├── account/profile/page.tsx  # ruta `/account/profile`
+│   │   └── account/change-password/page.tsx  # ruta `/account/change-password` (AUTH-03)
 │   └── globals.css       # + animaciones del login (ruta y entrada)
 ├── components/           # Sidebar, Topbar, NavLink (cliente: enlace activo), Overview, Explorer (cliente: filtros),
 │   │                     # AreaCard, Milestones, PageSection, StatCard, Badge,
@@ -116,13 +124,15 @@ backoffice/
 │   ├── incidencias/      # AnalizadorIncidencias (cliente), SelectorCsv (cliente), ResultadosAnalisis, ListaBarras,
 │   │                     # TablaCruce, TablaSatisfaccion, RegistrosInvalidos
 │   └── auth/             # AuthProvider, AuthGate, AuthShell, LoginScreen, RegisterScreen, ProfileEditor,
-│                         # SidebarAccount, UserMenu (cliente), LogoutIcon
+│                         # SidebarAccount, UserMenu (cliente), LogoutIcon, ForgotPasswordScreen,
+│                         # ResetPasswordScreen, ChangePasswordForm
 ├── lib/
 │   ├── data/             # areas.ts, initiatives.ts, milestones.ts, baseline.ts, suppliers.ts (valores del CONTEXT)
 │   ├── initiatives.ts    # lógica pura: filterInitiatives, countByArea, countByStatus
 │   ├── http.ts           # cliente HTTP de la API: fetchApi (URL base, Bearer y errores) y http (JSON; errores 422 por campo)
 │   ├── session.ts        # token en localStorage, caducidad (`exp`) y `next` seguro
-│   ├── auth.ts           # /auth/login, /users, /auth/me, /profiles/me, etiquetas de rol, iniciales
+│   ├── auth.ts           # /auth/login, /users, /auth/me, /profiles/me, recuperación y cambio de contraseña, roles
+│   ├── authRules.ts      # reglas de email y contraseña (las mismas que la API)
 │   ├── authErrors.ts     # errores de la API en español para los formularios de cuenta
 │   ├── suppliers.ts      # llamadas a /suppliers, validación del formulario y formato de tarifas y fechas
 │   ├── incidencias.ts    # subida del CSV (FormData) y descarga de results.csv (blob)
@@ -180,6 +190,9 @@ node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://local
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/register --expect "Crea tu cuenta" --expect "Código de invitación"
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/ --expect "Comprobando tu sesión"
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/account/profile --expect "Comprobando tu sesión"
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/forgot-password --expect "¿Olvidaste tu contraseña?" --expect "Enviar enlace"
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs "http://localhost:3002/reset-password?token=prueba" --expect "Elige una contraseña nueva"
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/account/change-password --expect "Comprobando tu sesión"
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/proveedores
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/incidencias
 ```
@@ -193,7 +206,10 @@ node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://local
   `PUT /users/{id}` (sin pantalla). **Antes de publicar, definir `REGISTRATION_CODE` en la API** para que no se pueda
   registrar cualquiera. Riesgos pendientes en
   [`docs/autenticacion.md`](../../docs/autenticacion.md#auditoría-de-seguridad).
-- Cambiar el email o la contraseña: la API lo permite (`PUT /users/{id}`), pero no hay pantalla.
+- Cambiar el email: la API lo permite (`PUT /users/{id}` con `current_password`), pero no hay pantalla. La contraseña
+  sí tiene pantalla (`/account/change-password`, AUTH-03).
+- Recuperación de contraseña en producción: la API necesita `RESEND_API_KEY`, `MAIL_FROM` y `FRONTEND_BASE_URL` con la
+  URL pública del backoffice (ver [`docs/autenticacion.md`](../../docs/autenticacion.md#recuperación-y-cambio-de-contraseña-auth-03)).
 - Sin conexión a otros datos reales (inventario, envíos, devoluciones…): llegará con `services/` y los pipelines de
   `data/` cuando existan.
 - Mantener `lib/data/` sincronizado con `CONTEXT.es.md` y `docs/hitos.md` cuando cambien.

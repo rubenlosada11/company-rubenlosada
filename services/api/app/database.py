@@ -2,7 +2,8 @@
 
 - Directorio de proveedores: `services/api/db/suppliers.json`, variable `SUPPLIERS_DB_PATH`.
 - Usuarios y perfiles (autenticación): `services/api/db/auth.json`, variable `AUTH_DB_PATH`. Es la única fuente de
-  verdad de `User` y `Profile`: no hay tablas de usuarios en ninguna otra base de datos.
+  verdad de `User` y `Profile`: no hay tablas de usuarios en ninguna otra base de datos. En el mismo fichero viven
+  los enlaces de recuperación de contraseña (`password_reset_tokens`, AUTH-03).
 
 Los ficheros están ignorados en git; los tests apuntan las variables a ficheros temporales.
 """
@@ -62,9 +63,10 @@ def get_auth_db_path() -> Path:
 
 @contextmanager
 def auth_db() -> Iterator[TinyDB]:
-    """Abre la base de usuarios (tablas `users` y `profiles`) y la cierra al terminar.
+    """Abre la base de usuarios (tablas `users`, `profiles` y `password_reset_tokens`) y la cierra al terminar.
 
-    Se entrega la base completa para que crear o borrar un usuario y su perfil ocurra bajo el mismo candado.
+    Se entrega la base completa para que las operaciones que tocan varias tablas (crear o borrar un usuario y su
+    perfil, usar un enlace de recuperación y cambiar la contraseña) ocurran bajo el mismo candado.
     """
     with _auth_lock:
         db = TinyDB(get_auth_db_path(), create_dirs=True, encoding="utf-8", ensure_ascii=False, indent=2)

@@ -13,6 +13,6 @@ interface LoginPageProps {
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const { next, motivo } = await searchParams;
-  const reason = motivo === "caducada" || motivo === "salida" ? motivo : null;
+  const reason = motivo === "caducada" || motivo === "salida" || motivo === "restablecida" ? motivo : null;
   return <LoginScreen next={safeNextPath(typeof next === "string" ? next : null)} reason={reason} />;
 }

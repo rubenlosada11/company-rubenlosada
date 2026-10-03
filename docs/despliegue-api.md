@@ -4,6 +4,9 @@ Instrucciones para el agente del servidor. Publicar la API permite usar en produ
 incidencias** (`/incidencias`) y el **directorio de proveedores** (`/proveedores`) del backoffice, que hoy solo
 funcionan en local.
 
+> **Recuperación de contraseña (AUTH-03, 2026-10-02):** la API envía emails con Resend. En producción necesita además
+> `RESEND_API_KEY`, `MAIL_FROM` y `FRONTEND_BASE_URL` (ver [Variables](#2-variables)) y la verificación 8–9.
+
 > **Autenticación (2026-09-29):** la API ya tiene login JWT y el backoffice una pantalla `/login`
 > ([`docs/autenticacion.md`](./autenticacion.md)). **Consecuencia:** el backoffice de `main` necesita la API para
 > dejar entrar. Si se redespliega sin la API publicada, el panel queda inaccesible. Despliega primero la API
@@ -92,7 +95,9 @@ WorkingDirectory=/srv/trackflow-api/services/api
 Environment=CORS_ALLOWED_ORIGINS=https://backofficetrackflow.rubenlosada.com
 Environment=SUPPLIERS_DB_PATH=/var/lib/trackflow-api/suppliers.json
 Environment=AUTH_DB_PATH=/var/lib/trackflow-api/auth.json
-# SECRET_KEY no va en la unidad: en un fichero solo legible por el servicio (chmod 600).
+Environment=FRONTEND_BASE_URL=https://backofficetrackflow.rubenlosada.com
+# SECRET_KEY, REGISTRATION_CODE, RESEND_API_KEY y MAIL_FROM no van en la unidad: en un fichero solo legible por el
+# servicio (chmod 600), con MAIL_FROM entre comillas: MAIL_FROM="TrackFlow <no-reply@rubenlosada.com>".
 EnvironmentFile=/etc/trackflow-api/secret.env
 ExecStart=/usr/local/bin/uv run --no-sync uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 Restart=on-failure
@@ -111,6 +116,10 @@ WantedBy=multi-user.target
 | API | `ACCESS_TOKEN_EXPIRE_MINUTES` | p. ej. `30` | Al arrancar (opcional). |
 | API | `REGISTRATION_CODE` | código de invitación aleatorio de 12+ caracteres (mismo comando que `SECRET_KEY`), fuera de git; se comparte solo con quien deba registrarse | Al arrancar. **Recomendada en producción:** sin ella el registro es abierto; con menos de 12 caracteres la API no arranca. |
 | API | `AUTH_DB_PATH` | ruta persistente fuera del código | Al arrancar y al ejecutar `create-admin`. |
+| API | `RESEND_API_KEY` | clave de [Resend](https://resend.com) con permiso *Sending access*, **distinta de la local** y fuera de git | Al arrancar (AUTH-03). Sin ella la API funciona, pero **no envía los emails de recuperación de contraseña**. |
+| API | `MAIL_FROM` | `"TrackFlow <no-reply@rubenlosada.com>"` (dominio verificado en Resend) | Al arrancar (AUTH-03). Obligatoria si hay `RESEND_API_KEY`: sin un remitente válido la API no arranca. En ficheros `.env`, **entre comillas dobles**. |
+| API | `FRONTEND_BASE_URL` | `https://backofficetrackflow.rubenlosada.com` | Al arrancar (AUTH-03). Es la URL del enlace del email (`…/reset-password?token=…`); sin ella el enlace apuntaría a `http://localhost:3002`. |
+| API | `RESET_TOKEN_EXPIRE_MINUTES` | p. ej. `30` (entre 15 y 60) | Al arrancar (AUTH-03, opcional). |
 | Backoffice | `NEXT_PUBLIC_API_BASE_URL` | A: `https://<dominio-api>` · B: `https://backofficetrackflow.rubenlosada.com` | **Antes de `npm run build`**: Next.js la incrusta en el JavaScript al compilar; cambiarla después no tiene efecto hasta recompilar. |
 
 Recompilar el backoffice en su carpeta del servidor con la variable (el `.env.local` de desarrollo no está en git):
@@ -171,6 +180,17 @@ páginas. Recordar ejecutar el seeder la primera vez (ver sección 1).
 6. Sin sesión: el backoffice redirige a `/login` y `curl https://<dominio-api>/suppliers` → 401.
 7. Login con el administrador creado con `create-admin` → el panel muestra su nombre y rol; **Cerrar sesión** vuelve a
    `/login`.
+8. **Recuperación de contraseña (AUTH-03):** `/login` → «¿Olvidaste tu contraseña?» → email del administrador → en el
+   log de la API, `trackflow.email: Email password_reset para el usuario … enviado (id …)` → el email llega (revisar
+   también «Correo no deseado») → su enlace abre `https://backofficetrackflow.rubenlosada.com/reset-password?token=…`
+   → contraseña nueva → login con ella. Si el log dice `Email no enviado: falta RESEND_API_KEY`, el proceso no tiene las
+   variables: reiniciarlo (ver la nota siguiente).
+9. Para un email que no existe, `curl -X POST https://<dominio-api>/auth/forgot-password -H "Content-Type: application/json" -d '{"email": "nadie@trackflow.test"}'`
+   → 200 con el mismo mensaje que para uno registrado.
+
+> **Cambios en las variables:** la API las lee al arrancar. Tras editar el fichero de entorno hay que **reiniciar el
+> servicio**; el `--reload` de desarrollo recarga el código, pero no las variables (comprobado en local el 2026-10-02:
+> una API arrancada antes de añadir `RESEND_API_KEY` no enviaba emails aunque el `.env` ya la tuviera).
 
 ## Comprobado en local (2026-09-28)
 

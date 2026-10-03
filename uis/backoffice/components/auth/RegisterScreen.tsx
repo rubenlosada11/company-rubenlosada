@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AccountCreatedError } from "@/lib/auth";
 import { toFormErrors } from "@/lib/authErrors";
+import { EMAIL_PATTERN, PASSWORD_MIN_LENGTH, passwordProblem } from "@/lib/authRules";
 import { ApiError } from "@/lib/http";
 import type { RegisterPayload } from "@/types/auth";
 import { Spinner } from "./AuthGate";
@@ -13,6 +14,7 @@ import {
   AlertIcon,
   ArrowIcon,
   AuthShell,
+  FieldError,
   iconClasses,
   InfoIcon,
   inputClasses,
@@ -35,11 +37,6 @@ type Values = Record<FieldName, string>;
 const FIELDS: readonly FieldName[] = ["email", "password", "name", "phone", "address", "invitation_code"];
 const EMPTY: Values = { email: "", password: "", name: "", phone: "", address: "", invitation_code: "" };
 
-// Mismas reglas que `services/api/app/auth_models.py`. La API vuelve a validarlo todo (también el teléfono).
-const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const PASSWORD_MIN_LENGTH = 8;
-const PASSWORD_MAX_BYTES = 72;
-
 /** Errores que se detectan sin llamar a la API: obligatorios, formato del email y longitud de la contraseña. */
 function validate(values: Values): Partial<Record<FieldName, string>> {
   const errors: Partial<Record<FieldName, string>> = {};
@@ -47,10 +44,10 @@ function validate(values: Values): Partial<Record<FieldName, string>> {
   if (!email) errors.email = "Escribe tu email.";
   else if (!EMAIL_PATTERN.test(email)) errors.email = "El email no tiene un formato válido.";
   if (!values.password) errors.password = "Elige una contraseña.";
-  else if (values.password.length < PASSWORD_MIN_LENGTH)
-    errors.password = `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`;
-  else if (new TextEncoder().encode(values.password).length > PASSWORD_MAX_BYTES)
-    errors.password = "La contraseña es demasiado larga (máximo 72 bytes; las tildes y la ñ ocupan 2).";
+  else {
+    const problem = passwordProblem(values.password);
+    if (problem) errors.password = problem;
+  }
   return errors;
 }
 
@@ -392,15 +389,5 @@ function Field({ id, label, required, hint, icon, error, extra, children }: Fiel
       <FieldError id={`${inputId}-error`} message={error} />
       {extra && <p className="text-sm">{extra}</p>}
     </div>
-  );
-}
-
-function FieldError({ id, message }: { id: string; message?: string }) {
-  if (!message) return null;
-  return (
-    <p id={id} className="flex items-start gap-1.5 text-sm font-semibold text-red-700">
-      <AlertIcon className="mt-0.5 size-4 shrink-0" />
-      {message}
-    </p>
   );
 }

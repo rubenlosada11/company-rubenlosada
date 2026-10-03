@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.routes import auth, incidents, profiles, suppliers, users
 from app.security import check_auth_config
+from app.services.email import check_email_config
 
 # Orígenes del navegador autorizados (lista separada por comas). Por defecto, el backoffice local (puerto 3002).
 DEFAULT_CORS_ORIGINS = "http://localhost:3002,http://127.0.0.1:3002"
@@ -31,6 +32,8 @@ class UTF8JSONResponse(JSONResponse):
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Sin SECRET_KEY válida la API no arranca: mejor un error claro al iniciar que un 500 en el primer login.
     check_auth_config()
+    # Igual con el email: clave de Resend sin remitente → error al arrancar, no en cada envío.
+    check_email_config()
     yield
 
 

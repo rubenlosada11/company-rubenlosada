@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { FORGOT_PASSWORD_PATH } from "@/lib/auth";
 import { toFormErrors } from "@/lib/authErrors";
 import { ApiError } from "@/lib/http";
 import { Spinner } from "./AuthGate";
@@ -12,9 +13,21 @@ import { AlertIcon, ArrowIcon, AuthShell, iconClasses, InfoIcon, inputClasses, M
 interface LoginScreenProps {
   /** Ruta interna a la que volver tras entrar (ya saneada por la página). */
   next: string;
-  /** Por qué se llega al login: sesión caducada o cierre de sesión voluntario. */
-  reason: "caducada" | "salida" | null;
+  /** Por qué se llega al login: sesión caducada, cierre de sesión voluntario o contraseña restablecida. */
+  reason: "caducada" | "salida" | "restablecida" | null;
 }
+
+const REASON_NOTICES = {
+  caducada: {
+    text: "Tu sesión ha caducado. Vuelve a iniciar sesión para continuar.",
+    classes: "border-amber-200 bg-amber-50 text-amber-900",
+  },
+  salida: { text: "Has cerrado sesión correctamente.", classes: "border-blue-200 bg-blue-50 text-blue-900" },
+  restablecida: {
+    text: "Contraseña actualizada. Inicia sesión con tu nueva contraseña.",
+    classes: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  },
+} as const;
 
 function loginErrorMessage(error: unknown): string {
   if (error instanceof ApiError && error.status === 422) return "Revisa el email y la contraseña.";
@@ -73,16 +86,10 @@ export function LoginScreen({ next, reason }: LoginScreenProps) {
       {reason && !error && (
         <p
           role="status"
-          className={`mt-6 flex items-start gap-2.5 rounded-xl border p-3 text-sm ${
-            reason === "caducada"
-              ? "border-amber-200 bg-amber-50 text-amber-900"
-              : "border-blue-200 bg-blue-50 text-blue-900"
-          }`}
+          className={`mt-6 flex items-start gap-2.5 rounded-xl border p-3 text-sm ${REASON_NOTICES[reason].classes}`}
         >
           <InfoIcon className="mt-0.5 size-4 shrink-0" />
-          {reason === "caducada"
-            ? "Tu sesión ha caducado. Vuelve a iniciar sesión para continuar."
-            : "Has cerrado sesión correctamente."}
+          {REASON_NOTICES[reason].text}
         </p>
       )}
 
@@ -134,6 +141,15 @@ export function LoginScreen({ next, reason }: LoginScreenProps) {
             disabled={busy}
             invalid={Boolean(error)}
           />
+          {/* Tras el campo (y no junto a la etiqueta): con el teclado se pasa del email a la contraseña sin desvíos. */}
+          <p className="text-right">
+            <Link
+              href={FORGOT_PASSWORD_PATH}
+              className="text-sm font-semibold text-blue-700 underline-offset-2 hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </p>
         </div>
 
         <button

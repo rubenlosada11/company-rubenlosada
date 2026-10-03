@@ -6,7 +6,7 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/auth-frontend` (desde `main` @ `f1f5171`, que ya incluye las PR #3–#12).
+- **Rama de trabajo:** `feature/password-reset` (desde `origin/main` @ `91e808e`, que ya incluye las PR #3–#13).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (práctica sin número de hito; contexto en
@@ -20,9 +20,12 @@
   `docs/autenticacion.md`. Mejora posterior: botón de cerrar sesión en el sidebar (PR #12).
 - **Flujos de autenticación del frontend (AUTH-02)** (práctica sin número de hito): implementados y validados en
   `feature/auth-frontend` (registro, perfil, token en `localStorage`, vistas protegidas y, como mejora adicional,
-  código de invitación en la API). Commit hecho en la rama; pendiente: push y PR (el desarrollador hará cambios
-  menores más adelante).
-- **Última actualización:** 2026-10-01.
+  código de invitación en la API). PR #13 fusionada el 2026-10-01 (`91e808e`).
+- **Recuperación y cambio de contraseña (AUTH-03)** (práctica sin número de hito): **en curso** en
+  `feature/password-reset`, por fases (1–11 con parada y confirmación; 12–18 en automático por indicación del
+  desarrollador). **Implementado, validado y con commit en la rama**; pendiente: push y PR (el texto de la PR está
+  preparado; no se abre sin indicación). Email con Resend y el dominio `rubenlosada.com` ya verificado por el desarrollador.
+- **Última actualización:** 2026-10-02.
 
 | Componente | Estado |
 | --- | --- |
@@ -34,7 +37,8 @@
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | Autenticación (AUTH-01) | ✅ API: `User`/`Profile` en TinyDB, JWT, `/auth`, `/users`, `/profiles` y 8 rutas existentes protegidas (269 tests). Backoffice: `/login` y panel protegido (E2E 34/34). Solo local |
-| Autenticación frontend (AUTH-02) | 🟡 Implementado, validado y con commit en `feature/auth-frontend` (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE`. Falta push y PR |
+| Autenticación frontend (AUTH-02) | ✅ PR #13 fusionada (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE` |
+| Recuperación y cambio de contraseña (AUTH-03) | 🟡 Commit en `feature/password-reset`, falta push y PR: API completa: persistencia, email, los tres endpoints y cambio de email con contraseña (473 tests) `/forgot-password` (E2E 39/39) y `/reset-password` (E2E 51/51) enlace en `/login` (E2E 26/26) y `/account/change-password` (E2E 42/42); E2E de punta a punta 33/33 con emails reales; regresión de AUTH-02 en verde |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
 | Analizador de incidencias | ✅ Entregado (PR #9): paquete + script (70 tests), API (144 tests), `/incidencias` (navegador 19/19), capturas; en producción muestra el aviso de API no configurada |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
@@ -745,6 +749,148 @@ hito: commit `Autenticación JWT — …`, sin `docs/hitos.md`.
 - Edge pide a veces `/favicon.ico` (404): el backoffice solo tiene `app/icon.png` desde el Hito 4.
 - Los 422 de FastAPI devuelven el valor recibido (`input`), contraseña incluida (riesgo 6 de `docs/autenticacion.md`).
 
+### 2026-10-01 — Recuperación y cambio de contraseña (AUTH-03, rama `feature/password-reset`)
+
+Ticket AUTH-03 (prompt del curso), **por fases con parada y confirmación**. Práctica sin hito: commit
+`Autenticación JWT — …`, sin `docs/hitos.md`. Documentación en Notion («Prácticas — Bootcamp» + página propia).
+
+**Decisiones del desarrollador (fase 1)**
+
+- **D1:** `PUT /users/{id}` deja de admitir `password`; la única vía es `POST /auth/change-password` (con la actual).
+- **D2:** `password_changed_at` en `User`: los JWT con `iat` anterior dejan de valer (reset y cambio revocan sesiones).
+- **D3:** email con **Resend** por su API REST con `urllib` (sin dependencia nueva). El desarrollador verificó el
+  dominio `rubenlosada.com` en Resend (registros `send` y `resend._domainkey` en Cloudflare; el correo de Hostinger
+  no cambia) y puso `RESEND_API_KEY`/`MAIL_FROM` en su `.env` (el agente no ve la clave).
+- **D4:** sin modo consola: sin `RESEND_API_KEY` la API arranca, no envía y avisa en el log sin el token.
+- **D5:** límite silencioso de 1 enlace por usuario cada 60 s.
+- **D6:** autorizado editar `services/api/.env.example` (solo nombres de variables).
+
+**Fases**
+
+- **1 · Auditoría:** AUTH-02 ya estaba en `main` (PR #13); rama creada desde `origin/main`. Sin ORM ni migraciones
+  (TinyDB), sin proveedor de email. Hallazgo: `PUT /users/{id}` cambiaba la contraseña sin pedir la actual (→ D1).
+- **2 · Diseño:** token opaco (`secrets.token_urlsafe(32)`), solo su SHA-256 en TinyDB, 30 min, un solo uso;
+  envío en `BackgroundTasks`; 400 único para cualquier token no válido; `change-password` devuelve un JWT nuevo.
+- **3 · Persistencia:** `PasswordResetToken` y `User.password_changed_at` (opcional; solo se guarda tras el primer
+  cambio, así que el test de claves exactas de AUTH-01 no cambia), `RESET_TOKEN_EXPIRE_MINUTES` (15–60, la API no
+  arranca fuera de rango) y `app/services/password_reset.py` (emitir, estado, usar, revocar). Usar un token es
+  atómico bajo `_auth_lock`. 33 tests nuevos (320 en total); mutaciones: sin `used_at` → 3 fallan, sin caducidad → 4,
+  comprobación y escritura en dos aperturas → falla el test de concurrencia.
+- **4 · Email:** `app/services/email.py` (`EmailSender`, `ResendSender` con `urllib` + `Idempotency-Key` +
+  `User-Agent` propio + timeout de 10 s, `DisabledSender` sin clave, dependencia `get_email_sender`, `deliver` que
+  nunca lanza y registra solo propósito, id de usuario y tipo de error de Resend), `app/email_templates.py` (HTML con
+  tablas y estilos en línea, 600 px, sin imágenes externas, URL escapada, más texto plano), `FRONTEND_BASE_URL` y
+  `password_reset_url` en `security.py`, `check_email_config` en el `lifespan` (clave sin `MAIL_FROM` válida → la API
+  no arranca) y `.env.example` (`RESEND_API_KEY=`, `MAIL_FROM=` y los opcionales comentados). `conftest.py` borra las
+  variables de email del entorno: ningún test envía de verdad. 39 tests (359 en total); mutaciones: sin escapar la URL
+  → 1 falla, mensaje del proveedor en el error → 7. Email revisado en Edge sin interfaz a 900, 390 y 320 px (iframes:
+  Edge impone ~500 px de ventana mínima). Verificación real (el desarrollador creó la API key): API
+  arranca con su `.env` (`/health` 200) y envío a `delivered@resend.dev` → Resend `last_event: delivered`, remitente
+  `TrackFlow <no-reply@rubenlosada.com>`. **Hallazgo:** `uv run --env-file` no admite `MAIL_FROM` sin comillas (espacio
+  y `<`): lo descarta junto con todas las líneas siguientes (solo un aviso). La validación de arranque lo detectó; en
+  `.env.example` se exige `MAIL_FROM="…"`. El desarrollador cambió la clave por una de solo envío
+  (`GET /emails` → `401 restricted_api_key`, comprobado). Segundo hallazgo: su línea quedó
+  `MAIL_FROM=MAIL_FROM="…"` y Resend la aceptó con el nombre «MAIL_FROM=TrackFlow»; `check_email_config` ahora exige
+  `direccion@dominio.tld` o `Nombre <direccion@dominio.tld>` (nombre sin `<>@="`) y rechaza ese caso (12 tests más;
+  371 en total). Verificación final con el `.env` corregido, sin variables pasadas a mano:
+  `MAIL_FROM="TrackFlow <no-reply@rubenlosada.com>"`, envío real a `delivered@resend.dev` correcto, `uvicorn` con
+  `--env-file .env` (puerto 8011) arranca sin avisos y `GET /health` → 200.
+- **5 · `POST /auth/forgot-password`:** `ForgotPasswordRequest` (formato con `check_email`, máx. 254) y
+  `MessageResponse`; siempre 200 con el mismo cuerpo; solo para usuarios activos y fuera del límite de 60 s se emite el
+  enlace y se envía con `BackgroundTasks` + `deliver` (idempotencia `password-reset/<id>`). 22 tests (393 en total):
+  existente/inexistente con cuerpo y cabeceras idénticos, normalización, 8 formatos inválidos → 422, repeticiones,
+  enlace nuevo anula el anterior, inactivo, errores del proveedor, sin clave, nada en logs, `FRONTEND_BASE_URL`,
+  pública. Mutación «mensaje distinto si no existe» → falla. **Servidor real** (`uvicorn :8011`, TinyDB en el
+  scratchpad, `.env` del desarrollador): 10 envíos reales a `delivered+…@resend.dev` registrados en el log sin token;
+  cuerpos y cabeceras idénticos; repetida → 200 sin email; inválido → 422. Tiempos con pausas: medianas 51 ms (existe)
+  y 47 ms (no existe). Sin pausas, la petición que sigue a un envío en curso tarda algo más: canal lateral débil,
+  documentado como riesgo residual.
+- **6 · `POST /auth/reset-password`:** `ResetPasswordRequest` (`token` ≤ 512, `new_password` con `check_password`).
+  Comprobación rápida del token antes de bcrypt (un token inventado no gasta CPU) y uso atómico con
+  `consume_reset_token`; 400 con un único mensaje para cualquier enlace no válido; 422 si la contraseña no cumple (el
+  token no se gasta). **Revocación (D2):** `issued_after_password_change` en `get_current_user`: 401 `Token no válido.`
+  si `iat < floor(password_changed_at)` (margen de 1 s). 37 tests (430 en total), incluidos 4 resets simultáneos con
+  el mismo token → un 200 y tres 400. Mutaciones: sin revocación → 2 fallan; sin comprobación previa → 1; ignorando el
+  fallo atómico → 2. Servidor real (`:8011`, TinyDB temporal): 10/10 (sesión antigua → 401 en `/auth/me` y
+  `/suppliers`, reutilización → 400, login nuevo OK, nada sensible en el log).
+- **7 · `POST /auth/change-password`:** `ChangePasswordRequest` (`current_password` ≤ 200 sin reglas de formato,
+  `new_password` con `check_password` y distinta de la actual → 422). Actual incorrecta → **400** (no 401: el frontend
+  no cierra la sesión). `users.change_password` guarda hash y `password_changed_at` (todas las sesiones anteriores →
+  401), `revoke_reset_tokens` anula enlaces pendientes y se devuelve un `Token` nuevo. **D1:** `UserUpdate` sin
+  `password` (422) y `update_user` sin la rama de contraseña; adaptados 3 tests de AUTH-01 (ahora prueban la propiedad
+  con `email`) + 2 nuevos. 30 tests (460 en total). Mutaciones: sin comprobar la actual → 5 fallan; sin anular enlaces →
+  1; sin `password_changed_at` → 4. Servidor real 13/13. **Riesgo detectado y cerrado (D7, opción a del desarrollador):**
+  `PUT /users/{id}` cambiaba el **email** solo con el token; con `forgot-password` eso permitía tomar la cuenta con un
+  token robado. Ahora cambiar el email exige `current_password` (400 si falta o es incorrecta; los permisos se
+  comprueban antes) y anula los enlaces pendientes. 13 tests (473 en total), incluida la cadena de ataque completa;
+  mutación sin la comprobación → 6 fallan; servidor real 6/6.
+- **8 · `/forgot-password`:** `ForgotPasswordScreen` (sobre `AuthShell`) y `app/forgot-password/page.tsx` (estática,
+  pública, accesible también con sesión). Mensaje genérico **fijo en el frontend** (`FORGOT_PASSWORD_MESSAGE` en
+  `lib/auth.ts`), no el de la API; tras enviar, el formulario se sustituye por «Revisa tu correo» con el foco en el
+  título. `authApi.forgotPassword` con `auth: false`; `safeNextPath` excluye `/forgot-password` y `/reset-password`.
+  Refactor sin cambios visibles: reglas de email/contraseña a `lib/authRules.ts` y `FieldError` a `AuthShell`
+  (`RegisterScreen` las importa). Validación: lint y typecheck en el repo; build en una **copia aislada** del
+  backoffice (`:3003`, `npm ci` en el scratchpad: Turbopack no admite un `node_modules` enlazado fuera de la raíz) con la
+  API en `:8011` (TinyDB temporal, `.env` real); el desarrollador tenía `next dev` en `:3002` y su API en `:8000`.
+  E2E 39/39 (validación sin petición, existe/no existe con pantalla idéntica, doble clic + Enter → 1 petición, error de
+  red y reintento, 500, 422, navegación, con sesión sin tocar el token, 390 px, sin `localStorage`, consola limpia) y
+  regresión de `/register` 8/8. Un email real enviado (el resto, por el límite de 60 s).
+- **9 · `/reset-password`:** página dinámica (lee `?token=` en el servidor, como `/login`) con
+  `referrer: no-referrer`; `ResetPasswordScreen` con tres estados: sin token («Falta el enlace», sin formulario),
+  formulario (nueva + confirmación; vacío, longitud, 72 bytes y «no coinciden» sin llamar a la API) y enlace rechazado
+  (400 → «Este enlace ya no sirve» + «Volver a recuperar contraseña»). Éxito: `logout()` (la API ya revocó las sesiones;
+  así también las demás pestañas) y `router.replace("/login?motivo=restablecida")` (el token sale del historial); el
+  login muestra el aviso verde (`REASON_NOTICES` en `LoginScreen`). `PasswordInput` admite `name`; `authErrors` tiene
+  etiquetas de `new_password`, `current_password` y `token`. E2E 51/51 (sin token ×3, validación, éxito con sesión
+  previa → sesión local borrada y la antigua 401 en la API, login con la nueva, reutilizado/caducado/manipulado → aviso
+  y enlace, 422, sin red, 500, doble clic → 1 petición, 390 px) y avisos `caducada`/`salida` del login sin cambios.
+- **10 · Enlace en `/login`:** «¿Olvidaste tu contraseña?» → `/forgot-password`, **bajo** el campo de contraseña y
+  alineado a la derecha (junto a la etiqueta, el tabulador pasaba del email al enlace). Sin más cambios en el login.
+  E2E 26/26: enlace y orden del tabulador (email → contraseña → mostrar → enlace → botón), visible con avisos y errores,
+  y regresión de AUTH-02 (vacío sin petición, credenciales incorrectas, login → panel con token, ruta privada →
+  `?next=` → vuelta, Bearer en `/auth/me`, cerrar sesión, `next=//evil.example`, `next=/reset-password` no es destino,
+  enlace a `/register`, 390 px).
+- **11 · `/account/change-password`:** página en `app/(panel)/` (protegida por `AuthGate`) con `ChangePasswordForm`
+  (actual, nueva y confirmación; vacío, longitud, igual a la actual y «no coinciden» sin llamar a la API). 400 → error
+  en «Contraseña actual» sin cerrar la sesión; 422 → en su campo; 401 → lo gestiona `lib/http.ts` (login con «sesión
+  caducada»). `AuthProvider.changePassword` guarda el token nuevo y **reprograma el temporizador de caducidad**
+  (`tokenVersion`); sin eso la sesión se cerraba al caducar el token antiguo (mutación en la copia → falla justo esa
+  comprobación). Tarjeta «Seguridad» en Mi perfil y «Volver a Mi perfil». E2E 42/42 con tokens de 1 minuto (ruta
+  protegida y `?next=`, acceso desde el perfil, validación, actual incorrecta, éxito: token nuevo, la sesión sigue, las
+  demás → 401, otra pestaña sigue dentro; sesión revocada → 401 → login; 422, sin red, 500, doble clic; 390 px;
+  caducidad reprogramada y cierre al caducar el nuevo).
+
+Fases 12–18 en automático (indicación del desarrollador: «avanza salvo decisión crítica»):
+
+- **12 · Validación E2E (33/33):** flujos A–F en el navegador con **envío real por Resend**; la API se arrancó con un
+  lanzador del scratchpad (`run_api_capture.py`) que, además de enviar, guarda el texto del email para abrir
+  exactamente el enlace enviado. A (login → enlace → `/forgot-password` → 200 → email con enlace y caducidad), B (reset →
+  aviso → login con la nueva; la sesión anterior 401), C (reutilizado → 400), D (enlace del email caducado → 400), E
+  (perfil → cambio → logout → login con la nueva) y F (existe/no existe: mismo código, cuerpo, cabeceras y pantalla; solo
+  un email). 3 envíos reales; token ausente de los logs.
+- **13 · Regresión de AUTH-02** con sus baterías originales (sesión `12b6ccde…`, puertos adaptados a `:3003`/`:8011`,
+  website en `:3001`, landing en `:8080`): fases 3 (23/23), 4 (29/29), 5 con código (42/42) y abierta (4/4), 7 (38/38),
+  8 (28/28) y 6 (48/50). Los 2 fallos de la fase 6 son de la landing estática: `serve` redirige `application.html` →
+  `application` y la comprobación esperaba la URL exacta; sin login, sin almacenamiento, sin API; `uis/landing` y
+  `uis/website` sin cambios (`git diff` vacío).
+- **14 · Seguridad:** sin `.env` versionados (`git check-ignore` en `services/api/.env` y `uis/backoffice/.env.local`);
+  ninguna clave en código, historial, logs ni bundle (`api.resend.com`, `RESEND`, `MAIL_FROM`, `SECRET_KEY`: 0); en la
+  TinyDB de la fase 12 los 3 tokens enviados solo están como SHA-256 y las contraseñas como bcrypt.
+- **15 · Calidad:** `uv lock --check`; 473 tests de la API; 70 de `scripts` y del paquete; backoffice `lint`,
+  `typecheck` y `build` **en el repo** (con el `next dev` del desarrollador en marcha: Next 16 lo aísla en `.next/dev`);
+  `next start` en `:3004` + `check-route.mjs` en 7 rutas (200, sin errores en el servidor); 0 avisos de hidratación en
+  `next dev` (copia, 8 pantallas). Documentación: `docs/autenticacion.md` (sección AUTH-03, rutas, errores,
+  configuración, riesgos 6–10 y ficheros), READMEs de la API y del backoffice, `techContext.md`.
+- **17 · Commit** `108c437` `Autenticación JWT — recuperación y cambio de contraseña con emails reales (AUTH-03)`;
+  **18 ·** texto de la PR preparado (no se abre sin indicación del desarrollador).
+- **Prueba manual del desarrollador (2026-10-02): todo correcto** con su buzón real (Hotmail): «¿Olvidaste tu
+  contraseña?» → email → enlace → contraseña nueva → login. Incidencia previa resuelta: tenía **dos APIs** arrancadas en
+  `:8000`; atendía la de la víspera, lanzada **antes** de añadir `RESEND_API_KEY` al `.env` (`uv run --env-file` solo lee
+  el `.env` al arrancar y `--reload` no lo relee), así que usaba `DisabledSender` y no enviaba (el enlace sí se creaba).
+  Solución: cerrar ambas y arrancar una sola. Documentado en el README de la API y en `docs/despliegue-api.md`, que
+  además recoge ya las variables de AUTH-03 (`RESEND_API_KEY`, `MAIL_FROM`, `FRONTEND_BASE_URL`,
+  `RESET_TOKEN_EXPIRE_MINUTES`) y los pasos de verificación 8–9.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -760,6 +906,8 @@ hito: commit `Autenticación JWT — …`, sin `docs/hitos.md`.
 - Despliegue de la API (`docs/despliegue-api.md`): topología (A subdominio / B mismo host) y, si es A, el subdominio
   y su DNS; quitar el Basic Auth del proxy delante de la API (choca con el Bearer). **Desplegar la API antes que el
   backoffice de `main`**: sin API, el login deja el panel inaccesible.
+- AUTH-03: hacer push de `feature/password-reset` y abrir la PR (texto preparado). En producción, la API necesita
+  `RESEND_API_KEY`, `MAIL_FROM` y `FRONTEND_BASE_URL` con la URL pública del backoffice.
 - Autenticación: cualquier usuario autenticado puede operar proveedores e incidencias. El registro se limita con
   `REGISTRATION_CODE` (AUTH-02): **definirlo al publicar la API**. Pendiente decidir si se exige `admin`/`manager` en
   las escrituras y un límite de intentos de login y de código.

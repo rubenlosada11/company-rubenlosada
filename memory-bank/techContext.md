@@ -18,7 +18,7 @@ JS es autónomo, con su propio `package.json` y `package-lock.json`, y se opera 
 | `uis/backoffice/` | Hito 4. Aplicación interna (Next.js). |
 | `packages/shared/` | `@repo/shared-types`: tipos de dominio (`Carrier`, `Shipment`, `ReturnRequest`, `Client`) y utilidades TS puras. `dist/` está versionado. |
 | `packages/analisis-incidencias/` | Paquete Python (solo biblioteca estándar, `uv_build`, `src/`): carga, validación, métricas y exportación del CSV de incidencias de CX. Lo usan `scripts/analyze.py` y `services/api`. Contexto: `CONTEXT-incidencias.es.md`. |
-| `services/api/` | **FastAPI + Pydantic + TinyDB**, Python gestionado con **uv** (`pyproject.toml` + `uv.lock` propios), tests con `pytest`. Directorio de proveedores (`/suppliers`, contexto `CONTEXT-directorio.md`), analizador de incidencias (`/api/incidents`, contexto `CONTEXT-incidencias.es.md`) y autenticación JWT (`/auth`, `/users`, `/profiles`; `docs/autenticacion.md`). |
+| `services/api/` | **FastAPI + Pydantic + TinyDB**, Python gestionado con **uv** (`pyproject.toml` + `uv.lock` propios), tests con `pytest`. Directorio de proveedores (`/suppliers`, contexto `CONTEXT-directorio.md`), analizador de incidencias (`/api/incidents`, contexto `CONTEXT-incidencias.es.md`) y autenticación JWT (`/auth`, `/users`, `/profiles`; `docs/autenticacion.md`), con recuperación y cambio de contraseña y emails por Resend (AUTH-03). |
 | `scripts/` | `analyze.py`: CLI del analizador de incidencias (+ `incidents-trackflow.csv` de prueba y `tests/`). |
 | `agents/`, `skills/`, `mcps/`, `workflows/`, `data/`, `infra/`, `internal/`, `shared/` | Solo README/plantillas (`agents/_template`, `skills/_template`). |
 | `docs/` | `hitos.md` (registro de hitos), `ARCHITECTURE_PROPOSAL.md` (propuesta de backend; no es un hito) + READMEs. |
@@ -119,7 +119,7 @@ tienen: las pruebas en navegador se hacen fuera del repo (Edge + `playwright-cor
 | Acción | Comando |
 | --- | --- |
 | Instalar dependencias (crea `.venv`) | `uv sync` |
-| Crear `.env` (la primera vez; pegar una `SECRET_KEY` generada; `REGISTRATION_CODE` opcional, ≥ 12 caracteres) | `Copy-Item .env.example .env` |
+| Crear `.env` (la primera vez; pegar una `SECRET_KEY` generada; `REGISTRATION_CODE` opcional, ≥ 12 caracteres; para enviar emails, `RESEND_API_KEY` y `MAIL_FROM="Nombre <dir@dominio>"` **entre comillas**) | `Copy-Item .env.example .env` |
 | Cargar proveedores iniciales (idempotente) | `uv run seed` |
 | Crear o promover el primer administrador | `uv run --env-file .env create-admin <email>` |
 | Arrancar la API (no arranca sin `SECRET_KEY`) | `uv run --env-file .env uvicorn app.main:app --reload --port 8000` |
@@ -222,6 +222,28 @@ Contexto: ticket AUTH-02. Rama `feature/auth-frontend` (2026-10-01). Documentaci
 | Foco tras error con un efecto posterior al render | Durante el envío los inputs están `disabled` y no aceptan foco (fallo heredado de AUTH-01 en el login, corregido). |
 | Perfil: se envían siempre `name`, `phone` y `address` (vacío → `null`) | `PUT /profiles/me` exige al menos un campo y `null` borra el dato. Email y rol de solo lectura. |
 | Commit `Autenticación JWT — …`, sin `docs/hitos.md` | Práctica sin hito (D6). |
+
+## Decisiones técnicas de la recuperación y el cambio de contraseña (AUTH-03)
+
+Contexto: ticket AUTH-03. Rama `feature/password-reset` (2026-10-01/02). Documentación: `docs/autenticacion.md`
+(sección «Recuperación y cambio de contraseña (AUTH-03)»). Solo `services/api` y `uis/backoffice`.
+
+| Decisión | Motivo |
+| --- | --- |
+| Tabla `password_reset_tokens` en `db/auth.json` (sin migraciones: TinyDB) con `token_hash` SHA-256, `expires_at`, `used_at` | Estado en servidor para invalidar el enlace (un JWT con `exp` no basta). SHA-256 basta para 256 bits aleatorios y permite buscar. |
+| Token opaco `secrets.token_urlsafe(32)`; 30 min (`RESET_TOKEN_EXPIRE_MINUTES`, 15–60); el último enlace anula los anteriores | Requisitos del ticket; la API no arranca fuera de rango. |
+| Uso atómico bajo `_auth_lock` (comprobar + `used_at` + contraseña); bcrypt antes, fuera del candado; filtro previo a bcrypt | Un solo uso con peticiones simultáneas (un solo worker); un token inventado no gasta CPU. |
+| `forgot-password`: siempre 200 con el mismo cuerpo; email en `BackgroundTasks`; 1 enlace por usuario cada 60 s; inactivos sin enlace | No enumerar usuarios (tampoco por tiempo); sin bombardeo de emails. |
+| Resend con `urllib` (sin dependencia), `EmailSender` + `get_email_sender` (tests con emisor falso), `DisabledSender` sin clave, `deliver` que nunca lanza | Un solo `POST`; ningún test envía emails; un fallo del proveedor no cambia la respuesta. Logs sin token, enlace, clave ni destinatario. |
+| `MAIL_FROM` validado (`dir@dominio.tld` o `Nombre <dir@dominio.tld>`, sin `=`/comillas en el nombre) | Hallazgos reales: sin comillas `uv run --env-file` descarta la línea y las siguientes; con la línea duplicada Resend aceptaba el nombre «MAIL_FROM=TrackFlow». |
+| Dominio `rubenlosada.com` verificado en Resend (`send` MX/TXT, `resend._domainkey` TXT en Cloudflare); remitente `no-reply@`; clave de solo envío | Sin dominio, Resend solo entrega al titular. No toca el correo de Hostinger. |
+| `User.password_changed_at` (opcional, solo tras el primer cambio) + `get_current_user` rechaza `iat < floor(password_changed_at)` | Reset y cambio cierran todas las sesiones (D2). `change-password` devuelve un token nuevo. |
+| `change-password`: 400 (no 401) con la actual incorrecta | El backoffice cierra la sesión ante un 401. |
+| `PUT /users/{id}` sin `password` (422) y cambio de email solo con `current_password` (anula enlaces pendientes) | D1 y D7: con un token robado no se puede cambiar la contraseña ni el email (cadena email → enlace → cuenta robada). |
+| Backoffice: `/forgot-password` (mensaje fijo en el frontend), `/reset-password` (dinámica, `referrer: no-referrer`, `router.replace`), `/account/change-password` en `(panel)` | Reutiliza `AuthShell`, `http.ts`, `AuthGate`; `lib/authRules.ts` comparte las reglas con el registro. |
+| `AuthProvider.changePassword` guarda el token y reprograma la caducidad (`tokenVersion`) | Sin ello la sesión se cerraba al caducar el token antiguo (verificado con mutación y tokens de 1 minuto). |
+| Pruebas E2E con una copia aislada del backoffice (`:3003`, `npm ci` propio: Turbopack rechaza un `node_modules` enlazado fuera de la raíz) y API en `:8011` con TinyDB temporal | El desarrollador tenía `next dev` en `:3002` y su API en `:8000`. Next.js 16 aísla `next dev` en `.next/dev`, así que el `npm run build` del repo no lo rompe. |
+| Commit `Autenticación JWT — … (AUTH-03)`, sin `docs/hitos.md` | Práctica sin hito. |
 
 ## Decisiones técnicas del analizador de incidencias
 

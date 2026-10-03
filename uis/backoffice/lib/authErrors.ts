@@ -13,6 +13,9 @@ export const FIELD_LABELS: Record<string, string> = {
   phone: "Teléfono",
   address: "Dirección",
   invitation_code: "Código de invitación",
+  new_password: "Contraseña nueva",
+  current_password: "Contraseña actual",
+  token: "Enlace",
 };
 
 const EXACT: Record<string, string> = {

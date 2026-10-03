@@ -110,15 +110,28 @@ Resumen. El detalle (permisos, errores, verificación y auditoría) está en
   de datos.
 - JWT HS256 con `sub` (UUID del usuario en TinyDB), `iat` y `exp`. Sin sesiones ni cookies.
 - La dependencia `get_current_user` ([`app/dependencies.py`](./app/dependencies.py)) valida el token y devuelve el
-  usuario activo. Cualquier fallo es un 401; actuar sobre algo ajeno es un 403.
+  usuario activo. Cualquier fallo es un 401; actuar sobre algo ajeno es un 403. Desde AUTH-03 también rechaza los
+  tokens emitidos antes del último cambio de contraseña (`password_changed_at`).
+- **Recuperación de contraseña (AUTH-03):** enlaces opacos de un solo uso (30 min, solo su SHA-256 en
+  `db/auth.json`, tabla `password_reset_tokens`) enviados con [Resend](https://resend.com) desde
+  [`app/services/email.py`](./app/services/email.py). Variables: `RESEND_API_KEY` (sin ella no se envían emails),
+  `MAIL_FROM` **entre comillas dobles** en el `.env` (`MAIL_FROM="TrackFlow <no-reply@tu-dominio>"`, dominio verificado
+  en Resend), `FRONTEND_BASE_URL` (por defecto `http://localhost:3002`) y `RESET_TOKEN_EXPIRE_MINUTES` (15–60, 30 por
+  defecto). Los tests nunca envían emails. **Si cambias el `.env`, para la API (`Ctrl+C`) y vuelve a arrancarla:**
+  `--reload` recarga el código, pero no las variables. Comprueba también que no queden dos APIs arrancadas: la antigua
+  seguiría ocupando el puerto 8000. Al pedir un enlace, la consola debe mostrar
+  `trackflow.email: Email password_reset … enviado (id …)`.
 
 | Método y ruta | Acceso |
 | --- | --- |
 | `POST /users` | pública: registro, siempre con rol `user`; con `REGISTRATION_CODE`, exige `invitation_code` (si no, 403) |
 | `POST /auth/login` · `POST /auth/token` | pública: JSON `{email, password}` · formulario OAuth2 de Swagger |
 | `GET /auth/me` | Bearer: email, rol y perfil |
+| `POST /auth/forgot-password` | pública: siempre 200 con el mismo mensaje; si el email es de un usuario activo, envía el enlace por email (AUTH-03) |
+| `POST /auth/reset-password` | pública: `{token, new_password}`; enlace de un solo uso (400 si no vale); cierra todas las sesiones (AUTH-03) |
+| `POST /auth/change-password` | Bearer: `{current_password, new_password}` (400 si la actual no es correcta); devuelve un token nuevo y cierra las demás sesiones (AUTH-03) |
 | `GET /users` · `GET /users/{id}` | Bearer: `admin`/`manager`, o el propio usuario en `/{id}` |
-| `PUT /users/{id}` | Bearer: email y contraseña, el propio usuario; `role` e `is_active`, solo `admin` |
+| `PUT /users/{id}` | Bearer: email, el propio usuario y con `current_password`; `role` e `is_active`, solo `admin`. Sin `password` (422): se cambia con `/auth/change-password` |
 | `DELETE /users/{id}` | Bearer: el propio usuario o `admin` (borra también el perfil) |
 | `GET /profiles/me` · `PUT /profiles/me` | Bearer: solo el propio perfil |
 | Las 6 rutas de `/suppliers` y las 2 de `/api/incidents` | Bearer: cualquier usuario autenticado |
@@ -344,10 +357,11 @@ Swagger UI (`/docs`, botón “Try it out” y selector de fichero).
 uv run pytest -q
 ```
 
-287 tests con pytest y `TestClient`: 118 del directorio de proveedores (cada uno sobre una base TinyDB temporal; nunca
-tocan `db/suppliers.json`), 26 del analizador de incidencias y 143 de autenticación. No hace falta `.env`:
-[`tests/conftest.py`](./tests/conftest.py) pone una `SECRET_KEY` de pruebas y una base de usuarios temporal en cada
-test, y el fixture `client` va autenticado. Así los tests anteriores comprueban que las rutas protegidas siguen
+473 tests con pytest y `TestClient`: 118 del directorio de proveedores (cada uno sobre una base TinyDB temporal; nunca
+tocan `db/suppliers.json`), 26 del analizador de incidencias, 145 de autenticación y 184 de recuperación y cambio de
+contraseña (AUTH-03). No hace falta `.env`: [`tests/conftest.py`](./tests/conftest.py) pone una `SECRET_KEY` de pruebas
+y una base de usuarios temporal en cada test, borra las variables de email (ningún test envía emails de verdad) y el
+fixture `client` va autenticado. Así los tests anteriores comprueban que las rutas protegidas siguen
 funcionando con un token válido.
 
 | Fichero | Qué cubre |
@@ -358,6 +372,8 @@ funcionando con un token válido.
 | [`tests/test_api.py`](./tests/test_api.py) | Los 6 endpoints: 201/200/204, filtros y combinación, 404, 422, `updated_at`, persistencia al reiniciar (otro proceso), CORS, UTF-8 |
 | [`tests/test_incidents.py`](./tests/test_incidents.py) | Valores esperados del CONTEXT, equivalencia con el script y exportación idéntica byte a byte, 400/404/413/415/422/500, último análisis, sin correos en JSON/log/exportación, CORS y `Content-Disposition` expuesto |
 | [`tests/test_auth.py`](./tests/test_auth.py) | Usuarios y perfiles en TinyDB, bcrypt, roles, login, JWT (válido, malformado, caducado, otra firma, `alg: none`, sin claims, usuario borrado o desactivado), configuración, código de invitación (`REGISTRATION_CODE`), 401/403/404/409, ownership, las 8 rutas existentes protegidas, `create-admin` |
+| [`tests/test_password_reset.py`](./tests/test_password_reset.py) | AUTH-03: enlaces (solo hash, caducidad, un solo uso, concurrencia, límite de 60 s, limpieza), `forgot-password` (misma respuesta exista o no el email), `reset-password` (tokens no válidos, cierre de sesiones), `change-password` y cambio de email con contraseña |
+| [`tests/test_email.py`](./tests/test_email.py) | AUTH-03: configuración de Resend y `MAIL_FROM`, petición exacta a la API de Resend, errores del proveedor, logs sin datos sensibles y plantilla del email |
 
 ## Persistencia
 
@@ -380,17 +396,18 @@ El acceso está en [`app/database.py`](./app/database.py): cada uso abre el fich
 services/api/
 ├── pyproject.toml        # dependencias (incl. ../../packages/analisis-incidencias), scripts `seed` y `create-admin`
 ├── uv.lock
-├── .env.example          # SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES y REGISTRATION_CODE (copiar a .env, ignorado)
+├── .env.example          # SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES, REGISTRATION_CODE, RESEND_API_KEY, MAIL_FROM… (copiar a .env, ignorado)
 ├── app/
 │   ├── main.py           # FastAPI, CORS, JSON UTF-8, logger `trackflow`, /health, comprobación de SECRET_KEY
 │   ├── models.py         # modelos Pydantic de proveedores y valores válidos del CONTEXT
-│   ├── auth_models.py    # User, Profile, Role y schemas de entrada/salida de autenticación
-│   ├── security.py       # bcrypt, JWT y código de invitación (configuración desde el entorno)
+│   ├── auth_models.py    # User, Profile, Role, PasswordResetToken y schemas de entrada/salida de autenticación
+│   ├── security.py       # bcrypt, JWT, código de invitación y enlaces de recuperación (configuración desde el entorno)
+│   ├── email_templates.py  # email de recuperación de contraseña (HTML + texto)
 │   ├── dependencies.py   # OAuth2PasswordBearer + get_current_user
 │   ├── database.py       # TinyDB (proveedores y usuarios)
 │   ├── seed.py           # `uv run seed`
 │   ├── create_admin.py   # `uv run create-admin <email>`
-│   ├── services/         # users.py, profiles.py (CRUD en TinyDB)
+│   ├── services/         # users.py, profiles.py (CRUD en TinyDB), password_reset.py (enlaces), email.py (Resend)
 │   └── routes/
 │       ├── auth.py       # /auth
 │       ├── users.py      # /users
