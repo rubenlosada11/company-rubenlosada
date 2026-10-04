@@ -226,3 +226,36 @@ def test_unusable_files(incidents_db_path, tmp_path, capsys, content, message):
     code, _, err = run(capsys, str(path))
     assert code == 1 and message in err
     assert not incidents_db_path.exists()
+
+
+# --- Errores de la base de datos --------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("content", [b"{corrupto", b"\xff\xfe no es utf-8"])
+def test_unreadable_database_exits_with_an_error_and_no_traceback(incidents_db_path, capsys, content):
+    incidents_db_path.parent.mkdir(parents=True, exist_ok=True)
+    incidents_db_path.write_bytes(content)
+
+    code, out, err = run(capsys)
+
+    assert code == 1
+    assert "Error: No se puede usar la base de datos" in err and str(incidents_db_path) in err
+    assert "Traceback" not in err and "Seed completado." not in out
+    assert incidents_db_path.read_bytes() == content  # no se ha tocado el fichero
+
+
+def test_a_write_error_shows_the_system_reason(monkeypatch, capsys):
+    def no_space(table, record):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(seed_incidents, "insert_incident", no_space)
+    code, out, err = run(capsys)
+    assert code == 1 and stats(out)["Insertadas"] == 0
+    assert "OSError (No space left on device)" in err and "@" not in err
+
+
+def test_incomplete_stored_document_does_not_break_the_summary(capsys):
+    with incidents_table() as table:
+        table.insert({"source_id": "TRF-999999"})  # documento antiguo o editado a mano, sin estado ni categoría
+    code, out, _ = run(capsys)
+    assert code == 0 and "Seed completado." in out

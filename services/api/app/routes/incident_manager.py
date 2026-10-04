@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 
 from app.dependencies import get_current_user
+from app.errors import log_unexpected
 from app.incident_models import (
     Branch,
     Incident,
@@ -77,8 +78,8 @@ class IncidentRoute(APIRoute):
                 return JSONResponse({"detail": detail}, status.HTTP_400_BAD_REQUEST, media_type=JSON_UTF8)
             except HTTPException:
                 raise
-            except Exception:
-                logger.exception("Error inesperado en %s %s", request.method, request.url.path)
+            except Exception as error:
+                log_unexpected(logger, error, "Error inesperado en %s %s", request.method, request.url.path)
                 return JSONResponse(
                     {"detail": ERROR_INTERNO}, status.HTTP_500_INTERNAL_SERVER_ERROR, media_type=JSON_UTF8
                 )

@@ -101,3 +101,21 @@ def test_main_prints_real_counts(db_path, capsys):
     assert "Seeder completed.\nInserted: 15\nSkipped: 0\nTotal: 15" in first
     assert "Seeder completed.\nInserted: 0\nSkipped: 15\nTotal: 15" in second
     assert "MRW España (Spain)" in first
+
+
+def test_main_returns_zero_on_success(db_path, capsys):
+    assert main() == 0
+    assert capsys.readouterr().err == ""
+
+
+def test_main_with_a_corrupt_database_exits_with_an_error_and_no_traceback(db_path, capsys):
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    db_path.write_text("{corrupto", encoding="utf-8")
+
+    assert main() == 1
+
+    captured = capsys.readouterr()
+    assert "Error: No se puede usar la base de datos" in captured.err and str(db_path) in captured.err
+    assert "no contiene JSON válido" in captured.err and "Traceback" not in captured.err
+    assert "Seeder completed." not in captured.out
+    assert db_path.read_text(encoding="utf-8") == "{corrupto"  # no se ha tocado el fichero

@@ -667,3 +667,54 @@ def test_create_admin_rejects_mismatched_passwords():
     with pytest.raises(ValueError, match="no coinciden"):
         create_or_promote_admin("jefa@trackflow.test", read_password=lambda _: next(answers))
     assert users_service.get_user_by_email("jefa@trackflow.test") is None
+
+
+def run_create_admin(monkeypatch, capsys, email="jefa@trackflow.test"):
+    """Ejecuta `create-admin <email>` y devuelve (código de salida, stdout, stderr)."""
+    from app import create_admin
+
+    monkeypatch.setattr("sys.argv", ["create-admin", email])
+    with pytest.raises(SystemExit) as exit_info:
+        create_admin.main()
+    captured = capsys.readouterr()
+    # `sys.exit("texto")` termina con código 1 y escribe el texto en stderr (aquí queda en `code`).
+    return exit_info.value.code, captured.out, captured.err
+
+
+def test_create_admin_command_reports_an_invalid_email(monkeypatch, capsys):
+    code, out, _ = run_create_admin(monkeypatch, capsys, email="sin-arroba")
+    assert code == "email no tiene un formato válido" and out == ""
+
+
+def test_create_admin_command_reports_a_corrupt_database_without_the_raw_json_error(monkeypatch, capsys, auth_env):
+    auth_env.parent.mkdir(parents=True, exist_ok=True)
+    auth_env.write_text("{corrupto", encoding="utf-8")
+    code, out, _ = run_create_admin(monkeypatch, capsys)
+    assert code.startswith("Error: No se puede usar la base de datos") and str(auth_env) in code
+    assert "Expecting property name" not in code and out == ""
+
+
+@pytest.mark.parametrize("interruption", [KeyboardInterrupt, EOFError])
+def test_create_admin_command_can_be_cancelled_at_the_password_prompt(monkeypatch, capsys, interruption):
+    from app import create_admin
+
+    def cancelled(email):
+        raise interruption
+
+    monkeypatch.setattr(create_admin, "create_or_promote_admin", cancelled)
+    code, out, _ = run_create_admin(monkeypatch, capsys)
+    assert "Operación cancelada" in code and out == ""
+    assert users_service.get_user_by_email("jefa@trackflow.test") is None
+
+
+def test_create_admin_command_does_not_hide_unexpected_errors(monkeypatch, capsys):
+    """Un `ValueError` que no es un dato mal escrito es un fallo real: no se presenta como error de validación."""
+    from app import create_admin
+
+    def explode(email):
+        raise ValueError("fallo interno")
+
+    monkeypatch.setattr(create_admin, "create_or_promote_admin", explode)
+    monkeypatch.setattr("sys.argv", ["create-admin", "jefa@trackflow.test"])
+    with pytest.raises(ValueError, match="fallo interno"):
+        create_admin.main()

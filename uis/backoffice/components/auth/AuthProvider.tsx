@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { AccountCreatedError, authApi } from "@/lib/auth";
-import { ApiError } from "@/lib/http";
+import { ApiError, apiErrorMessage } from "@/lib/http";
 import { clearToken, readToken, saveToken, TOKEN_KEY, tokenExpiry, UNAUTHORIZED_EVENT } from "@/lib/session";
 import type { CurrentUser, Profile, RegisterPayload } from "@/types/auth";
 
@@ -33,6 +33,9 @@ interface AuthContextValue {
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   retry: () => void;
 }
+
+const STORAGE_BLOCKED_MESSAGE =
+  "Tu navegador no permite guardar la sesión. Sal del modo privado o permite el almacenamiento de este sitio e inténtalo de nuevo.";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -78,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setEndReason("expired");
           setStatus("anonymous");
         } else {
-          setConnectionError(error instanceof ApiError ? error.message : "No se pudo comprobar la sesión.");
+          setConnectionError(apiErrorMessage(error, "comprobar tu sesión"));
           setStatus("unreachable");
         }
       }
@@ -127,7 +130,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // vean un cierre de sesión momentáneo. El token solo se guarda si la API lo emite.
   const login = useCallback(async (email: string, password: string) => {
     const { access_token } = await authApi.login(email, password);
-    saveToken(access_token);
+    // Sin el token guardado, la siguiente petición iría sin autenticar: se avisa aquí con un mensaje que lo explica.
+    if (!saveToken(access_token)) throw new ApiError(STORAGE_BLOCKED_MESSAGE, 0);
     try {
       const me = await authApi.me();
       setUser(me);

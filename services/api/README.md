@@ -282,9 +282,7 @@ El mismo cuerpo con `"rate_per_shipment": 0` → 422 (formato de validación de 
     {
       "type": "greater_than",
       "loc": ["body", "rate_per_shipment"],
-      "msg": "Input should be greater than 0",
-      "input": 0,
-      "ctx": { "gt": 0.0 }
+      "msg": "Input should be greater than 0"
     }
   ]
 }
@@ -292,7 +290,8 @@ El mismo cuerpo con `"rate_per_shipment": 0` → 422 (formato de validación de 
 
 Otros 422: `status` fuera de `active`/`suspended`, país o categoría inexistentes, `categories` vacía, email sin
 formato, campo obligatorio ausente (`Field required`) o moneda que no corresponde al país
-(`Un proveedor de USA debe usar la moneda USD (recibido: EUR)`).
+(`Un proveedor de USA debe usar la moneda USD (recibido: EUR)`). El 422 de toda la API lleva solo `type`, `loc` y `msg`:
+no devuelve el valor recibido (`input`), que en el login o el registro sería la contraseña.
 
 ### `PATCH /suppliers/{id}/rate`
 
@@ -341,8 +340,8 @@ Endpoints en [`app/routes/incidents.py`](./app/routes/incidents.py); validación
 - Prefijo `/api` porque así lo pide el ejercicio (proveedores usa `/suppliers` sin prefijo).
 - El último análisis correcto se guarda **en memoria** (`app.state.ultimo_analisis`): se pierde al reiniciar y exige
   un solo proceso (un worker). Un análisis fallido no lo sustituye.
-- Los errores inesperados se capturan solo en este router: al cliente le llega `{"detail": "Error interno del
-  servidor."}` y la traza queda en el log. Proveedores no cambia.
+- Un error inesperado responde 500 `{"detail": "Error interno del servidor."}` y la traza queda en el log (ver
+  [Gestión de errores](#gestión-de-errores)).
 - El log (`trackflow.api.incidents`) registra una línea de resumen por análisis, sin correos:
   `Análisis de 'incidents-trackflow.csv': 100 registros (95 válidos, 5 inválidos)`.
 
@@ -381,7 +380,8 @@ completa (modelo, seed, errores, backoffice y limitaciones): [`docs/gestor-incid
   elemento por campo y el mensaje en español, sin devolver el valor recibido:
   `{"detail": [{"field": "description", "loc": ["body", "description"], "msg": "La descripción es obligatoria."}]}`.
   Un error inesperado responde 500 `{"detail": "Error interno del servidor."}` y la traza queda en el log.
-- Además, `app/main.py` convierte cualquier error no controlado de **cualquier** ruta en ese mismo 500 genérico.
+- Además, cualquier error no controlado de **cualquier** ruta responde ese mismo 500 genérico (ver
+  [Gestión de errores](#gestión-de-errores)).
 
 ### Seed del CSV histórico
 
@@ -421,7 +421,28 @@ funcionando con un token válido.
 | [`tests/test_incident_manager.py`](./tests/test_incident_manager.py) | Gestor: los 5 endpoints, 400 por campo, filtros, 404, las 16 combinaciones de transición, resumen con y sin datos, 401, 500 sin traza y convivencia con el analizador y proveedores |
 | [`tests/test_auth.py`](./tests/test_auth.py) | Usuarios y perfiles en TinyDB, bcrypt, roles, login, JWT (válido, malformado, caducado, otra firma, `alg: none`, sin claims, usuario borrado o desactivado), configuración, código de invitación (`REGISTRATION_CODE`), 401/403/404/409, ownership, las 8 rutas existentes protegidas, `create-admin` |
 | [`tests/test_password_reset.py`](./tests/test_password_reset.py) | AUTH-03: enlaces (solo hash, caducidad, un solo uso, concurrencia, límite de 60 s, limpieza), `forgot-password` (misma respuesta exista o no el email), `reset-password` (tokens no válidos, cierre de sesiones), `change-password` y cambio de email con contraseña |
+| [`tests/test_errors.py`](./tests/test_errors.py) | Gestión de errores común: 500 genérico con CORS fuera del gestor, fichero de base corrupto o ilegible (`StorageError`, candado liberado), 422 sin los valores recibidos, logs sin datos personales, nombre de fichero saneado y arranque con configuración no válida |
 | [`tests/test_email.py`](./tests/test_email.py) | AUTH-03: configuración de Resend y `MAIL_FROM`, petición exacta a la API de Resend, errores del proveedor, logs sin datos sensibles y plantilla del email |
+
+## Gestión de errores
+
+Lo que es común a toda la API está en [`app/errors.py`](./app/errors.py) y [`app/database.py`](./app/database.py):
+
+| Situación | Respuesta | En el log del servidor |
+| --- | --- | --- |
+| Datos no válidos | 422 con `type`, `loc` y `msg` por error, sin el valor recibido (el gestor de incidencias responde 400 con su formato propio) | nada |
+| Error no controlado en cualquier ruta | 500 `{"detail": "Error interno del servidor."}`, con las cabeceras CORS: el backoffice lo distingue de una API apagada | traza completa |
+| Fichero de la base ilegible, sin permisos o con JSON corrupto (`StorageError`) | el mismo 500 genérico | una línea: qué fichero falla y por qué, sin su contenido |
+| Dato guardado que no cumple su modelo | el mismo 500 genérico | modelo, campo, tipo de fallo y línea del código; nunca el documento (email, hash) |
+| Configuración no válida al arrancar | la API no arranca | `La API no puede arrancar: <motivo>` |
+
+Nunca llegan al cliente trazas, rutas del servidor ni mensajes de excepción. Los comandos `uv run seed`,
+`uv run create-admin` y `scripts/seed_incidents.py` convierten `StorageError` en un mensaje por stderr y código de
+salida 1.
+
+Capturas: [422 sin el valor recibido](./screenshots/screenshot%20errores%20422.jpg) (Swagger, `POST /auth/login` con la
+contraseña mal tipada) y [`uv run seed` con la base corrupta](./screenshots/screenshot%20errores%20seed.png) (mensaje y
+código de salida 1).
 
 ## Persistencia
 

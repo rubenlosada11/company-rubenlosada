@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CURRENCY_BY_COUNTRY, SUPPLIER_CATEGORIES, SUPPLIER_COUNTRIES, SUPPLIER_STATUSES } from "@/lib/data/suppliers";
-import { ApiError, FORM_ERROR } from "@/lib/http";
+import { ApiError, apiErrorMessage, FORM_ERROR } from "@/lib/http";
 import { EMPTY_DRAFT, type SupplierDraft, suppliersApi, validateDraft } from "@/lib/suppliers";
 import type { Supplier, SupplierCategory } from "@/types";
 
@@ -58,13 +58,12 @@ export function SupplierForm({ onCreated, onCancel }: SupplierFormProps) {
       setDraft(EMPTY_DRAFT);
       onCreated(created);
     } catch (error) {
-      if (error instanceof ApiError) {
+      if (error instanceof ApiError && Object.keys(error.fieldErrors).length > 0) {
+        // Datos rechazados: cada error va en su campo; el aviso general solo lleva el que no es de ningún campo.
         setErrors(error.fieldErrors);
-        setServerMessage(
-          error.status === 422 ? `La API ha rechazado los datos (422): ${error.message}` : error.message
-        );
+        setServerMessage(error.fieldErrors[FORM_ERROR] ?? "Revisa los campos marcados y vuelve a intentarlo.");
       } else {
-        setServerMessage("Error inesperado. Inténtalo de nuevo.");
+        setServerMessage(apiErrorMessage(error, "registrar el proveedor"));
       }
     } finally {
       setSubmitting(false);

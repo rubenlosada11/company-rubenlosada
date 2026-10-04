@@ -1,4 +1,4 @@
-import { fetchApi } from "@/lib/http";
+import { ApiError, fetchApi, readJson } from "@/lib/http";
 import type { ResultadoAnalisis } from "@/types/incidencias";
 
 /** Endpoints del analizador de incidencias en `services/api` (ver CONTEXT-incidencias.es.md). */
@@ -11,7 +11,12 @@ export async function analizarCsv(archivo: File): Promise<ResultadoAnalisis> {
     headers: { Accept: "application/json" },
     body: formulario,
   });
-  return (await res.json()) as ResultadoAnalisis;
+  const resultado = await readJson<ResultadoAnalisis>(res);
+  // La página pinta estos bloques directamente: si falta alguno, mejor un error legible que un fallo al renderizar.
+  if (!resultado?.totales || !resultado.satisfaccion || !resultado.por_fecha || !resultado.cruces) {
+    throw new ApiError("La respuesta del análisis no tiene el formato esperado. Inténtalo de nuevo.", res.status);
+  }
+  return resultado;
 }
 
 /** Descarga el último análisis con el nombre de `Content-Disposition` (la API lo expone por CORS). */

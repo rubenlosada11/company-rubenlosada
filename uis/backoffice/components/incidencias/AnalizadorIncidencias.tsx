@@ -3,14 +3,17 @@
 import { useState } from "react";
 import { ResultadosAnalisis } from "@/components/incidencias/ResultadosAnalisis";
 import { SelectorCsv } from "@/components/incidencias/SelectorCsv";
-import { ApiError } from "@/lib/http";
+import { ApiError, apiErrorMessage } from "@/lib/http";
 import { analizarCsv, descargarResultados } from "@/lib/incidencias";
 import type { ResultadoAnalisis } from "@/types/incidencias";
 
-const ERROR_INESPERADO = "El análisis ha fallado por un error inesperado. Inténtalo de nuevo.";
+const SIN_ANALISIS = "Todavía no hay ningún análisis que descargar. Analiza primero un fichero CSV.";
 
-function mensaje(error: unknown): string {
-  return error instanceof ApiError ? error.message : ERROR_INESPERADO;
+/** Los 4xx del analizador (sin fichero, formato, tamaño, CSV no procesable) ya llegan redactados en español. */
+function mensaje(error: unknown, accion: string): string {
+  // El 404 de la descarga nombra el endpoint de la API: se sustituye por un texto para el usuario.
+  if (error instanceof ApiError && error.status === 404) return SIN_ANALISIS;
+  return apiErrorMessage(error, accion);
 }
 
 function Spinner() {
@@ -56,7 +59,7 @@ export function AnalizadorIncidencias() {
       setResultado(await analizarCsv(archivo));
     } catch (e) {
       setResultado(null);
-      setError(mensaje(e));
+      setError(mensaje(e, "analizar el fichero"));
     } finally {
       setCargando(false);
     }
@@ -68,7 +71,7 @@ export function AnalizadorIncidencias() {
     try {
       await descargarResultados();
     } catch (e) {
-      setErrorDescarga(mensaje(e));
+      setErrorDescarga(mensaje(e, "descargar los resultados"));
     } finally {
       setDescargando(false);
     }

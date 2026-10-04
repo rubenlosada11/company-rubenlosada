@@ -6,7 +6,7 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/gestor-incidencias` (desde `origin/main` @ `f586bb3`, que ya incluye las PR #3–#14).
+- **Rama de trabajo:** `feature/error-handling-audit` (desde `origin/main` @ `2d90092`, que ya incluye las PR #3–#15).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (práctica sin número de hito; contexto en
@@ -26,8 +26,11 @@
 - **Gestor de incidencias centralizado** (práctica sin número de hito; sienta bases del Hito 5; contexto en
   [`CONTEXT-gestor-incidencias.es.md`](../CONTEXT-gestor-incidencias.es.md)): **implementado y validado** en
   `feature/gestor-incidencias`, por fases con parada y confirmación. Documentación en `docs/gestor-incidencias.md`.
-  Capturas del desarrollador añadidas y base real cargada con el seed. Rama subida y **PR #15 abierta** hacia
-  `main` (fusionable, sin conflictos); pendiente: que el desarrollador la revise y la fusione.
+  Capturas del desarrollador añadidas y base real cargada con el seed. **PR #15 fusionada** (`2d90092`).
+- **Gestión de errores** (práctica sin número de hito): auditoría y corrección de la gestión de errores de backoffice,
+  API y scripts, **implementada y validada** en `feature/error-handling-audit`. Las apps de hitos anteriores quedan
+  fuera por decisión del desarrollador. Entregada en un solo commit, con la rama subida y PR hacia `main`; pendiente:
+  que el desarrollador la revise y la fusione.
 - **Última actualización:** 2026-10-04.
 
 | Componente | Estado |
@@ -41,7 +44,8 @@
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | Autenticación (AUTH-01) | ✅ API: `User`/`Profile` en TinyDB, JWT, `/auth`, `/users`, `/profiles` y 8 rutas existentes protegidas (269 tests). Backoffice: `/login` y panel protegido (E2E 34/34). Solo local |
 | Autenticación frontend (AUTH-02) | ✅ PR #13 fusionada (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE` |
-| Gestor de incidencias | 🟡 PR #15 abierta (`feature/gestor-incidencias` → `main`), falta fusionarla: paquete + scripts 192 tests, API 751 tests, navegador 69 + 64 + 33 + 44 + 22 |
+| Gestión de errores | 🟡 Implementada y validada en `feature/error-handling-audit` (API 789 tests, paquete + scripts 196, navegador 41 + 36); un commit, rama subida y PR hacia `main`: falta fusionarla |
+| Gestor de incidencias | ✅ PR #15 fusionada (`2d90092`): paquete + scripts 192 tests, API 751 tests, navegador 69 + 64 + 33 + 44 + 22 |
 | Recuperación y cambio de contraseña (AUTH-03) | ✅ PR #14 fusionada (`f586bb3`): API completa: persistencia, email, los tres endpoints y cambio de email con contraseña (473 tests) `/forgot-password` (E2E 39/39) y `/reset-password` (E2E 51/51) enlace en `/login` (E2E 26/26) y `/account/change-password` (E2E 42/42); E2E de punta a punta 33/33 con emails reales; regresión de AUTH-02 en verde |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
 | Analizador de incidencias | ✅ Entregado (PR #9): paquete + script (70 tests), API (144 tests), `/incidencias` (navegador 19/19), capturas; en producción muestra el aviso de API no configurada |
@@ -969,6 +973,90 @@ hito: commits `Gestor de incidencias — …`, sin `docs/hitos.md`. Fuente de ve
 - API en `:8000` y backoffice (`npm run start`) en `:3002`, con `SECRET_KEY` de pruebas y las tres bases TinyDB en el
   scratchpad (`AUTH_DB_PATH`, `SUPPLIERS_DB_PATH`, `INCIDENTS_DB_PATH`). `db/` real sin tocar: no tiene `incidents.json`.
 
+### 2026-10-04 — Gestión de errores: auditoría y corrección (rama `feature/error-handling-audit`)
+
+**Objetivo:** auditar y mejorar la gestión de errores del código existente, sin funcionalidad nueva. Por fases con parada
+y confirmación (auditoría → estrategia → frontend → backend → scripts → revisión → validación). Rama creada desde
+`origin/main` @ `2d90092` (PR #15 ya fusionada). Práctica sin número de hito.
+
+**Auditoría (20 hallazgos: 4 altos, 7 medios, 9 bajos; ninguno crítico)** — los principales: el 500 de la API salía
+fuera de CORS y el backoffice lo mostraba como «API apagada»; el backoffice no tenía límites de error; el JSON de una
+respuesta correcta se leía sin proteger («Unexpected token…» en la interfaz); mensajes técnicos o en inglés en
+proveedores, analizador y cuenta; el 422 devolvía el valor recibido (la contraseña en el login); los comandos de carga
+acababan en una traza con la base corrupta.
+
+**Decisiones del desarrollador**
+
+- `uis/talent-pipeline-tracker`, `uis/landing` y `uis/script-automatizacion` (áreas protegidas) **no se tocan**: quedan
+  como pendientes. `skills/data-analysis/scripts/pandas_clean.py` tampoco (plantilla).
+- Se aplica un manejador común del 422 (sin `input`), que no cambia el contrato.
+- `scripts/analyze.py` con 0 registros válidos sigue terminando con código 0.
+- Un solo commit para toda la práctica.
+
+**Frontend (`uis/backoffice`, `uis/website`)**
+
+- `lib/http.ts`: tiempo máximo de 20 s, `readJson` (respuesta que no es JSON → error legible), mensajes sin variable de
+  entorno, ruta ni URL fuera de desarrollo, validación de Pydantic traducida y `apiErrorMessage(error, acción)`.
+- Proveedores, analizador, perfil y sesión usan `apiErrorMessage`; `lib/authErrors.ts` ya no muestra `error.message` de
+  errores que no son de la API; formateadores tolerantes a fechas y monedas no válidas; el analizador comprueba la forma
+  de la respuesta; login con el almacenamiento bloqueado → aviso claro.
+- Nuevos: `app/error.tsx`, `app/(panel)/error.tsx`, `app/global-error.tsx`, `app/not-found.tsx`,
+  `components/ErrorPanel.tsx` y `uis/website/app/not-found.tsx`.
+
+**Backend (`services/api`)**
+
+- `app/errors.py`: `UnexpectedErrorMiddleware` (500 genérico dentro de CORS), `validation_error` (422 sin `input` ni
+  `ctx`) y `log_unexpected` (errores de Pydantic sin los valores).
+- `app/database.py`: `StorageError` y apertura única de las tres bases (`_open_db`).
+- `app/main.py`: registro de lo anterior y línea clara si la configuración impide arrancar.
+- `routes/incidents.py`: nombre del fichero saneado para el log y el mensaje.
+
+**Scripts**
+
+- `uv run seed`, `uv run create-admin` y `scripts/seed_incidents.py`: base ilegible o corrupta → mensaje en stderr y
+  código 1. `create-admin` ya no captura cualquier `ValueError` y admite la cancelación. `scripts/analyze.py`: red final
+  para errores imprevistos. `carga.py`: el CSV mal formado ya no arrastra el texto interno de `csv.Error`.
+
+**Validaciones (todas ejecutadas el 2026-10-04 sobre el código final)**
+
+- Backoffice y website: `lint`, `typecheck` y `build` → 0.
+- `services/api`: `uv run pytest -q -W error::DeprecationWarning` → **789 passed** (751 + 38 nuevos);
+  `uv lock --check` OK. Paquete y scripts: **196 passed** (192 + 4 nuevos).
+- Mutaciones: sin el middleware fallan 5 tests nuevos; sin el manejador del 422, 6.
+- Navegador con la API simulada (Edge + `playwright-core` en el scratchpad, build de producción): **41/41** — carga,
+  éxito, 500, 502 con HTML, 200 que no es JSON, sin conexión, tiempo agotado (20 s), 422 en inglés mostrado en español,
+  fallo de render contenido por el límite de error, 404, login y regresiones del gestor y del analizador.
+- Flujo real backoffice `:3002` → API `:8000` con bases temporales: **36/36** — login, proveedores (seed, filtro, tarifa,
+  alta), base corrupta con la API en marcha (500 legible, mensaje de servidor y «Reintentar»), gestor (alta, estado,
+  vuelta atrás ante error), analizador (CSV real, descarga, 422 y 413), perfil, 404 y API apagada.
+- Scripts ejecutados con entradas válidas, inexistentes, malformadas e incompletas: códigos 0/1/2 esperados, sin trazas.
+
+**Problemas encontrados y resueltos**
+
+- El origen registrado de un error de Pydantic era una línea interna de la librería; ahora es la última del código propio
+  (lo detectó un test nuevo).
+- Los formularios de cuenta podían mostrar el 401 técnico de la API (cabecera `Authorization`): traducido.
+- Falsos fallos de mi prueba en navegador (no de la app): un texto que también está en el panel de marca del login, un
+  contador leído antes de terminar la recarga y el «@» del email de la barra superior.
+
+**Capturas del desarrollador** (opcionales en esta práctica; revisadas antes de subirlas, sin datos sensibles)
+
+- `uis/backoffice/screenshots/screenshot errores servidor.png`, `… sin conexion.png`, `… validacion.png` y `… 404.png`;
+  `services/api/screenshots/screenshot errores 422.jpg` y `… seed.png`. Enlazadas desde los README del backoffice y de
+  la API, y mostradas con su leyenda en la descripción de la PR.
+- La de validación (formulario de registro) se rehízo: la primera versión mostraba el código de invitación y un email
+  personal, y el repositorio es público. El desarrollador los tapó antes de subirla.
+
+**No comprobado**
+
+- Cancelar la contraseña de `create-admin` en una ejecución real: en Windows `getpass` lee del teclado y no de la entrada
+  redirigida (cubierto solo por test unitario). Tampoco el modo desarrollo del backoffice (`npm run dev`).
+
+**Método de prueba en navegador**
+
+- Igual que en el gestor: API en `:8000` y backoffice (`npm run start`) en `:3002`, con las tres bases en el scratchpad.
+  El fichero de una base se corrompe y se restaura con la API en marcha para provocar un 500 real. `db/` real sin tocar.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -986,7 +1074,10 @@ hito: commits `Gestor de incidencias — …`, sin `docs/hitos.md`. Fuente de ve
   backoffice de `main`**: sin API, el login deja el panel inaccesible.
 - AUTH-03 en producción: la API necesita `RESEND_API_KEY`, `MAIL_FROM` y `FRONTEND_BASE_URL` con la URL pública del
   backoffice.
-- Gestor de incidencias: fusionar la PR #15 (lo hace el desarrollador). Pendiente de decidir: permisos por rol o sede, paginación y las alertas
+- Gestión de errores en las apps de hitos anteriores (`uis/talent-pipeline-tracker`: cliente HTTP con `throw` al
+  importar, `statusText` en crudo y sin límites de error; `uis/landing/formulario` y `uis/script-automatizacion`:
+  elementos del DOM sin comprobar). Áreas protegidas: no se han tocado.
+- Gestor de incidencias (PR #15 fusionada). Pendiente de decidir: permisos por rol o sede, paginación y las alertas
   de incidencias sin resolver del CONTEXT.
 - Autenticación: cualquier usuario autenticado puede operar proveedores e incidencias. El registro se limita con
   `REGISTRATION_CODE` (AUTH-02): **definirlo al publicar la API**. Pendiente decidir si se exige `admin`/`manager` en

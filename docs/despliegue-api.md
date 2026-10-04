@@ -21,7 +21,7 @@ funcionan en local.
 | Pieza | Producción hoy |
 | --- | --- |
 | Backoffice | https://backofficetrackflow.rubenlosada.com/ — Next.js compilado en el servidor desde el tarball de `main` (`npm ci --include=dev` + `npm run build`), detrás de Cloudflare, **sin autenticación** y con `noindex`. |
-| API (`services/api`) | No desplegada. Por eso `/proveedores` e `/incidencias` muestran en producción el aviso “Falta la variable NEXT_PUBLIC_API_BASE_URL…”. |
+| API (`services/api`) | No desplegada. Por eso `/proveedores` e `/incidencias` muestran en producción el aviso “El servicio no está disponible en este momento…” (el nombre de la variable que falta, `NEXT_PUBLIC_API_BASE_URL`, solo se muestra en desarrollo). |
 
 ## Decisiones pendientes
 
