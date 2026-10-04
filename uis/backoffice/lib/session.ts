@@ -20,11 +20,13 @@ export function readToken(): string | null {
   }
 }
 
-export function saveToken(token: string): void {
+/** Guarda el token y devuelve si se pudo: con el almacenamiento bloqueado (modo privado estricto) no hay sesión. */
+export function saveToken(token: string): boolean {
   try {
     window.localStorage.setItem(TOKEN_KEY, token);
+    return true;
   } catch {
-    // Almacenamiento bloqueado (modo privado estricto): la sesión dura hasta recargar la página.
+    return false;
   }
 }
 

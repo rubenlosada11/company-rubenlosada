@@ -259,7 +259,7 @@ Contexto: `CONTEXT-incidencias.es.md`. Documentación: `docs/analizador-incidenc
 | Salida en español; pregunta `¿Deseas exportar los resultados a CSV? [s / n]` (`s/sí/si/y/n/no`, repite ante otra respuesta, EOF/Ctrl+C sin exportar) | Decisión del equipo. |
 | `results.csv`: una fila por métrica (`seccion,metrica,valor,porcentaje`), UTF-8 con BOM; mismos bytes en script y API (`generar_csv_bytes`) | Petición de Valentina Cruz; Excel respeta los acentos. |
 | Endpoints en la API existente: `POST /api/incidents/analyze` (multipart, `file`) y `GET /api/incidents/results/export` | Los exige el ejercicio (con prefijo `/api`, a diferencia de `/suppliers`); sin app FastAPI aparte. |
-| Errores JSON `{"detail"}`: 400 sin fichero, 404 export sin análisis, 413 > 5 MB, 415 no `.csv`, 422 no procesable, 500 genérico | El 500 se captura **solo en el router de incidencias** (D4): un manejador global cambiaría proveedores. |
+| Errores JSON `{"detail"}`: 400 sin fichero, 404 export sin análisis, 413 > 5 MB, 415 no `.csv`, 422 no procesable, 500 genérico | El 500 se captura **solo en el router de incidencias** (D4): un manejador global cambiaría proveedores. *(Sustituido por la gestión de errores común: ver su sección.)* |
 | Logger `trackflow` a INFO con handler propio en `app/main.py` | La línea de resumen por análisis sale en uvicorn sin tocar el logger raíz. |
 | Último análisis en memoria (`app.state.ultimo_analisis`); un análisis fallido no lo sustituye | Sin base de datos. Exige **un solo worker** en producción. |
 | La respuesta incluye `reglas` (etiquetas) | El frontend no duplica las etiquetas. |
@@ -291,6 +291,30 @@ Contexto: `CONTEXT-gestor-incidencias.es.md`. Documentación: `docs/gestor-incid
 | Cambio de estado optimista con vuelta atrás; resumen con petición y error propios | Requisitos del enunciado: rollback tras fallo y que un fallo del resumen no rompa el resto. |
 | Etiquetas de sede literales del CONTEXT; las de categoría, origen y estado, traducción propia | El CONTEXT solo fija las de sede. Sin soporte bilingüe (no existe en el backoffice). |
 | Commits `Gestor de incidencias — …`, sin `docs/hitos.md` | Práctica sin hito, aunque sienta bases del Hito 5 (indicación del desarrollador). |
+
+## Decisiones técnicas de la gestión de errores
+
+Rama `feature/error-handling-audit` (2026-10-04), por fases con parada y confirmación. Resumen para quien usa la API en
+`services/api/README.md` («Gestión de errores»). **Sustituye** a lo que las tablas anteriores dicen sobre el 500 (antes
+solo se capturaba dentro de los routers de incidencias) y sobre no tener un manejador común de validación.
+
+| Decisión | Motivo |
+| --- | --- |
+| `UnexpectedErrorMiddleware` (ASGI puro, `app/errors.py`) registrado **antes** que `CORSMiddleware` | El último middleware añadido es el más externo: así el 500 genérico lleva cabeceras CORS en todas las rutas. Fuera de CORS el navegador lo ve como fallo de red y el backoffice decía «API apagada». |
+| El `exception_handler(Exception)` y los `except Exception` de los routers de incidencias se mantienen | Último recurso (fallo en el propio CORS) y código con tests; son inocuos. |
+| Manejador común de `RequestValidationError`: 422 con `type`, `loc` y `msg`, sin `input` ni `ctx` | El 422 por defecto devuelve el valor recibido: la contraseña en login, registro y cambio de contraseña. No cambia el código ni los campos que lee `lib/http.ts`. El gestor sigue con su 400 propio (lo captura antes su `IncidentRoute`). |
+| `StorageError` en `app/database.py`, con una sola apertura (`_open_db`) para las tres bases | TinyDB lee al usar la tabla, no al abrir: se vigila también el bloque que usa la base. Solo `OSError`, `JSONDecodeError` y `UnicodeDecodeError`; el resto de errores pasa intacto. El mensaje lleva ruta y motivo, nunca el contenido. |
+| `log_unexpected`: de un `ValidationError` de Pydantic solo modelo, campo, tipo y línea del código propio | Su texto incluye el documento (email, hash de la contraseña). El resto de errores conserva la traza completa. |
+| Línea `La API no puede arrancar: …` antes de relanzar `ConfigError` | Starlette imprime igualmente la traza del arranque fallido; cambiarlo rompería los tests que esperan `ConfigError`. |
+| Backoffice: tiempo máximo de 20 s con `AbortController` propio (no `AbortSignal.any`) | Compatibilidad con navegadores sin `AbortSignal.any`; el aviso de quien llama sigue cancelando también la lectura del cuerpo. |
+| Mensajes con detalle técnico (variable de entorno, URL de la API) solo si `NODE_ENV !== "production"` | El aviso sigue ayudando en desarrollo sin exponer configuración en la demo pública. |
+| `apiErrorMessage(error, acción)` en `lib/http.ts`; `incidentErrorMessage` del gestor no se toca | Un solo traductor para proveedores, analizador, perfil y sesión; el del gestor ya era correcto y tiene pruebas propias. |
+| Validación: los mensajes propios de la API (`Value error, …` y los del gestor) se respetan; los de Pydantic se traducen y, si no se conocen, «Valor no válido.» | Nunca se muestra un mensaje técnico en inglés. |
+| `app/error.tsx`, `app/(panel)/error.tsx`, `app/global-error.tsx`, `app/not-found.tsx` y `ErrorPanel` (enlace `<a href="/">`, no `<Link>`) | Salida ante un fallo de render; el del panel conserva el menú lateral. Tras un fallo conviene recargar la aplicación entera. |
+| Scripts: `StorageError` → stderr y código 1; `create-admin` captura `InvalidInput` (subclase de `ValueError`) en lugar de `ValueError` | `JSONDecodeError` es un `ValueError`: antes una base corrupta se presentaba como error de validación. |
+| `scripts/analyze.py`: `except Exception` final que solo muestra el tipo de error | Límite de una CLI para personal no técnico; el mensaje podría arrastrar datos de una fila. Con 0 registros válidos sigue terminando con 0 (decisión del desarrollador). |
+| Apps de hitos anteriores (tracker, landing, script-automatizacion) sin tocar | Áreas protegidas; quedan en «Trabajo pendiente» de `progress.md`. |
+| Un solo commit `Gestión de errores — …`, sin `docs/hitos.md` | Práctica sin hito; indicación expresa del desarrollador para esta práctica. |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 

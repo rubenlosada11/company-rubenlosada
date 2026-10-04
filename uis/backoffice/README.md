@@ -73,7 +73,7 @@ Operations). Todos los datos salen de la API; nada está escrito en el frontend.
 | --- | --- |
 | Listado (nombre, zona, email, notas, país, categorías, tarifa, estado, fecha de la última tarifa) | `GET /suppliers` |
 | Filtros por país y por categoría, combinables, sin recargar la página | `GET /suppliers?country=…&category=…` |
-| Alta con validación en cliente; los errores 422 de FastAPI se muestran junto a su campo. La moneda la fija el país | `POST /suppliers` |
+| Alta con validación en cliente; los errores 422 de la API se muestran junto a su campo, en español. La moneda la fija el país | `POST /suppliers` |
 | Editar la tarifa en la fila (estado “Guardando…”, error en la fila, valor y fecha actualizados al momento) | `PATCH /suppliers/{id}/rate` |
 | Suspender / reactivar desde la fila; estado con badge verde (activo) o ámbar (suspendido) | `PATCH /suppliers/{id}/status` |
 
@@ -120,6 +120,15 @@ de las sedes son las del CONTEXT. Capturas:
 [listado con datos](./screenshots/screenshot%20gestor%20listado.png) y
 [resumen con métricas](./screenshots/screenshot%20gestor%20resumen.png).
 
+## Qué ocurre cuando algo falla
+
+Todas las pantallas que llaman a la API muestran un mensaje en español, sin códigos HTTP ni detalles técnicos, y una
+salida («Reintentar», «Volver al inicio» o el menú). Capturas:
+[error interno de la API](./screenshots/screenshot%20errores%20servidor.png) (ya no se confunde con una API apagada),
+[API que no responde](./screenshots/screenshot%20errores%20sin%20conexion.png),
+[error de validación de la API en su campo](./screenshots/screenshot%20errores%20validacion.png) y
+[página no encontrada](./screenshots/screenshot%20errores%20404.png).
+
 ## Estructura
 
 ```text
@@ -139,9 +148,10 @@ backoffice/
 │   │   ├── gestor-incidencias/nueva/page.tsx  # ruta `/gestor-incidencias/nueva` (formulario)
 │   │   ├── account/profile/page.tsx  # ruta `/account/profile`
 │   │   └── account/change-password/page.tsx  # ruta `/account/change-password` (AUTH-03)
+│   ├── error.tsx, global-error.tsx, not-found.tsx  # límites de error y 404 (también `(panel)/error.tsx`, con el menú)
 │   └── globals.css       # + animaciones del login (ruta y entrada)
 ├── components/           # Sidebar, Topbar, NavLink (cliente: enlace activo), Overview, Explorer (cliente: filtros),
-│   │                     # AreaCard, Milestones, PageSection, StatCard, Badge,
+│   │                     # AreaCard, Milestones, PageSection, StatCard, Badge, ErrorPanel (pantallas de error y 404),
 │   │                     # SupplierDirectory, SupplierForm, SupplierRow (cliente: directorio de proveedores)
 │   ├── incidencias/      # AnalizadorIncidencias (cliente), SelectorCsv (cliente), ResultadosAnalisis, ListaBarras,
 │   │                     # TablaCruce, TablaSatisfaccion, RegistrosInvalidos
@@ -153,7 +163,8 @@ backoffice/
 │   ├── data/             # areas.ts, initiatives.ts, milestones.ts, baseline.ts, suppliers.ts (valores del CONTEXT),
 │   │                     # incidents.ts (sedes, categorías, orígenes, estados y transiciones del gestor)
 │   ├── initiatives.ts    # lógica pura: filterInitiatives, countByArea, countByStatus
-│   ├── http.ts           # cliente HTTP de la API: fetchApi (URL base, Bearer y errores) y http (JSON; errores 422 por campo)
+│   ├── http.ts           # cliente HTTP de la API: fetchApi (URL base, Bearer, tiempo máximo y errores), http (JSON;
+│   │                     # errores de validación por campo, en español) y apiErrorMessage (mensaje para el usuario)
 │   ├── session.ts        # token en localStorage, caducidad (`exp`) y `next` seguro
 │   ├── auth.ts           # /auth/login, /users, /auth/me, /profiles/me, recuperación y cambio de contraseña, roles
 │   ├── authRules.ts      # reglas de email y contraseña (las mismas que la API)

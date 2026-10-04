@@ -27,7 +27,8 @@ python analyze.py incidents-trackflow.csv
 - Al terminar pregunta `¿Deseas exportar los resultados a CSV? [s / n]` (acepta `s`, `sí`, `si`, `y`, `n`, `no`; con
   Ctrl+C o fin de entrada termina sin exportar). `-o/--output` cambia el fichero de destino; `scripts/results.csv`
   está en `.gitignore`.
-- Códigos de salida: `0` correcto, `1` error de fichero, `2` falta el argumento.
+- Códigos de salida: `0` correcto, `1` error (fichero que no existe o no se puede leer, CSV no procesable, fallo al
+  escribir la exportación o error imprevisto), `2` falta el argumento. Los errores se escriben en stderr, sin trazas.
 - Nunca muestra ni exporta `customer_email`: los inválidos se identifican por línea e `incident_id`.
 
 Tests, desde la raíz del repo: `python -m pytest scripts/tests packages/analisis-incidencias/tests`. Documentación
@@ -52,8 +53,9 @@ uv run --project services/api python scripts/seed_incidents.py
 - Resultado con el CSV de prueba: 100 filas leídas, 95 válidas e insertadas, 5 inválidas. Es idempotente: la segunda
   ejecución da 0 insertadas y 95 duplicadas.
 - Admite la ruta de otro CSV como argumento. `INCIDENTS_DB_PATH` cambia el fichero de la base.
-- Códigos de salida: `0` correcto, `1` error de fichero o de escritura, `2` falta el entorno de la API (p. ej. al
-  ejecutarlo con el Python del sistema).
+- Códigos de salida: `0` correcto, `1` error del CSV, de escritura o de la base de datos (fichero ilegible o JSON
+  corrupto: indica cuál y por qué), `2` falta el entorno de la API (p. ej. al ejecutarlo con el Python del sistema).
+  Los errores se escriben en stderr, sin trazas.
 - No imprime ni guarda `customer_email`.
 
 Sus tests están en [`services/api/tests/test_seed_incidents.py`](../services/api/tests/test_seed_incidents.py), porque

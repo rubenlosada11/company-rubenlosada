@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { authApi, ROLE_LABELS } from "@/lib/auth";
 import { toFormErrors } from "@/lib/authErrors";
-import { ApiError } from "@/lib/http";
+import { ApiError, apiErrorMessage } from "@/lib/http";
 import type { CurrentUser, Profile } from "@/types/auth";
 import { Spinner } from "./AuthGate";
 import { useAuth } from "./AuthProvider";
@@ -69,7 +69,7 @@ export function ProfileEditor() {
         if (controller.signal.aborted) return;
         // 401: `lib/http.ts` ya ha cerrado la sesión y `AuthGate` lleva al login.
         if (error instanceof ApiError && error.status === 401) return;
-        setLoadError(error instanceof ApiError ? error.message : "No se pudo cargar tu perfil.");
+        setLoadError(apiErrorMessage(error, "cargar tu perfil"));
       });
     return () => controller.abort();
   }, [reloadKey]);

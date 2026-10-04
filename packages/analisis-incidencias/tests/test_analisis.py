@@ -210,3 +210,10 @@ def test_exportacion_en_bytes_lleva_bom_utf8():
     contenido = generar_csv_bytes(resultado)
     assert contenido.startswith(b"\xef\xbb\xbf")
     assert contenido.decode("utf-8-sig") == generar_csv(resultado)
+
+
+def test_csv_mal_formado_no_muestra_el_error_interno():
+    with pytest.raises(ErrorAnalisis) as error:
+        parsear_csv(",".join(CAMPOS) + "\n" + "x" * 200_000 + "\n")
+    assert str(error.value) == "El CSV está mal formado (cerca de la línea 2)."
+    assert "field" not in str(error.value)

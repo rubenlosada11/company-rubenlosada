@@ -179,3 +179,35 @@ def test_main_sin_argumento():
     with pytest.raises(SystemExit) as salida:
         analyze.main([])
     assert salida.value.code == 2
+
+
+# --- Errores imprevistos ---
+
+
+def test_main_error_imprevisto_termina_con_1_sin_traza(monkeypatch, capsys):
+    def explota(*args):
+        raise RuntimeError("fila con persona@example.com")
+
+    monkeypatch.setattr(analyze, "analizar", explota)
+    assert analyze.main([str(CSV_REAL)]) == 1
+    salida = capsys.readouterr()
+    assert "Error: no se pudo completar el análisis (RuntimeError)." in salida.err
+    assert "Traceback" not in salida.err and "@" not in salida.err and salida.out == ""
+
+
+def test_main_error_al_formatear_no_imprime_un_informe_a_medias(monkeypatch, capsys):
+    monkeypatch.setattr(analyze, "formatear_informe", lambda resultado: 1 / 0)
+    assert analyze.main([str(CSV_REAL)]) == 1
+    salida = capsys.readouterr()
+    assert "ZeroDivisionError" in salida.err and salida.out == ""
+
+
+def test_main_error_de_escritura_sin_motivo_del_sistema(tmp_path, monkeypatch, capsys):
+    def sin_motivo(resultado, destino):
+        raise OSError
+
+    monkeypatch.setattr("builtins.input", respuestas("s"))
+    monkeypatch.setattr(analyze, "exportar_csv", sin_motivo)
+    assert analyze.main([str(CSV_REAL), "--output", str(tmp_path / "r.csv")]) == 1
+    error = capsys.readouterr().err
+    assert "no se pudo escribir la exportación: OSError" in error and "None" not in error

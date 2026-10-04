@@ -28,7 +28,7 @@ def leer_csv(ruta: str | Path) -> list[Fila]:
     try:
         contenido = ruta.read_bytes()
     except OSError as error:
-        raise ErrorAnalisis(f"No se puede leer el fichero: {error.strerror}") from None
+        raise ErrorAnalisis(f"No se puede leer el fichero: {error.strerror or type(error).__name__}") from None
     return decodificar_csv(contenido)
 
 
@@ -62,8 +62,9 @@ def parsear_csv(texto: str) -> list[Fila]:
                 for i, campo in enumerate(cabecera)
             }
             filas.append(Fila(lector.line_num, datos, len(valores) == len(cabecera)))
-    except csv.Error as error:
-        raise ErrorAnalisis(f"El CSV está mal formado: {error}") from None
+    except csv.Error:
+        # El texto de `csv.Error` es interno y está en inglés («field larger than field limit…»): solo se indica dónde.
+        raise ErrorAnalisis(f"El CSV está mal formado (cerca de la línea {lector.line_num}).") from None
 
     if not filas:
         raise ErrorAnalisis("El fichero no contiene registros (solo cabecera).")

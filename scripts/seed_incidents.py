@@ -35,10 +35,14 @@ try:
     from pydantic import ValidationError
     from tinydb.table import Table
 
-    from app.database import get_incidents_db_path, incidents_table
+    from app.database import StorageError, get_incidents_db_path, incidents_table
     from app.incident_models import IncidentRecord
     from app.services.incidents import insert_incident
-except ImportError as error:  # Python del sistema, sin el entorno de la API
+except ImportError as error:
+    # Solo si lo que falta es el entorno de la API (Python del sistema): otro fallo de importación es un error de
+    # programación y debe verse tal cual.
+    if error.name not in ("pydantic", "tinydb", "app"):
+        raise
     sys.stderr.reconfigure(encoding="utf-8")
     print(f"Error: falta el entorno de la API ({error.name}).", file=sys.stderr)
     print("Ejecuta desde la raíz:  uv run --project services/api python scripts/seed_incidents.py", file=sys.stderr)
@@ -92,7 +96,9 @@ def seed(table: Table, filas: list[Fila]) -> ResultadoSeed:
             insert_incident(table, registro)
         except Exception as error:  # un fallo al escribir una fila no detiene el resto
             resultado.errores += 1
-            print(f"  ! línea {fila.linea} ({registro.source_id}): {type(error).__name__}", file=sys.stderr)
+            # Tipo de error y, si es del sistema de ficheros, su motivo. Nunca el contenido de la fila.
+            motivo = type(error).__name__ + (f" ({error.strerror})" if getattr(error, "strerror", None) else "")
+            print(f"  ! línea {fila.linea} ({registro.source_id}): {motivo}", file=sys.stderr)
             continue
         existentes.add(registro.source_id)
         resultado.insertadas += 1
@@ -103,7 +109,8 @@ def seed(table: Table, filas: list[Fila]) -> ResultadoSeed:
 def totales_del_csv(table: Table) -> tuple[Counter, Counter]:
     """Conteos por estado y categoría de las incidencias de la base que vienen del CSV."""
     docs = [doc for doc in table.all() if doc.get("source_id")]
-    return Counter(doc["status"] for doc in docs), Counter(doc["category"] for doc in docs)
+    # `.get`: un documento incompleto no debe impedir mostrar el resumen de una carga que ya ha terminado.
+    return Counter(doc.get("status") for doc in docs), Counter(doc.get("category") for doc in docs)
 
 
 def imprimir(resultado: ResultadoSeed, por_estado: Counter, por_categoria: Counter, total: int) -> None:
@@ -149,10 +156,15 @@ def main(argv: list[str] | None = None) -> int:
     print(f"CSV:           {args.csv}")
     print(f"Base de datos: {get_incidents_db_path()}")
     print()
-    with incidents_table() as table:
-        resultado = seed(table, filas)
-        por_estado, por_categoria = totales_del_csv(table)
-        total = len(table)
+    try:
+        with incidents_table() as table:
+            resultado = seed(table, filas)
+            por_estado, por_categoria = totales_del_csv(table)
+            total = len(table)
+    except StorageError as error:
+        # Fichero de la base ilegible o corrupto: la carga no se puede hacer (o no se puede comprobar).
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
     imprimir(resultado, por_estado, por_categoria, total)
     return 1 if resultado.errores else 0
 

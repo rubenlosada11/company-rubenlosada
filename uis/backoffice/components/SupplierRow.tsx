@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { categoryLabel, countryLabel, statusLabel } from "@/lib/data/suppliers";
-import { ApiError } from "@/lib/http";
+import { ApiError, apiErrorMessage } from "@/lib/http";
 import { formatDateTime, formatRate, parseRate, suppliersApi } from "@/lib/suppliers";
 import type { Supplier } from "@/types";
 import { Badge } from "./Badge";
@@ -10,8 +10,9 @@ import { Badge } from "./Badge";
 const buttonBase =
   "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-60";
 
-function errorMessage(error: unknown): string {
-  return error instanceof ApiError ? error.message : "Error inesperado. Inténtalo de nuevo.";
+/** Error de una edición en la fila: el de su campo si la API lo rechaza por validación; si no, el mensaje general. */
+function errorMessage(error: unknown, field: string, action: string): string {
+  return (error instanceof ApiError && error.fieldErrors[field]) || apiErrorMessage(error, action);
 }
 
 interface SupplierRowProps {
@@ -49,7 +50,7 @@ export function SupplierRow({ supplier, onUpdated }: SupplierRowProps) {
       onUpdated(await suppliersApi.updateRate(supplier.id, rate));
       setEditingRate(false);
     } catch (error) {
-      setRateError(errorMessage(error));
+      setRateError(errorMessage(error, "rate_per_shipment", "guardar la tarifa"));
     } finally {
       setSavingRate(false);
     }
@@ -61,7 +62,7 @@ export function SupplierRow({ supplier, onUpdated }: SupplierRowProps) {
     try {
       onUpdated(await suppliersApi.updateStatus(supplier.id, isActive ? "suspended" : "active"));
     } catch (error) {
-      setStatusError(errorMessage(error));
+      setStatusError(errorMessage(error, "status", "cambiar el estado"));
     } finally {
       setSavingStatus(false);
     }

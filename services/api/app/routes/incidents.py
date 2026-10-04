@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
 from app.dependencies import get_current_user
+from app.errors import log_unexpected
 
 logger = logging.getLogger("trackflow.api.incidents")
 
@@ -33,6 +34,7 @@ router = APIRouter(
 )
 
 TAMANO_MAXIMO = 5 * 1024 * 1024  # 5 MB: el CSV de un mes ocupa ~15 KB por cada 100 filas
+LONGITUD_MAXIMA_NOMBRE = 120
 NOMBRE_EXPORTACION = "results.csv"
 ERROR_INTERNO = "Error interno del servidor."
 
@@ -41,6 +43,12 @@ ETIQUETAS_REGLAS = {
     codigo: {"etiqueta": etiqueta, "complementaria": codigo in REGLAS_COMPLEMENTARIAS}
     for codigo, etiqueta in REGLAS.items()
 }
+
+
+def nombre_seguro(nombre: str) -> str:
+    """Nombre del fichero sin ruta ni caracteres de control (saltos de línea): va al log y al mensaje de error."""
+    base = PurePath(nombre.replace("\\", "/")).name
+    return "".join(caracter for caracter in base if caracter.isprintable())[:LONGITUD_MAXIMA_NOMBRE]
 
 
 @router.post("/analyze")
@@ -52,7 +60,7 @@ async def analizar_incidencias(
     if file is None or not file.filename:
         raise HTTPException(400, "No se ha enviado ningún fichero. Adjunta un CSV en el campo 'file'.")
 
-    nombre = PurePath(file.filename.replace("\\", "/")).name
+    nombre = nombre_seguro(file.filename)
     if not nombre.lower().endswith(".csv"):
         raise HTTPException(415, f"Formato no admitido: '{nombre}'. El fichero debe tener extensión .csv.")
 
@@ -64,9 +72,9 @@ async def analizar_incidencias(
         resultado = analizar(decodificar_csv(contenido), nombre)
     except ErrorAnalisis as error:
         raise HTTPException(422, str(error)) from None
-    except Exception:
+    except Exception as error:
         # Solo en este router: la traza queda en el log del servidor y al cliente le llega un mensaje genérico.
-        logger.exception("Error inesperado al analizar '%s'", nombre)
+        log_unexpected(logger, error, "Error inesperado al analizar '%s'", nombre)
         raise HTTPException(500, ERROR_INTERNO) from None
 
     # Solo se guarda un análisis correcto: uno fallido no sustituye al anterior.
@@ -88,8 +96,8 @@ def exportar_resultados(request: Request) -> Response:
 
     try:
         contenido = generar_csv_bytes(resultado)
-    except Exception:
-        logger.exception("Error inesperado al exportar el último análisis")
+    except Exception as error:
+        log_unexpected(logger, error, "Error inesperado al exportar el último análisis")
         raise HTTPException(500, ERROR_INTERNO) from None
 
     return Response(

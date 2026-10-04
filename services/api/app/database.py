@@ -7,8 +7,12 @@
 - Gestor de incidencias: `services/api/db/incidents.json`, variable `INCIDENTS_DB_PATH`.
 
 Los ficheros están ignorados en git; los tests apuntan las variables a ficheros temporales.
+
+Si un fichero no se puede abrir, leer o escribir (permisos, disco, JSON corrupto) se lanza `StorageError`, que dice qué
+base falla y por qué. La API lo convierte en un 500 genérico y los scripts, en un mensaje y un código de salida 1.
 """
 
+import json
 import os
 import threading
 from collections.abc import Iterator
@@ -26,6 +30,49 @@ SUPPLIERS_TABLE = "suppliers"
 _lock = threading.Lock()
 
 
+class StorageError(Exception):
+    """El fichero de una base TinyDB no se puede abrir, leer o escribir.
+
+    El mensaje lleva la ruta y el motivo, nunca el contenido del fichero. Es para el log o la consola: no se envía al
+    cliente de la API.
+    """
+
+    def __init__(self, path: Path, cause: Exception):
+        super().__init__(f"No se puede usar la base de datos {path}: {_storage_reason(cause)}.")
+        self.path = path
+
+
+# Fallos del fichero: sistema de ficheros (permisos, disco lleno, ruta no válida) y contenido que no es JSON en UTF-8.
+_STORAGE_FAILURES = (OSError, json.JSONDecodeError, UnicodeDecodeError)
+
+
+def _storage_reason(cause: Exception) -> str:
+    if isinstance(cause, json.JSONDecodeError):
+        return f"el fichero no contiene JSON válido (línea {cause.lineno}, columna {cause.colno})"
+    if isinstance(cause, UnicodeDecodeError):
+        return "el fichero no está codificado en UTF-8"
+    return getattr(cause, "strerror", None) or type(cause).__name__
+
+
+@contextmanager
+def _open_db(path: Path, lock: threading.Lock) -> Iterator[TinyDB]:
+    """Abre un fichero TinyDB bajo su candado y lo cierra al terminar. Los fallos del fichero salen como `StorageError`.
+
+    TinyDB lee el fichero al usar una tabla, no al abrirlo: por eso también se vigila el bloque que usa la base.
+    """
+    with lock:
+        try:
+            db = TinyDB(path, create_dirs=True, encoding="utf-8", ensure_ascii=False, indent=2)
+        except _STORAGE_FAILURES as error:
+            raise StorageError(path, error) from error
+        try:
+            yield db
+        except _STORAGE_FAILURES as error:
+            raise StorageError(path, error) from error
+        finally:
+            db.close()
+
+
 def get_db_path() -> Path:
     return Path(os.environ.get("SUPPLIERS_DB_PATH", DEFAULT_DB_PATH))
 
@@ -37,12 +84,8 @@ def suppliers_table() -> Iterator[Table]:
     Se abre en cada uso (y no una instancia global) para leer siempre el estado del disco, también si otro
     proceso —p. ej. el seeder— lo ha modificado con la API arrancada.
     """
-    with _lock:
-        db = TinyDB(get_db_path(), create_dirs=True, encoding="utf-8", ensure_ascii=False, indent=2)
-        try:
-            yield db.table(SUPPLIERS_TABLE)
-        finally:
-            db.close()
+    with _open_db(get_db_path(), _lock) as db:
+        yield db.table(SUPPLIERS_TABLE)
 
 
 def get_suppliers_table() -> Iterator[Table]:
@@ -69,12 +112,8 @@ def auth_db() -> Iterator[TinyDB]:
     Se entrega la base completa para que las operaciones que tocan varias tablas (crear o borrar un usuario y su
     perfil, usar un enlace de recuperación y cambiar la contraseña) ocurran bajo el mismo candado.
     """
-    with _auth_lock:
-        db = TinyDB(get_auth_db_path(), create_dirs=True, encoding="utf-8", ensure_ascii=False, indent=2)
-        try:
-            yield db
-        finally:
-            db.close()
+    with _open_db(get_auth_db_path(), _auth_lock) as db:
+        yield db
 
 
 DEFAULT_INCIDENTS_DB_PATH = Path(__file__).resolve().parent.parent / "db" / "incidents.json"
@@ -91,9 +130,5 @@ def get_incidents_db_path() -> Path:
 @contextmanager
 def incidents_table() -> Iterator[Table]:
     """Abre la base del gestor de incidencias, entrega la tabla `incidents` y la cierra al terminar."""
-    with _incidents_lock:
-        db = TinyDB(get_incidents_db_path(), create_dirs=True, encoding="utf-8", ensure_ascii=False, indent=2)
-        try:
-            yield db.table(INCIDENTS_TABLE)
-        finally:
-            db.close()
+    with _open_db(get_incidents_db_path(), _incidents_lock) as db:
+        yield db.table(INCIDENTS_TABLE)

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from tinydb.table import Table
 
-from app.database import get_db_path, suppliers_table
+from app.database import StorageError, get_db_path, suppliers_table
 from app.models import SupplierCreate, utc_now
 
 # Copia literal de `SUPPLIERS_SEED` en CONTEXT-directorio.md (un test comprueba que siguen siendo iguales).
@@ -207,12 +207,18 @@ def seed(table: Table) -> SeedResult:
     return SeedResult(inserted=inserted, skipped=skipped, total=len(table))
 
 
-def main() -> None:
+def main() -> int:
     # Si la salida va a una tubería o fichero, Windows usa cp1252 y los acentos se estropean.
     sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
-    with suppliers_table() as table:
-        result = seed(table)
+    try:
+        with suppliers_table() as table:
+            result = seed(table)
+    except StorageError as error:
+        # Fichero ilegible o corrupto: no se ha cargado nada. Mensaje claro y código de salida distinto de cero.
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
 
     print(f"Base de datos: {get_db_path()}")
     for label in result.inserted:
@@ -223,7 +229,8 @@ def main() -> None:
     print(f"Inserted: {len(result.inserted)}")
     print(f"Skipped: {len(result.skipped)}")
     print(f"Total: {result.total}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

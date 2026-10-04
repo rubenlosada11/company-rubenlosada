@@ -12,13 +12,20 @@ import sys
 from pydantic import ValidationError
 
 from app.auth_models import Role, UserCreate, check_email
-from app.database import get_auth_db_path
+from app.database import StorageError, get_auth_db_path
 from app.services.users import create_user, get_user_by_email, update_user
+
+
+class InvalidInput(ValueError):
+    """Dato escrito por quien ejecuta el comando que no es válido (email, contraseñas que no coinciden)."""
 
 
 def create_or_promote_admin(email: str, read_password=getpass.getpass) -> tuple[str, str]:
     """Devuelve `("creado" | "promovido", id)`. `read_password` se inyecta en los tests."""
-    email = check_email(email)
+    try:
+        email = check_email(email)
+    except ValueError as error:
+        raise InvalidInput(str(error)) from None
     existing = get_user_by_email(email)
     if existing is not None:
         update_user(existing.id, {"role": Role.ADMIN, "is_active": True})
@@ -26,23 +33,30 @@ def create_or_promote_admin(email: str, read_password=getpass.getpass) -> tuple[
 
     password = read_password("Contraseña: ")
     if password != read_password("Repite la contraseña: "):
-        raise ValueError("Las contraseñas no coinciden.")
+        raise InvalidInput("Las contraseñas no coinciden.")
     user, _ = create_user(UserCreate(email=email, password=password), role=Role.ADMIN)
     return "creado", user.id
 
 
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(prog="create-admin", description="Crea o promueve un usuario administrador.")
     parser.add_argument("email")
     args = parser.parse_args()
 
+    # `sys.exit` con un texto lo escribe en stderr y termina con código 1.
     try:
         action, user_id = create_or_promote_admin(args.email)
     except ValidationError as error:
         sys.exit("; ".join(item["msg"].removeprefix("Value error, ") for item in error.errors()))
-    except ValueError as error:
+    except InvalidInput as error:
         sys.exit(str(error))
+    except StorageError as error:
+        sys.exit(f"Error: {error}")
+    except (EOFError, KeyboardInterrupt):
+        # Ctrl+C o entrada cerrada mientras se pide la contraseña.
+        sys.exit("\nOperación cancelada: no se ha creado ni modificado ningún usuario.")
 
     print(f"Base de datos: {get_auth_db_path()}")
     print(f"Administrador {action}: {args.email.strip().lower()} (id {user_id})")

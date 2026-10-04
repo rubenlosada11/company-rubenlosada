@@ -1,10 +1,10 @@
 /**
  * Errores de la API en los formularios de cuenta (login, registro y perfil), en español.
  *
- * FastAPI/Pydantic devuelven algunos mensajes en inglés o con el nombre técnico del campo. Aquí se traducen los que
- * produce `services/api` (comprobados contra la API real); un mensaje desconocido se muestra tal cual, nunca se oculta.
+ * `lib/http.ts` ya traduce los mensajes de Pydantic (en inglés). Aquí se pulen los que redacta `services/api` con el
+ * nombre técnico del campo (comprobados contra la API real); el resto de mensajes de la API se muestra tal cual.
  */
-import { ApiError, FORM_ERROR } from "@/lib/http";
+import { ApiError, FORM_ERROR, SERVER_ERROR_MESSAGE, SESSION_EXPIRED_MESSAGE } from "@/lib/http";
 
 export const FIELD_LABELS: Record<string, string> = {
   email: "Email",
@@ -19,27 +19,19 @@ export const FIELD_LABELS: Record<string, string> = {
 };
 
 const EXACT: Record<string, string> = {
-  "Field required": "Este campo es obligatorio.",
-  "Input should be a valid string": "Debe ser un texto.",
-  "Extra inputs are not permitted": "La API no admite este campo.",
+  // 401 de una petición protegida (p. ej. `/auth/me` justo después de entrar): la API habla de tokens y cabeceras.
+  "No autenticado. Inicia sesión y envía el token en la cabecera Authorization: Bearer <token>.": SESSION_EXPIRED_MESSAGE,
+  "Token no válido.": SESSION_EXPIRED_MESSAGE,
+  "El token ha caducado. Inicia sesión de nuevo.": SESSION_EXPIRED_MESSAGE,
   "email no tiene un formato válido": "El email no tiene un formato válido.",
   "phone no tiene un formato de teléfono válido": "El teléfono no tiene un formato válido (p. ej. +34 976 000 000).",
   "Envía al menos un campo: name, phone o address": "Cambia al menos un campo: nombre, teléfono o dirección.",
 };
 
-const PATTERNS: [RegExp, (match: RegExpMatchArray) => string][] = [
-  [/^String should have at most (\d+) characters?$/, (m) => `Máximo ${m[1]} caracteres.`],
-  [/^String should have at least (\d+) characters?$/, (m) => `Mínimo ${m[1]} caracteres.`],
-];
-
-/** Traduce un mensaje de la API; si no se conoce, lo devuelve igual (con punto final). */
+/** Pule un mensaje de la API; si no está en la tabla, lo devuelve igual (con punto final). */
 export function translateApiMessage(message: string): string {
   const text = message.trim();
   if (EXACT[text]) return EXACT[text];
-  for (const [pattern, build] of PATTERNS) {
-    const match = text.match(pattern);
-    if (match) return build(match);
-  }
   return /[.!?]$/.test(text) ? text : `${text}.`;
 }
 
@@ -55,10 +47,9 @@ export interface FormErrors {
  * el formulario no muestra se añaden al mensaje general con su etiqueta, para que no se pierdan.
  */
 export function toFormErrors(error: unknown, visibleFields: readonly string[]): FormErrors {
-  if (!(error instanceof ApiError)) {
-    const detail = error instanceof Error && error.message ? ` (${error.message})` : "";
-    return { fields: {}, message: `Error inesperado${detail}. Inténtalo de nuevo.` };
-  }
+  // El mensaje de un error que no viene de la API es técnico (p. ej. un `TypeError`): no se muestra.
+  if (!(error instanceof ApiError)) return { fields: {}, message: "Error inesperado. Inténtalo de nuevo." };
+  if (error.status >= 500) return { fields: {}, message: SERVER_ERROR_MESSAGE };
 
   const entries = Object.entries(error.fieldErrors);
   if (entries.length === 0) return { fields: {}, message: translateApiMessage(error.message) };

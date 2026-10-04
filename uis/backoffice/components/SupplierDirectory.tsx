@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SUPPLIER_CATEGORIES, SUPPLIER_COUNTRIES } from "@/lib/data/suppliers";
-import { ApiError } from "@/lib/http";
+import { apiErrorMessage } from "@/lib/http";
 import { suppliersApi } from "@/lib/suppliers";
 import type { Supplier, SupplierFilters } from "@/types";
 import { SupplierForm } from "./SupplierForm";
@@ -48,8 +48,7 @@ export function SupplierDirectory() {
       .then((list) => setResult({ key: requestKey, suppliers: list, error: null }))
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
-        const message = error instanceof ApiError ? error.message : "Error inesperado al cargar los proveedores.";
-        setResult({ key: requestKey, suppliers: [], error: message });
+        setResult({ key: requestKey, suppliers: [], error: apiErrorMessage(error, "cargar los proveedores") });
       });
     return () => controller.abort();
   }, [filters, requestKey]);

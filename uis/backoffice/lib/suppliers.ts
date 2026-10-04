@@ -100,14 +100,22 @@ export function validateDraft(draft: SupplierDraft): {
 }
 
 export function formatRate(supplier: Pick<Supplier, "rate_per_shipment" | "currency">): string {
-  return new Intl.NumberFormat("es-ES", {
-    style: "currency",
-    currency: supplier.currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
-  }).format(supplier.rate_per_shipment);
+  try {
+    return new Intl.NumberFormat("es-ES", {
+      style: "currency",
+      currency: supplier.currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 4,
+    }).format(supplier.rate_per_shipment);
+  } catch {
+    // `Intl` lanza `RangeError` con un código de moneda que no reconoce: se muestra la tarifa sin formato de moneda.
+    return `${supplier.rate_per_shipment} ${supplier.currency ?? ""}`.trim();
+  }
 }
 
 export function formatDateTime(iso: string): string {
-  return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+  const date = new Date(iso);
+  // `format` lanza `RangeError` con una fecha no válida, y eso rompería el render de toda la tabla.
+  if (Number.isNaN(date.getTime())) return "Fecha no disponible";
+  return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }

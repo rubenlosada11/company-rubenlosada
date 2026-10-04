@@ -37,7 +37,10 @@ export const incidentsApi = {
 export const NO_INCIDENT_FILTERS: IncidentFilters = { status: "", origin: "", branch: "", category: "" };
 
 export function formatIncidentDate(iso: string): string {
-  return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+  const date = new Date(iso);
+  // `format` lanza `RangeError` con una fecha no válida, y eso rompería el render de todo el listado.
+  if (Number.isNaN(date.getTime())) return "Fecha no disponible";
+  return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
 /** Mismos límites que la API (`gestor.py` del paquete compartido). */

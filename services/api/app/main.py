@@ -3,12 +3,14 @@ import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.errors import UnexpectedErrorMiddleware, unexpected_error, validation_error
 from app.routes import auth, incident_manager, incidents, profiles, suppliers, users
-from app.security import check_auth_config
+from app.security import ConfigError, check_auth_config
 from app.services.email import check_email_config
 
 # Orígenes del navegador autorizados (lista separada por comas). Por defecto, el backoffice local (puerto 3002).
@@ -30,10 +32,15 @@ class UTF8JSONResponse(JSONResponse):
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    # Sin SECRET_KEY válida la API no arranca: mejor un error claro al iniciar que un 500 en el primer login.
-    check_auth_config()
-    # Igual con el email: clave de Resend sin remitente → error al arrancar, no en cada envío.
-    check_email_config()
+    try:
+        # Sin SECRET_KEY válida la API no arranca: mejor un error claro al iniciar que un 500 en el primer login.
+        check_auth_config()
+        # Igual con el email: clave de Resend sin remitente → error al arrancar, no en cada envío.
+        check_email_config()
+    except ConfigError as error:
+        # El servidor imprime además la traza del arranque fallido: esta línea deja el motivo a la vista.
+        trackflow_logger.error("La API no puede arrancar: %s", error)
+        raise
     yield
 
 
@@ -48,6 +55,10 @@ app = FastAPI(
     default_response_class=UTF8JSONResponse,
     lifespan=lifespan,
 )
+
+# Se registra antes que CORS para quedar dentro de él (el último middleware añadido es el más externo): así el 500
+# genérico de un error no controlado lleva las cabeceras CORS y el backoffice puede leerlo.
+app.add_middleware(UnexpectedErrorMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -74,15 +85,10 @@ app.include_router(incidents.router)
 app.include_router(incident_manager.router)
 
 
-@app.exception_handler(Exception)
-async def unexpected_error(request: Request, _: Exception) -> UTF8JSONResponse:
-    """Red de seguridad: cualquier error no controlado responde 500 con un mensaje genérico, nunca con la traza.
-
-    Starlette lo ejecuta fuera del middleware de CORS, así que el navegador no puede leer esta respuesta desde otro
-    origen; por eso el gestor de incidencias captura además sus errores dentro de su router.
-    """
-    trackflow_logger.exception("Error no controlado en %s %s", request.method, request.url.path)
-    return UTF8JSONResponse({"detail": "Error interno del servidor."}, status_code=500)
+# Errores que no gestiona ningún router (ver `app/errors.py`): 422 sin los valores recibidos y, como último recurso
+# si algo falla fuera de `UnexpectedErrorMiddleware`, 500 genérico (Starlette lo ejecuta fuera de CORS).
+app.add_exception_handler(RequestValidationError, validation_error)
+app.add_exception_handler(Exception, unexpected_error)
 
 
 @app.get("/health", tags=["health"])

@@ -103,7 +103,8 @@ npm run dev
 
 Abrir `http://localhost:3002/incidencias` (también desde el menú “Análisis de incidencias”). El navegador llama a la
 API en la URL de `NEXT_PUBLIC_API_BASE_URL`, que Next.js incrusta al compilar: tras cambiarla, reinicia `npm run dev` o
-repite `npm run build`. Si falta, la página muestra el aviso “Falta la variable NEXT_PUBLIC_API_BASE_URL…”.
+repite `npm run build`. Si falta, la página muestra el aviso “Falta la variable NEXT_PUBLIC_API_BASE_URL…” en desarrollo
+y “El servicio no está disponible en este momento…” en el build de producción.
 
 ## Formato del CSV
 
@@ -217,7 +218,8 @@ satisfacción → registros inválidos → más desgloses → evolución tempora
 - Números en formato es-ES (`3,06`, `14,7 %`); barras de una serie en `blue-700`; aviso de inválidos en ámbar con icono
   y texto; tablas de satisfacción por país, categoría y transportista.
 - Errores claros: sin fichero, extensión no `.csv` (sin llamar a la API), `detail` de la API, API que no responde
-  (“No se pudo conectar con la API de TrackFlow…”) y variable `NEXT_PUBLIC_API_BASE_URL` ausente.
+  (“No se pudo conectar con la API de TrackFlow…”), API que tarda más de 20 s, respuesta que no es JSON y variable
+  `NEXT_PUBLIC_API_BASE_URL` ausente. Un 5xx muestra un texto fijo, nunca el detalle interno.
 - Reutiliza `StatCard`, `PageSection` y `NavLink` del backoffice. Las llamadas usan `fetchApi` de `lib/http.ts` (URL
   base y conversión de errores compartidas con proveedores), que no fuerza `Content-Type: application/json` y así
   permite enviar `FormData` y descargar el CSV como blob.

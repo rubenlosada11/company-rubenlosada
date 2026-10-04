@@ -236,8 +236,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: {error}", file=sys.stderr)
         return 1
 
-    resultado = analizar(filas, Path(args.csv).name)
-    print(formatear_informe(resultado))
+    try:
+        resultado = analizar(filas, Path(args.csv).name)
+        informe = formatear_informe(resultado)
+    except Exception as error:  # noqa: BLE001 - red final de la CLI: un fallo imprevisto no debe acabar en una traza
+        # Solo el tipo: el mensaje de un error imprevisto podría arrastrar datos de una fila (p. ej. un correo).
+        print(f"Error: no se pudo completar el análisis ({type(error).__name__}).", file=sys.stderr)
+        return 1
+    print(informe)
 
     if not preguntar_exportacion():
         print("No se ha exportado ningún fichero.")
@@ -245,7 +251,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         destino = exportar_csv(resultado, args.output)
     except OSError as error:
-        print(f"Error: no se pudo escribir la exportación: {error.strerror}", file=sys.stderr)
+        # `strerror` puede faltar (p. ej. en un `OSError` creado sin código de error).
+        motivo = error.strerror or type(error).__name__
+        print(f"Error: no se pudo escribir la exportación: {motivo}", file=sys.stderr)
         return 1
     print(f"Resultados exportados a {destino.resolve()}")
     return 0
