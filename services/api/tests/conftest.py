@@ -30,6 +30,14 @@ def auth_env(tmp_path, monkeypatch):
     return path
 
 
+@pytest.fixture(autouse=True)
+def incidents_db_path(tmp_path, monkeypatch):
+    """Base temporal del gestor de incidencias en todos los tests (nunca toca `db/incidents.json`)."""
+    path = tmp_path / "db" / "incidents.json"
+    monkeypatch.setenv("INCIDENTS_DB_PATH", str(path))
+    return path
+
+
 @pytest.fixture
 def db_path(tmp_path, monkeypatch):
     """Base de datos TinyDB temporal y aislada para cada test (nunca toca `db/suppliers.json`)."""
