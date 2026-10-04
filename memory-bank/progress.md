@@ -26,8 +26,8 @@
 - **Gestor de incidencias centralizado** (práctica sin número de hito; sienta bases del Hito 5; contexto en
   [`CONTEXT-gestor-incidencias.es.md`](../CONTEXT-gestor-incidencias.es.md)): **implementado y validado** en
   `feature/gestor-incidencias`, por fases con parada y confirmación. Documentación en `docs/gestor-incidencias.md`.
-  Capturas del desarrollador añadidas y base real cargada con el seed. **Cuatro commits en la rama**; pendiente:
-  push y PR.
+  Capturas del desarrollador añadidas y base real cargada con el seed. Rama subida y **PR #15 abierta** hacia
+  `main` (fusionable, sin conflictos); pendiente: que el desarrollador la revise y la fusione.
 - **Última actualización:** 2026-10-04.
 
 | Componente | Estado |
@@ -41,7 +41,7 @@
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | Autenticación (AUTH-01) | ✅ API: `User`/`Profile` en TinyDB, JWT, `/auth`, `/users`, `/profiles` y 8 rutas existentes protegidas (269 tests). Backoffice: `/login` y panel protegido (E2E 34/34). Solo local |
 | Autenticación frontend (AUTH-02) | ✅ PR #13 fusionada (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE` |
-| Gestor de incidencias | 🟡 Cuatro commits en `feature/gestor-incidencias`, falta push y PR: paquete + scripts 192 tests, API 751 tests, navegador 69 + 64 + 33 + 44 + 22 |
+| Gestor de incidencias | 🟡 PR #15 abierta (`feature/gestor-incidencias` → `main`), falta fusionarla: paquete + scripts 192 tests, API 751 tests, navegador 69 + 64 + 33 + 44 + 22 |
 | Recuperación y cambio de contraseña (AUTH-03) | ✅ PR #14 fusionada (`f586bb3`): API completa: persistencia, email, los tres endpoints y cambio de email con contraseña (473 tests) `/forgot-password` (E2E 39/39) y `/reset-password` (E2E 51/51) enlace en `/login` (E2E 26/26) y `/account/change-password` (E2E 42/42); E2E de punta a punta 33/33 con emails reales; regresión de AUTH-02 en verde |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
 | Analizador de incidencias | ✅ Entregado (PR #9): paquete + script (70 tests), API (144 tests), `/incidencias` (navegador 19/19), capturas; en producción muestra el aviso de API no configurada |
@@ -951,6 +951,11 @@ hito: commits `Gestor de incidencias — …`, sin `docs/hitos.md`. Fuente de ve
   y el de documentación, memory bank y capturas (este). Las capturas se rehicieron con un usuario ficticio
   (`tu.email@trackflow.test`) para no publicar datos personales.
 
+- **16–17 · Push y PR:** rama subida a `origin` (`c129f6b`) y **PR #15** abierta hacia `main` con funcionalidad,
+  arquitectura, seed, endpoints, frontend, validaciones reales, las tres capturas y lo no comprobado. Verificada con
+  `gh pr view` (4 commits, 46 ficheros, `MERGEABLE`) y comprobando que enlaces e imágenes responden 200. Sin merge.
+  Este fichero se actualizó después en un quinto commit.
+
 **Problemas encontrados y resueltos**
 
 - Mi arnés de tests del seed cargaba el script con `importlib` sin registrarlo en `sys.modules` (lo exige
@@ -981,7 +986,7 @@ hito: commits `Gestor de incidencias — …`, sin `docs/hitos.md`. Fuente de ve
   backoffice de `main`**: sin API, el login deja el panel inaccesible.
 - AUTH-03 en producción: la API necesita `RESEND_API_KEY`, `MAIL_FROM` y `FRONTEND_BASE_URL` con la URL pública del
   backoffice.
-- Gestor de incidencias: push de `feature/gestor-incidencias` y PR a `main`. Pendiente de decidir: permisos por rol o sede, paginación y las alertas
+- Gestor de incidencias: fusionar la PR #15 (lo hace el desarrollador). Pendiente de decidir: permisos por rol o sede, paginación y las alertas
   de incidencias sin resolver del CONTEXT.
 - Autenticación: cualquier usuario autenticado puede operar proveedores e incidencias. El registro se limita con
   `REGISTRATION_CODE` (AUTH-02): **definirlo al publicar la API**. Pendiente decidir si se exige `admin`/`manager` en
