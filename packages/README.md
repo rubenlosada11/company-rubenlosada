@@ -14,4 +14,4 @@ Each subfolder under `packages/` should represent **one versionable package** (f
 | Package | Language | Contents | Used by |
 | --- | --- | --- | --- |
 | [`shared/`](./shared/README.md) | TypeScript | `@repo/shared-types`: TrackFlow domain types and pure utilities (Milestone 2) | `uis/script-automatizacion` |
-| [`analisis-incidencias/`](./analisis-incidencias/README.md) | Python (standard library only) | Loading, validation, metrics and export of the CX incidents CSV ([`CONTEXT-incidencias.es.md`](../CONTEXT-incidencias.es.md)) | `scripts/analyze.py` and `services/api` |
+| [`analisis-incidencias/`](./analisis-incidencias/README.md) | Python (standard library only) | Loading, validation, metrics and export of the CX incidents CSV ([`CONTEXT-incidencias.es.md`](../CONTEXT-incidencias.es.md)); plus values, validation, transitions and mappings of the incident manager ([`CONTEXT-gestor-incidencias.es.md`](../CONTEXT-gestor-incidencias.es.md)) | `scripts/analyze.py`, `scripts/seed_incidents.py` and `services/api` |

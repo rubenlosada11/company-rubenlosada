@@ -34,3 +34,28 @@ Tests, desde la raíz del repo: `python -m pytest scripts/tests packages/analisi
 completa (API, backoffice, reglas y decisiones): [`docs/analizador-incidencias.md`](../docs/analizador-incidencias.md).
 Captura de la salida en consola (tres partes): [1](./screenshots/screenshot%20script%20consola1.png),
 [2](./screenshots/screenshot%20script%20consola2.png) y [3](./screenshots/screenshot%20script%20consola3.png).
+
+## Seed del gestor de incidencias
+
+[`seed_incidents.py`](./seed_incidents.py) carga el CSV histórico [`incidents-trackflow.csv`](./incidents-trackflow.csv)
+en la base del gestor de incidencias (`services/api/db/incidents.json`), con los mapeos de
+[`CONTEXT-gestor-incidencias.es.md`](../CONTEXT-gestor-incidencias.es.md). Valida cada fila con la misma lógica que el
+analizador, la pasa por el modelo de la API y descarta e informa de las que no valen.
+
+A diferencia de `analyze.py`, necesita el entorno de la API (TinyDB y los modelos). Desde la **raíz del repo**, con la
+API parada:
+
+```powershell
+uv run --project services/api python scripts/seed_incidents.py
+```
+
+- Resultado con el CSV de prueba: 100 filas leídas, 95 válidas e insertadas, 5 inválidas. Es idempotente: la segunda
+  ejecución da 0 insertadas y 95 duplicadas.
+- Admite la ruta de otro CSV como argumento. `INCIDENTS_DB_PATH` cambia el fichero de la base.
+- Códigos de salida: `0` correcto, `1` error de fichero o de escritura, `2` falta el entorno de la API (p. ej. al
+  ejecutarlo con el Python del sistema).
+- No imprime ni guarda `customer_email`.
+
+Sus tests están en [`services/api/tests/test_seed_incidents.py`](../services/api/tests/test_seed_incidents.py), porque
+necesitan TinyDB (`uv run pytest -q` desde `services\api`). Documentación completa:
+[`docs/gestor-incidencias.md`](../docs/gestor-incidencias.md).

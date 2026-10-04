@@ -6,7 +6,7 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/password-reset` (desde `origin/main` @ `91e808e`, que ya incluye las PR #3–#13).
+- **Rama de trabajo:** `feature/gestor-incidencias` (desde `origin/main` @ `f586bb3`, que ya incluye las PR #3–#14).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (práctica sin número de hito; contexto en
@@ -21,11 +21,14 @@
 - **Flujos de autenticación del frontend (AUTH-02)** (práctica sin número de hito): implementados y validados en
   `feature/auth-frontend` (registro, perfil, token en `localStorage`, vistas protegidas y, como mejora adicional,
   código de invitación en la API). PR #13 fusionada el 2026-10-01 (`91e808e`).
-- **Recuperación y cambio de contraseña (AUTH-03)** (práctica sin número de hito): **en curso** en
-  `feature/password-reset`, por fases (1–11 con parada y confirmación; 12–18 en automático por indicación del
-  desarrollador). **Implementado, validado y con commit en la rama**; pendiente: push y PR (el texto de la PR está
-  preparado; no se abre sin indicación). Email con Resend y el dominio `rubenlosada.com` ya verificado por el desarrollador.
-- **Última actualización:** 2026-10-02.
+- **Recuperación y cambio de contraseña (AUTH-03)** (práctica sin número de hito): **entregada**, PR #14 fusionada
+  (`f586bb3`). Email con Resend y el dominio `rubenlosada.com` verificado por el desarrollador.
+- **Gestor de incidencias centralizado** (práctica sin número de hito; sienta bases del Hito 5; contexto en
+  [`CONTEXT-gestor-incidencias.es.md`](../CONTEXT-gestor-incidencias.es.md)): **implementado y validado** en
+  `feature/gestor-incidencias`, por fases con parada y confirmación. Documentación en `docs/gestor-incidencias.md`.
+  Capturas del desarrollador añadidas y base real cargada con el seed. **Cuatro commits en la rama**; pendiente:
+  push y PR.
+- **Última actualización:** 2026-10-04.
 
 | Componente | Estado |
 | --- | --- |
@@ -38,7 +41,8 @@
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | Autenticación (AUTH-01) | ✅ API: `User`/`Profile` en TinyDB, JWT, `/auth`, `/users`, `/profiles` y 8 rutas existentes protegidas (269 tests). Backoffice: `/login` y panel protegido (E2E 34/34). Solo local |
 | Autenticación frontend (AUTH-02) | ✅ PR #13 fusionada (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE` |
-| Recuperación y cambio de contraseña (AUTH-03) | 🟡 Commit en `feature/password-reset`, falta push y PR: API completa: persistencia, email, los tres endpoints y cambio de email con contraseña (473 tests) `/forgot-password` (E2E 39/39) y `/reset-password` (E2E 51/51) enlace en `/login` (E2E 26/26) y `/account/change-password` (E2E 42/42); E2E de punta a punta 33/33 con emails reales; regresión de AUTH-02 en verde |
+| Gestor de incidencias | 🟡 Cuatro commits en `feature/gestor-incidencias`, falta push y PR: paquete + scripts 192 tests, API 751 tests, navegador 69 + 64 + 33 + 44 + 22 |
+| Recuperación y cambio de contraseña (AUTH-03) | ✅ PR #14 fusionada (`f586bb3`): API completa: persistencia, email, los tres endpoints y cambio de email con contraseña (473 tests) `/forgot-password` (E2E 39/39) y `/reset-password` (E2E 51/51) enlace en `/login` (E2E 26/26) y `/account/change-password` (E2E 42/42); E2E de punta a punta 33/33 con emails reales; regresión de AUTH-02 en verde |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
 | Analizador de incidencias | ✅ Entregado (PR #9): paquete + script (70 tests), API (144 tests), `/incidencias` (navegador 19/19), capturas; en producción muestra el aviso de API no configurada |
 | `docs/ARCHITECTURE_PROPOSAL.md` | ✅ Redactado (entregable del curso, no es un hito) |
@@ -891,6 +895,75 @@ Fases 12–18 en automático (indicación del desarrollador: «avanza salvo deci
   además recoge ya las variables de AUTH-03 (`RESEND_API_KEY`, `MAIL_FROM`, `FRONTEND_BASE_URL`,
   `RESET_TOKEN_EXPIRE_MINUTES`) y los pasos de verificación 8–9.
 
+### 2026-10-04 — Gestor de incidencias centralizado (rama `feature/gestor-incidencias`)
+
+Prompt operativo del curso en 17 fases, **con parada y confirmación del desarrollador en cada una**. Práctica sin
+hito: commits `Gestor de incidencias — …`, sin `docs/hitos.md`. Fuente de verdad: `CONTEXT-gestor-incidencias.es.md`.
+
+**Decisiones del desarrollador**
+
+- Rama `feature/gestor-incidencias`; versionar el CONTEXT; práctica sin hito (aunque sienta bases del Hito 5).
+- Seguir el enunciado donde choca con el repo: **400** en datos no válidos y **500 global**.
+- **`description` es obligatoria** en el alta (dicho de forma expresa).
+- Guardar el `incident_id` del CSV como referencia interna para la idempotencia; JWT en los endpoints nuevos.
+- Autorizado añadir `# INCIDENTS_DB_PATH=db/incidents.json` a `services/api/.env.example`.
+- La carga de la base real (`db/incidents.json`) queda para después de la entrega técnica, con los pasos que se le den.
+
+**Fases**
+
+- **1 · Auditoría:** FastAPI + TinyDB (sin ORM ni migraciones), backoffice Next.js, validación del analizador ya en
+  `packages/analisis-incidencias`; `packages/shared` es TypeScript. El CSV está en `scripts/` (no en la ruta que cita
+  el CONTEXT). Línea base: 70 y 473 tests.
+- **2 · Contrato:** tablas campo/valores/transformación; el CSV reproduce los totales del CONTEXT (95; 29/52/14;
+  14/45/19/17). Discrepancia: «`incident_id` no se almacena» frente a idempotencia (`title + created_at` → 88 de 95).
+- **3 · Diseño:** ver «Decisiones técnicas del gestor de incidencias» en `techContext.md`.
+- **4 · Modelo y validación:** `gestor.py`, `app/incident_models.py`, tabla `incidents`, `services/incidents.py`.
+  Mutaciones: campo vacío deja de ser error → 27 fallan; `resolved` deja de ser final → 3.
+- **5 · Seed:** `scripts/seed_incidents.py`. 1.ª ejecución 100/95/95/0/5; 2.ª 0 insertadas, 95 duplicadas, mismo
+  SHA-256 del fichero. Mutaciones: sin control de duplicados → 4 fallan; sin validación compartida → 12.
+- **6 · API alta y lectura:** `routes/incident_manager.py` con `IncidentRoute` (400 y 500 propios) y manejador global
+  en `main.py`. Servidor real 35/35. Mutaciones: ruta por defecto → 65 fallan; filtros ignorados → 16.
+- **7 · API transiciones y resumen:** `PATCH /{id}/status` y `GET /summary`. Servidor real 16/16. Mutaciones: sin
+  comprobar la transición → 22 fallan; sin renovar `updated_at` → 4; `/summary` después de `/{id}` → 7.
+- **8 · Formulario** `/gestor-incidencias/nueva`: navegador 69/69 (vacío, categoría inválida con 400 real, sede vacía,
+  envío válido, 400, 500 y 502, latencia, doble envío, 390 px).
+- **9 · Listado** `/gestor-incidencias`: filtros (también por categoría), carga, vacío, error con reintento y cambio de
+  estado optimista con vuelta atrás. Navegador 64/64.
+- **10 · Resumen:** `IncidentSummary` con petición y error propios; `IncidentDashboard` lo refresca tras un cambio de
+  estado. Navegador 33/33.
+- **11 · E2E** sobre bases vacías con API y navegador reales: 44/44 (seed → API → UI → crear → listar → filtrar →
+  cambiar estado → resumen; y validación, transición inválida, 404, 500 real con un documento corrupto, corte de red).
+- **12 · Calidad:** el cambio de estado pasa por `IncidentRecord` antes de escribirse; tipo `IncidentTargetStatus`
+  (sin destino `open`); pie del sidebar. Batería final: 192 + 751 tests, lint/typecheck/build 0, navegador
+  69 + 64 + 33 + 44 y regresión de inicio, proveedores, analizador y sesión 22/22; `check-route` 8 rutas;
+  `check-hygiene` OK. `ruff` puntual (no es dependencia del repo): código nuevo sin avisos.
+- **13 · Documentación:** `docs/gestor-incidencias.md`, READMEs de `services/api`, `uis/backoffice`, `scripts`,
+  `packages/analisis-incidencias`, índices de `docs/`, `packages/`, `services/` y `uis/`, `AGENTS.md` §2,
+  `.env.example` y este memory bank.
+
+- **14 · Revisión de Git:** el desarrollador cargó su base real con el seed y añadió las tres capturas
+  (`uis/backoffice/screenshots/screenshot gestor …png`), revisadas (95 · 29 / 0 / 52 / 14, sedes 50 / 45) y enlazadas
+  desde `docs/gestor-incidencias.md` y el README del backoffice.
+
+- **15 · Commits escalonados** (decisión del desarrollador: cuatro en lugar del commit único del enunciado; así
+  también en los hitos), con la identidad `noreply` de GitHub y tras repetir las validaciones (192 + 751 tests,
+  lint/typecheck/build 0): `41bc0a1` validación compartida, modelo y seed · `14b2016` API · `957e166` backoffice ·
+  y el de documentación, memory bank y capturas (este). Las capturas se rehicieron con un usuario ficticio
+  (`tu.email@trackflow.test`) para no publicar datos personales.
+
+**Problemas encontrados y resueltos**
+
+- Mi arnés de tests del seed cargaba el script con `importlib` sin registrarlo en `sys.modules` (lo exige
+  `dataclass` con `from __future__ import annotations`).
+- Falsos fallos de mi QA en navegador (no de la app): una búsqueda de palabras sueltas en toda la página y la
+  reinyección del token tras cerrar sesión en el mismo contexto.
+- Texto del aviso de carga del listado corregido («…cargar el listado»).
+
+**Método de prueba en navegador**
+
+- API en `:8000` y backoffice (`npm run start`) en `:3002`, con `SECRET_KEY` de pruebas y las tres bases TinyDB en el
+  scratchpad (`AUTH_DB_PATH`, `SUPPLIERS_DB_PATH`, `INCIDENTS_DB_PATH`). `db/` real sin tocar: no tiene `incidents.json`.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -906,8 +979,10 @@ Fases 12–18 en automático (indicación del desarrollador: «avanza salvo deci
 - Despliegue de la API (`docs/despliegue-api.md`): topología (A subdominio / B mismo host) y, si es A, el subdominio
   y su DNS; quitar el Basic Auth del proxy delante de la API (choca con el Bearer). **Desplegar la API antes que el
   backoffice de `main`**: sin API, el login deja el panel inaccesible.
-- AUTH-03: hacer push de `feature/password-reset` y abrir la PR (texto preparado). En producción, la API necesita
-  `RESEND_API_KEY`, `MAIL_FROM` y `FRONTEND_BASE_URL` con la URL pública del backoffice.
+- AUTH-03 en producción: la API necesita `RESEND_API_KEY`, `MAIL_FROM` y `FRONTEND_BASE_URL` con la URL pública del
+  backoffice.
+- Gestor de incidencias: push de `feature/gestor-incidencias` y PR a `main`. Pendiente de decidir: permisos por rol o sede, paginación y las alertas
+  de incidencias sin resolver del CONTEXT.
 - Autenticación: cualquier usuario autenticado puede operar proveedores e incidencias. El registro se limita con
   `REGISTRATION_CODE` (AUTH-02): **definirlo al publicar la API**. Pendiente decidir si se exige `admin`/`manager` en
   las escrituras y un límite de intentos de login y de código.
@@ -918,7 +993,8 @@ Fases 12–18 en automático (indicación del desarrollador: «avanza salvo deci
 
 **Deuda técnica conocida**
 
-- Sin tests automatizados ni CI en todo el repo; las validaciones dependen del flujo de `AGENTS.md` y de la skill.
+- Sin tests automatizados de JavaScript ni CI en el repo (sí hay tests de Python con pytest); las validaciones
+  dependen del flujo de `AGENTS.md` y de la skill.
 - El backoffice publicado es anterior al login (protegido hoy con el popup de autenticación HTTP del servidor). El
   login de la app llega a `main` con la PR de `feature/auth-api`, pero necesita la API desplegada.
 - Logo, favicon e imagen duplicados por app (patrón ya usado por el tracker). Si crece, valorar `packages/`

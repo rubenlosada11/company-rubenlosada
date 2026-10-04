@@ -12,4 +12,4 @@ Cada subcarpeta dentro de `packages/` debería representar **un paquete versiona
 | Paquete | Lenguaje | Qué contiene | Lo usan |
 | --- | --- | --- | --- |
 | [`shared/`](./shared/README.md) | TypeScript | `@repo/shared-types`: tipos de dominio de TrackFlow y utilidades puras (Hito 2) | `uis/script-automatizacion` |
-| [`analisis-incidencias/`](./analisis-incidencias/README.md) | Python (solo biblioteca estándar) | Carga, validación, métricas y exportación del CSV de incidencias de CX ([`CONTEXT-incidencias.es.md`](../CONTEXT-incidencias.es.md)) | `scripts/analyze.py` y `services/api` |
+| [`analisis-incidencias/`](./analisis-incidencias/README.md) | Python (solo biblioteca estándar) | Carga, validación, métricas y exportación del CSV de incidencias de CX ([`CONTEXT-incidencias.es.md`](../CONTEXT-incidencias.es.md)); y valores, validación, transiciones y mapeos del gestor de incidencias ([`CONTEXT-gestor-incidencias.es.md`](../CONTEXT-gestor-incidencias.es.md)) | `scripts/analyze.py`, `scripts/seed_incidents.py` y `services/api` |

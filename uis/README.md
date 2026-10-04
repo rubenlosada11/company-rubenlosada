@@ -23,7 +23,7 @@ Organize `uis/` by **different concerns** — each subfolder covers a distinct a
 
 - `website/`: TrackFlow's public corporate website (Next.js + Tailwind): hero, services, delivery flow, US/Spain coverage, benefits, target audience and contact, with Schema.org markup. Its content comes from `CONTEXT.es.md` and its CTA points to the existing lead form in `landing/formulario/`. See [`website/README.md`](./website/README.md).
 
-- `backoffice/`: internal TrackFlow Tech application (Next.js + Tailwind) with its own layout: business-area overview, backlog of initiatives with area/status filters, and project milestones derived from `CONTEXT.es.md`, plus the **supplier directory** (`/proveedores`) and the CX **incident analyzer** (`/incidencias`), both backed by the local API in `services/api` (no authentication yet). See [`backoffice/README.md`](./backoffice/README.md).
+- `backoffice/`: internal TrackFlow Tech application (Next.js + Tailwind) with its own layout: business-area overview, backlog of initiatives with area/status filters, and project milestones derived from `CONTEXT.es.md`, plus the **supplier directory** (`/proveedores`), the CX **incident analyzer** (`/incidencias`) and the **incident manager** (`/gestor-incidencias`), backed by the local API in `services/api`, behind a login. See [`backoffice/README.md`](./backoffice/README.md).
 
 ### Run The Landing Page Locally
 
@@ -67,7 +67,7 @@ npm install
 npm run dev
 ```
 
-Then open `http://localhost:3002`. `/proveedores` and `/incidencias` need the API running and `.env.local` (a copy of `.env.example`). More detail in [`backoffice/README.md`](./backoffice/README.md).
+Then open `http://localhost:3002`. Signing in and using `/proveedores`, `/incidencias` and `/gestor-incidencias` need the API running and `.env.local` (a copy of `.env.example`). More detail in [`backoffice/README.md`](./backoffice/README.md).
 
 ### Run The Talent Pipeline Tracker Locally
 

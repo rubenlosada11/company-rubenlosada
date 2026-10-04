@@ -17,9 +17,9 @@ JS es autónomo, con su propio `package.json` y `package-lock.json`, y se opera 
 | `uis/website/` | Hito 4. Web corporativa pública (Next.js). |
 | `uis/backoffice/` | Hito 4. Aplicación interna (Next.js). |
 | `packages/shared/` | `@repo/shared-types`: tipos de dominio (`Carrier`, `Shipment`, `ReturnRequest`, `Client`) y utilidades TS puras. `dist/` está versionado. |
-| `packages/analisis-incidencias/` | Paquete Python (solo biblioteca estándar, `uv_build`, `src/`): carga, validación, métricas y exportación del CSV de incidencias de CX. Lo usan `scripts/analyze.py` y `services/api`. Contexto: `CONTEXT-incidencias.es.md`. |
-| `services/api/` | **FastAPI + Pydantic + TinyDB**, Python gestionado con **uv** (`pyproject.toml` + `uv.lock` propios), tests con `pytest`. Directorio de proveedores (`/suppliers`, contexto `CONTEXT-directorio.md`), analizador de incidencias (`/api/incidents`, contexto `CONTEXT-incidencias.es.md`) y autenticación JWT (`/auth`, `/users`, `/profiles`; `docs/autenticacion.md`), con recuperación y cambio de contraseña y emails por Resend (AUTH-03). |
-| `scripts/` | `analyze.py`: CLI del analizador de incidencias (+ `incidents-trackflow.csv` de prueba y `tests/`). |
+| `packages/analisis-incidencias/` | Paquete Python (solo biblioteca estándar, `uv_build`, `src/`): carga, validación, métricas y exportación del CSV de incidencias de CX. Lo usan `scripts/analyze.py` y `services/api`. Contexto: `CONTEXT-incidencias.es.md`. Incluye `gestor.py`: valores, validación, transiciones y mapeos del gestor de incidencias (`CONTEXT-gestor-incidencias.es.md`), que usan la API y `scripts/seed_incidents.py`. |
+| `services/api/` | **FastAPI + Pydantic + TinyDB**, Python gestionado con **uv** (`pyproject.toml` + `uv.lock` propios), tests con `pytest`. Directorio de proveedores (`/suppliers`, contexto `CONTEXT-directorio.md`), analizador de incidencias (`/api/incidents`, contexto `CONTEXT-incidencias.es.md`), gestor de incidencias (también en `/api/incidents`; `docs/gestor-incidencias.md`) y autenticación JWT (`/auth`, `/users`, `/profiles`; `docs/autenticacion.md`), con recuperación y cambio de contraseña y emails por Resend (AUTH-03). |
+| `scripts/` | `analyze.py`: CLI del analizador de incidencias (+ `incidents-trackflow.csv` de prueba y `tests/`). `seed_incidents.py`: carga ese CSV en el gestor de incidencias (necesita el entorno de la API). |
 | `agents/`, `skills/`, `mcps/`, `workflows/`, `data/`, `infra/`, `internal/`, `shared/` | Solo README/plantillas (`agents/_template`, `skills/_template`). |
 | `docs/` | `hitos.md` (registro de hitos), `ARCHITECTURE_PROPOSAL.md` (propuesta de backend; no es un hito) + READMEs. |
 | `memory-bank/`, `AGENTS.md`, `.agents/` | Infraestructura para agentes (Hito 4). |
@@ -124,6 +124,7 @@ tienen: las pruebas en navegador se hacen fuera del repo (Edge + `playwright-cor
 | Crear o promover el primer administrador | `uv run --env-file .env create-admin <email>` |
 | Arrancar la API (no arranca sin `SECRET_KEY`) | `uv run --env-file .env uvicorn app.main:app --reload --port 8000` |
 | Tests | `uv run pytest -q` |
+| Cargar el CSV histórico en el gestor de incidencias (idempotente; **desde la raíz del repo**, con la API parada) | `uv run --project services/api python scripts/seed_incidents.py` |
 
 Analizador de incidencias (Python ≥ 3.11 del sistema, sin instalar nada):
 
@@ -268,6 +269,28 @@ Contexto: `CONTEXT-incidencias.es.md`. Documentación: `docs/analizador-incidenc
 | Privacidad: `customer_email` nunca en consola, JSON, exportación, página ni logs; inválidos por línea e `incident_id` | Requisito del CONTEXT; cubierto por tests. |
 | Pruebas en navegador fuera del repo (D3); capturas manuales del desarrollador (D2) | Convenciones de `AGENTS.md`. |
 | Práctica sin número de hito (D6): commits `Analizador de incidencias — …`; no va a `docs/hitos.md` ni a `lib/data/milestones.ts` | Decisión del desarrollador, igual que proveedores. |
+
+## Decisiones técnicas del gestor de incidencias
+
+Contexto: `CONTEXT-gestor-incidencias.es.md`. Documentación: `docs/gestor-incidencias.md`. Rama
+`feature/gestor-incidencias` (2026-10-04), por fases con parada y confirmación.
+
+| Decisión | Motivo |
+| --- | --- |
+| Valores, validación, transiciones y mapeos en `packages/analisis-incidencias/src/analisis_incidencias/gestor.py` (solo stdlib); **no** en `packages/shared` | Los consumen el seed y la API; `packages/shared` es TypeScript y área protegida. Los enums de Pydantic se construyen desde ese módulo. |
+| Tabla TinyDB `incidents` en `db/incidents.json` (`INCIDENTS_DB_PATH`), candado propio; sin migraciones | Patrón de proveedores y usuarios. TinyDB no impone restricciones: toda escritura (alta, seed y cambio de estado) pasa por `IncidentRecord`. |
+| `description` **obligatoria** en el alta, igual que `title`, `category`, `origin` y `branch` | Decisión expresa del desarrollador. Máximos: 120 (CONTEXT) y 2.000 caracteres (límite técnico). |
+| `id` = `doc_id` de TinyDB; el `incident_id` del CSV se guarda como `source_id` interno y la API no lo devuelve | El CONTEXT dice que no se almacena, pero sin él el seed no puede ser idempotente: `title + created_at` solo da 88 claves para 95 filas. Aprobado por el desarrollador. |
+| Router nuevo `routes/incident_manager.py` con el mismo prefijo `/api/incidents` que el analizador; `/summary` declarada antes de `/{incident_id}` | Rutas exactas del enunciado sin tocar el analizador. |
+| **400** en datos no válidos solo en ese router, con una clase de ruta propia (`IncidentRoute`); `detail` = lista de `{field, loc, msg}` en español, sin el valor recibido | Lo pide el enunciado. Un manejador global cambiaría el 422 de proveedores y autenticación. `lib/http.ts` ya entiende ese formato. |
+| 500 genérico capturado en el router **y** manejador global de `Exception` en `main.py` | El global lo pide el enunciado, pero Starlette lo ejecuta fuera de CORS (el navegador vería un fallo de red); por eso el gestor lo captura además dentro del router. |
+| Transición no permitida → 400 en el campo `status` con el motivo; comprobar y escribir bajo el mismo candado | Enunciado; dos peticiones simultáneas no aplican dos transiciones desde el mismo estado. |
+| Seed en `scripts/seed_incidents.py`, ejecutado con `uv run --project services/api python …`; sus tests en `services/api/tests` | Ubicación exigida por el enunciado; el Python del sistema no tiene TinyDB. |
+| Backoffice: `/gestor-incidencias` (resumen + listado) y `/gestor-incidencias/nueva` (formulario); `/incidencias` sigue siendo el analizador | No romper una ruta ya entregada. |
+| Filtro adicional por categoría en el listado | El CONTEXT pide filtrar con facilidad `lost_parcel` y `carrier_issue`. |
+| Cambio de estado optimista con vuelta atrás; resumen con petición y error propios | Requisitos del enunciado: rollback tras fallo y que un fallo del resumen no rompa el resto. |
+| Etiquetas de sede literales del CONTEXT; las de categoría, origen y estado, traducción propia | El CONTEXT solo fija las de sede. Sin soporte bilingüe (no existe en el backoffice). |
+| Commits `Gestor de incidencias — …`, sin `docs/hitos.md` | Práctica sin hito, aunque sienta bases del Hito 5 (indicación del desarrollador). |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 
