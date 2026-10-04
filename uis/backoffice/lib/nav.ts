@@ -6,4 +6,6 @@ export const NAV_ITEMS = [
   { label: "Hitos del proyecto", href: "/#hitos" },
   { label: "Proveedores", href: "/proveedores" },
   { label: "Análisis de incidencias", href: "/incidencias" },
+  { label: "Incidencias", href: "/gestor-incidencias" },
+  { label: "Registrar incidencia", href: "/gestor-incidencias/nueva" },
 ] as const;

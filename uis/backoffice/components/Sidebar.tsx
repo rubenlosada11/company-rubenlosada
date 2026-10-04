@@ -38,8 +38,8 @@ export function Sidebar() {
       <div className="mt-auto space-y-4">
         <SidebarAccount />
         <p className="px-3 text-xs leading-relaxed text-blue-300">
-          TrackFlow Tech · Uso interno. El resumen procede de CONTEXT.es.md; el directorio de proveedores y el
-          análisis de incidencias usan la API de TrackFlow.
+          TrackFlow Tech · Uso interno. El resumen procede de CONTEXT.es.md; los proveedores, el análisis de
+          incidencias y el gestor de incidencias usan la API de TrackFlow.
         </p>
       </div>
     </aside>
