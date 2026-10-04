@@ -1,6 +1,6 @@
-# TrackFlow API — Directorio de proveedores y analizador de incidencias
+# TrackFlow API — Directorio de proveedores, analizador y gestor de incidencias
 
-API de TrackFlow con dos módulos, protegidos con autenticación JWT:
+API de TrackFlow con tres módulos, protegidos con autenticación JWT:
 
 - **Directorio de proveedores** (`/suppliers`): el registro centralizado que sustituye a las hojas de cálculo de Carlos
   Vega (Carrier Operations) y Ana Whitfield (Warehouse Operations) y unifica los mercados de USA y España. Fuente de
@@ -8,13 +8,17 @@ API de TrackFlow con dos módulos, protegidos con autenticación JWT:
 - **Analizador de incidencias** (`/api/incidents`): valida el CSV de incidencias de CX y calcula sus métricas con el
   paquete compartido [`packages/analisis-incidencias`](../../packages/analisis-incidencias/README.md). Ver
   [Analizador de incidencias](#analizador-de-incidencias).
+- **Gestor de incidencias** (también en `/api/incidents`): registro, listado con filtros, cambio de estado y resumen
+  de las incidencias de TrackFlow, con el CSV del analizador como datos iniciales. Fuente de verdad:
+  [`CONTEXT-gestor-incidencias.es.md`](../../CONTEXT-gestor-incidencias.es.md). Ver
+  [Gestor de incidencias](#gestor-de-incidencias).
 - **Autenticación** (`/auth`, `/users`, `/profiles`): usuarios y perfiles en TinyDB, login con JWT Bearer y protección
   de rutas. Ver [Autenticación](#autenticación) y la documentación completa en
   [`docs/autenticacion.md`](../../docs/autenticacion.md).
 
 **Stack:** Python ≥ 3.12, [uv](https://docs.astral.sh/uv/), FastAPI, Pydantic y TinyDB (base de datos en un fichero
 JSON). Sin ORM, Docker ni base de datos de servidor: TinyDB es una elección deliberada de este ejercicio. La consumen
-las páginas `/proveedores` e `/incidencias` del [backoffice](../../uis/backoffice/README.md).
+las páginas `/proveedores`, `/incidencias` y `/gestor-incidencias` del [backoffice](../../uis/backoffice/README.md).
 
 > Todas las rutas de proveedores e incidencias exigen un token (`Authorization: Bearer`). Solo son públicas
 > `POST /users`, `POST /auth/login`, `POST /auth/token` y `/health`. Hoy se usa en **local**. Antes de publicarla, lee
@@ -65,6 +69,7 @@ uv run --env-file .env uvicorn app.main:app --reload --port 8000
 | `REGISTRATION_CODE` | — (registro abierto) | Código de invitación que exige `POST /users` (≥ 12 caracteres). Mejora adicional de AUTH-02, fuera del enunciado ([detalle](../../docs/autenticacion.md#mejora-adicional-código-de-invitación-registration_code)). **Defínelo antes de publicar la API** |
 | `AUTH_DB_PATH` | `services/api/db/auth.json` | Fichero de TinyDB de usuarios y perfiles |
 | `SUPPLIERS_DB_PATH` | `services/api/db/suppliers.json` | Fichero de TinyDB de proveedores |
+| `INCIDENTS_DB_PATH` | `services/api/db/incidents.json` | Fichero de TinyDB del gestor de incidencias |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3002,http://127.0.0.1:3002` | Orígenes del navegador autorizados (el backoffice). Admite la cabecera `Authorization` y expone `Content-Disposition` para las descargas |
 
 ## Seeder
@@ -134,7 +139,7 @@ Resumen. El detalle (permisos, errores, verificación y auditoría) está en
 | `PUT /users/{id}` | Bearer: email, el propio usuario y con `current_password`; `role` e `is_active`, solo `admin`. Sin `password` (422): se cambia con `/auth/change-password` |
 | `DELETE /users/{id}` | Bearer: el propio usuario o `admin` (borra también el perfil) |
 | `GET /profiles/me` · `PUT /profiles/me` | Bearer: solo el propio perfil |
-| Las 6 rutas de `/suppliers` y las 2 de `/api/incidents` | Bearer: cualquier usuario autenticado |
+| Las 6 rutas de `/suppliers` y las 7 de `/api/incidents` (2 del analizador y 5 del gestor) | Bearer: cualquier usuario autenticado |
 | `GET /health` | pública |
 
 Desde PowerShell 5.1:
@@ -351,13 +356,53 @@ curl.exe -s -H "Authorization: Bearer $($login.access_token)" -o results.csv htt
 El `results.csv` descargado es idéntico byte a byte al que exporta `python analyze.py`. También se pueden probar desde
 Swagger UI (`/docs`, botón “Try it out” y selector de fichero).
 
+## Gestor de incidencias
+
+Endpoints en [`app/routes/incident_manager.py`](./app/routes/incident_manager.py), modelos en
+[`app/incident_models.py`](./app/incident_models.py) y acceso a TinyDB en
+[`app/services/incidents.py`](./app/services/incidents.py). Los valores permitidos, la validación y las transiciones
+vienen de `gestor.py`, en [`packages/analisis-incidencias`](../../packages/analisis-incidencias/README.md). Documentación
+completa (modelo, seed, errores, backoffice y limitaciones): [`docs/gestor-incidencias.md`](../../docs/gestor-incidencias.md).
+
+| Método y ruta | Éxito | Errores |
+| --- | --- | --- |
+| `POST /api/incidents` | 201 + incidencia creada, en estado `open` | 400 datos no válidos |
+| `GET /api/incidents` | 200 + lista, de la más reciente a la más antigua (filtros opcionales `status`, `origin`, `branch`, `category`); `[]` sin datos | 400 valor de filtro que no existe |
+| `GET /api/incidents/summary` | 200 + totales por estado, categoría, origen y sede (a 0 sin datos) | — |
+| `GET /api/incidents/{id}` | 200 + incidencia | 404 · 400 id no numérico |
+| `PATCH /api/incidents/{id}/status` | 200 + incidencia con el nuevo estado y `updated_at` renovado | 400 transición no permitida o estado desconocido · 404 |
+
+- Todos exigen `Authorization: Bearer <token>` (401 sin él).
+- Campos que envía el cliente, todos obligatorios: `title` (máx. 120), `description` (máx. 2.000), `category`,
+  `origin` y `branch`. `id`, `status`, `created_at` y `updated_at` los pone el servidor.
+- Transiciones: `open → in_progress | discarded` e `in_progress → resolved | discarded`. `resolved` y `discarded` son
+  finales.
+- **Errores propios de este router.** Los datos no válidos responden **400** (no el 422 del resto de la API) con un
+  elemento por campo y el mensaje en español, sin devolver el valor recibido:
+  `{"detail": [{"field": "description", "loc": ["body", "description"], "msg": "La descripción es obligatoria."}]}`.
+  Un error inesperado responde 500 `{"detail": "Error interno del servidor."}` y la traza queda en el log.
+- Además, `app/main.py` convierte cualquier error no controlado de **cualquier** ruta en ese mismo 500 genérico.
+
+### Seed del CSV histórico
+
+Desde la **raíz del repo**, con la API parada:
+
+```powershell
+uv run --project services/api python scripts/seed_incidents.py
+```
+
+Carga las 95 filas válidas de `scripts/incidents-trackflow.csv` (descarta e informa de 5), con `origin = customer`. Es
+idempotente: la segunda ejecución da 0 insertadas y 95 duplicadas. Tras el seed, `GET /api/incidents/summary` devuelve
+29 `open`, 52 `resolved` y 14 `discarded`; y 14 `lost_parcel`, 45 `carrier_issue`, 19 `delivery_failure` y 17
+`returns_issue`, los valores esperados del CONTEXT. Para empezar de cero, borra `db\incidents.json` y repítelo.
+
 ## Tests
 
 ```powershell
 uv run pytest -q
 ```
 
-473 tests con pytest y `TestClient`: 118 del directorio de proveedores (cada uno sobre una base TinyDB temporal; nunca
+751 tests con pytest y `TestClient`: 278 del gestor de incidencias, 118 del directorio de proveedores (cada uno sobre una base TinyDB temporal; nunca
 tocan `db/suppliers.json`), 26 del analizador de incidencias, 145 de autenticación y 184 de recuperación y cambio de
 contraseña (AUTH-03). No hace falta `.env`: [`tests/conftest.py`](./tests/conftest.py) pone una `SECRET_KEY` de pruebas
 y una base de usuarios temporal en cada test, borra las variables de email (ningún test envía emails de verdad) y el
@@ -371,6 +416,9 @@ funcionando con un token válido.
 | [`tests/test_seed.py`](./tests/test_seed.py) | Seed idéntico al CONTEXT, 1.ª y 2.ª ejecución, inserción parcial, no sobrescribe, salida por consola |
 | [`tests/test_api.py`](./tests/test_api.py) | Los 6 endpoints: 201/200/204, filtros y combinación, 404, 422, `updated_at`, persistencia al reiniciar (otro proceso), CORS, UTF-8 |
 | [`tests/test_incidents.py`](./tests/test_incidents.py) | Valores esperados del CONTEXT, equivalencia con el script y exportación idéntica byte a byte, 400/404/413/415/422/500, último análisis, sin correos en JSON/log/exportación, CORS y `Content-Disposition` expuesto |
+| [`tests/test_incident_models.py`](./tests/test_incident_models.py) | Gestor: modelos, campos obligatorios, valores permitidos, fechas, tabla TinyDB y datos inválidos que no llegan a la base |
+| [`tests/test_seed_incidents.py`](./tests/test_seed_incidents.py) | Gestor: `scripts/seed_incidents.py` con los totales del CONTEXT, idempotencia, inválidas reportadas, sin correos y errores de fichero |
+| [`tests/test_incident_manager.py`](./tests/test_incident_manager.py) | Gestor: los 5 endpoints, 400 por campo, filtros, 404, las 16 combinaciones de transición, resumen con y sin datos, 401, 500 sin traza y convivencia con el analizador y proveedores |
 | [`tests/test_auth.py`](./tests/test_auth.py) | Usuarios y perfiles en TinyDB, bcrypt, roles, login, JWT (válido, malformado, caducado, otra firma, `alg: none`, sin claims, usuario borrado o desactivado), configuración, código de invitación (`REGISTRATION_CODE`), 401/403/404/409, ownership, las 8 rutas existentes protegidas, `create-admin` |
 | [`tests/test_password_reset.py`](./tests/test_password_reset.py) | AUTH-03: enlaces (solo hash, caducidad, un solo uso, concurrencia, límite de 60 s, limpieza), `forgot-password` (misma respuesta exista o no el email), `reset-password` (tokens no válidos, cierre de sesiones), `change-password` y cambio de email con contraseña |
 | [`tests/test_email.py`](./tests/test_email.py) | AUTH-03: configuración de Resend y `MAIL_FROM`, petición exacta a la API de Resend, errores del proveedor, logs sin datos sensibles y plantilla del email |
@@ -385,6 +433,7 @@ Los datos se guardan con **TinyDB** en un fichero JSON en disco, así que sobrev
 | Tabla | `suppliers` (el `id` de cada proveedor es el `doc_id` que asigna TinyDB) |
 | Cambiar la ruta | variable de entorno `SUPPLIERS_DB_PATH` (los tests usan un fichero temporal) |
 | Usuarios y perfiles | `services/api/db/auth.json`, tablas `users` y `profiles` (el `id` es un UUID); variable `AUTH_DB_PATH` |
+| Incidencias del gestor | `services/api/db/incidents.json`, tabla `incidents` (el `id` es el `doc_id`); variable `INCIDENTS_DB_PATH` |
 | Git | `db/` está en `.gitignore`: la base local no se versiona |
 
 El acceso está en [`app/database.py`](./app/database.py): cada uso abre el fichero, trabaja con la tabla y lo cierra
@@ -400,20 +449,23 @@ services/api/
 ├── app/
 │   ├── main.py           # FastAPI, CORS, JSON UTF-8, logger `trackflow`, /health, comprobación de SECRET_KEY
 │   ├── models.py         # modelos Pydantic de proveedores y valores válidos del CONTEXT
+│   ├── incident_models.py  # modelos del gestor de incidencias (valores y reglas del paquete compartido)
 │   ├── auth_models.py    # User, Profile, Role, PasswordResetToken y schemas de entrada/salida de autenticación
 │   ├── security.py       # bcrypt, JWT, código de invitación y enlaces de recuperación (configuración desde el entorno)
 │   ├── email_templates.py  # email de recuperación de contraseña (HTML + texto)
 │   ├── dependencies.py   # OAuth2PasswordBearer + get_current_user
-│   ├── database.py       # TinyDB (proveedores y usuarios)
+│   ├── database.py       # TinyDB (proveedores, usuarios e incidencias)
 │   ├── seed.py           # `uv run seed`
 │   ├── create_admin.py   # `uv run create-admin <email>`
-│   ├── services/         # users.py, profiles.py (CRUD en TinyDB), password_reset.py (enlaces), email.py (Resend)
+│   ├── services/         # users.py, profiles.py (CRUD en TinyDB), password_reset.py (enlaces), email.py (Resend),
+│   │                     # incidents.py (gestor de incidencias)
 │   └── routes/
 │       ├── auth.py       # /auth
 │       ├── users.py      # /users
 │       ├── profiles.py   # /profiles
 │       ├── suppliers.py  # /suppliers
-│       └── incidents.py  # /api/incidents
+│       ├── incidents.py  # /api/incidents (analizador: /analyze y /results/export)
+│       └── incident_manager.py  # /api/incidents (gestor: alta, listado, detalle, estado y resumen)
 ├── tests/
 └── db/                   # base local (ignorada en git)
 ```
@@ -443,5 +495,7 @@ Las del backoffice (proveedores con filtros y análisis de incidencias) están e
 - Un único `updated_at` por proveedor (última actualización de tarifa): no se guarda el histórico de tarifas
   anteriores.
 - El seeder y la API no se coordinan entre procesos (ver la nota del seeder).
+- Gestor de incidencias: sin paginación, edición ni borrado; sin permisos por rol; la integridad la da el modelo
+  Pydantic, no TinyDB (ver [`docs/gestor-incidencias.md`](../../docs/gestor-incidencias.md#limitaciones)).
 - El último análisis de incidencias vive en memoria: se pierde al reiniciar, es compartido por todos los usuarios y con
   varios workers la exportación podría no encontrarlo.

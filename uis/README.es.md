@@ -23,7 +23,7 @@ Organiza `uis/` por **distintas áreas de la compañía** — cada subcarpeta ag
 
 - `website/`: sitio web corporativo público de TrackFlow (Next.js + Tailwind): hero, servicios, flujo de entrega, cobertura EE. UU./España, beneficios, público objetivo y contacto, con marcado Schema.org. Su contenido sale de `CONTEXT.es.md` y su CTA apunta al formulario existente en `landing/formulario/`. Ver [`website/README.md`](./website/README.md).
 
-- `backoffice/`: aplicación interna de TrackFlow Tech (Next.js + Tailwind) con layout propio: resumen de áreas de negocio, backlog de iniciativas con filtros por área y estado, e hitos del proyecto, derivado de `CONTEXT.es.md`, el **directorio de proveedores** (`/proveedores`) y el **analizador de incidencias** de CX (`/incidencias`), conectados a la API local de `services/api` (sin autenticación todavía). Ver [`backoffice/README.md`](./backoffice/README.md).
+- `backoffice/`: aplicación interna de TrackFlow Tech (Next.js + Tailwind) con layout propio: resumen de áreas de negocio, backlog de iniciativas con filtros por área y estado, e hitos del proyecto, derivado de `CONTEXT.es.md`, el **directorio de proveedores** (`/proveedores`), el **analizador de incidencias** de CX (`/incidencias`) y el **gestor de incidencias** (`/gestor-incidencias`), conectados a la API local de `services/api`, con login. Ver [`backoffice/README.md`](./backoffice/README.md).
 
 ### Ejecutar la landing localmente
 
@@ -67,7 +67,7 @@ npm install
 npm run dev
 ```
 
-Luego abre `http://localhost:3002`. Para `/proveedores` e `/incidencias` hace falta la API arrancada y `.env.local` (copia de `.env.example`). Más detalle en [`backoffice/README.md`](./backoffice/README.md).
+Luego abre `http://localhost:3002`. Para entrar y usar `/proveedores`, `/incidencias` y `/gestor-incidencias` hace falta la API arrancada y `.env.local` (copia de `.env.example`). Más detalle en [`backoffice/README.md`](./backoffice/README.md).
 
 ### Ejecutar el Talent Pipeline Tracker
 

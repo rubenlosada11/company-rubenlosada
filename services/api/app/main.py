@@ -3,11 +3,11 @@ import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.routes import auth, incidents, profiles, suppliers, users
+from app.routes import auth, incident_manager, incidents, profiles, suppliers, users
 from app.security import check_auth_config
 from app.services.email import check_email_config
 
@@ -40,7 +40,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title="TrackFlow API",
     description=(
-        "Directorio de proveedores de TrackFlow (USA + Spain) y analizador de incidencias de CX. "
+        "Directorio de proveedores de TrackFlow (USA + Spain), analizador de incidencias de CX y gestor de "
+        "incidencias. "
         "Autenticación con Bearer JWT: `POST /auth/login` (o el botón «Authorize»)."
     ),
     version="0.1.0",
@@ -70,6 +71,18 @@ app.include_router(users.router)
 app.include_router(profiles.router)
 app.include_router(suppliers.router)
 app.include_router(incidents.router)
+app.include_router(incident_manager.router)
+
+
+@app.exception_handler(Exception)
+async def unexpected_error(request: Request, _: Exception) -> UTF8JSONResponse:
+    """Red de seguridad: cualquier error no controlado responde 500 con un mensaje genérico, nunca con la traza.
+
+    Starlette lo ejecuta fuera del middleware de CORS, así que el navegador no puede leer esta respuesta desde otro
+    origen; por eso el gestor de incidencias captura además sus errores dentro de su router.
+    """
+    trackflow_logger.exception("Error no controlado en %s %s", request.method, request.url.path)
+    return UTF8JSONResponse({"detail": "Error interno del servidor."}, status_code=500)
 
 
 @app.get("/health", tags=["health"])

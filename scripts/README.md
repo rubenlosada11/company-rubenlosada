@@ -19,3 +19,11 @@ metrics and export live in [`packages/analisis-incidencias`](../packages/analisi
 
 Full details in the Spanish version: [README.es.md](./README.es.md) and in
 [`docs/analizador-incidencias.md`](../docs/analizador-incidencias.md).
+
+## Incident manager seed
+
+[`seed_incidents.py`](./seed_incidents.py) loads the historical CSV into the incident manager database of
+`services/api`, applying the mappings in [`CONTEXT-gestor-incidencias.es.md`](../CONTEXT-gestor-incidencias.es.md). It is
+idempotent and needs the API environment. From the repo root, with the API stopped:
+`uv run --project services/api python scripts/seed_incidents.py`. Details in the Spanish version and in
+[`docs/gestor-incidencias.md`](../docs/gestor-incidencias.md).

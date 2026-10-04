@@ -2,8 +2,8 @@
 
 Aplicación interna de TrackFlow Tech. Muestra la estructura del negocio, el backlog de iniciativas de TrackFlow
 Tech y el estado de los hitos del proyecto **a partir del contexto de empresa** (ruta `/`), el **directorio de
-proveedores** (ruta `/proveedores`) y el **analizador de incidencias** de CX (ruta `/incidencias`), estos dos
-conectados a la API [`services/api`](../../services/api/README.md). **Se entra con login** (ruta `/login`) o creando
+proveedores** (ruta `/proveedores`), el **analizador de incidencias** de CX (ruta `/incidencias`) y el **gestor de
+incidencias** (rutas `/gestor-incidencias` y `/gestor-incidencias/nueva`), estos tres conectados a la API [`services/api`](../../services/api/README.md). **Se entra con login** (ruta `/login`) o creando
 una cuenta (ruta `/register`), con un token JWT; cada usuario edita sus datos de contacto en `/account/profile`, cambia
 su contraseña en `/account/change-password` y, si la olvida, la recupera por email desde `/forgot-password` (ver
 [Acceso](#acceso-login-registro-perfil-y-contraseña)).
@@ -27,7 +27,7 @@ Next.js (App Router) + React + TypeScript + Tailwind CSS, con las mismas version
 | --- | --- | --- |
 | `/login` | pública | Email y contraseña → `POST /auth/login` → token en `localStorage` → `GET /auth/me` → vuelve a `?next=` (solo rutas internas) o a `/`. Mensajes de la API en español (credenciales incorrectas, cuenta desactivada, API caída, sesión caducada o cerrada). |
 | `/register` | pública | Email, contraseña, nombre, teléfono y dirección (opcionales) y código de invitación → `POST /users` → login automático → `/`. Errores por campo (los de la API, traducidos); 409 con enlace al login; 403 si el código no es válido. |
-| `/`, `/proveedores`, `/incidencias` | **privada** | Panel. Sin sesión → `/login?next=<ruta>`. |
+| `/`, `/proveedores`, `/incidencias`, `/gestor-incidencias`, `/gestor-incidencias/nueva` | **privada** | Panel. Sin sesión → `/login?next=<ruta>`. |
 | `/account/profile` | **privada** | `GET /auth/me`: email y rol (solo lectura) y nombre, teléfono y dirección editables con `PUT /profiles/me`. Tarjeta «Seguridad» con el acceso al cambio de contraseña. |
 | `/forgot-password` | pública | AUTH-03. Email → `POST /auth/forgot-password` → «Revisa tu correo» con un mensaje **fijo** que no revela si el email existe. Se llega desde «¿Olvidaste tu contraseña?» del login. |
 | `/reset-password?token=…` | pública | AUTH-03. Enlace del email (sin `Referer`). Nueva contraseña + confirmación → `POST /auth/reset-password` → `/login?motivo=restablecida`. Sin token o con un enlace no válido, caducado o usado: aviso y «Volver a recuperar contraseña». |
@@ -100,6 +100,26 @@ aviso en el formulario. Capturas con el CSV de prueba: [resumen](./screenshots/s
 [registros inválidos](./screenshots/screenshot%20incidencias%20invalidos.png) y
 [página completa](./screenshots/screenshot%20incidencias%20completo.png).
 
+## Qué muestran las rutas `/gestor-incidencias` y `/gestor-incidencias/nueva`
+
+Gestor centralizado de incidencias, según [`CONTEXT-gestor-incidencias.es.md`](../../CONTEXT-gestor-incidencias.es.md).
+Documentación completa: [`docs/gestor-incidencias.md`](../../docs/gestor-incidencias.md). No es el analizador de
+`/incidencias`: aquel calcula métricas de un CSV sin guardar nada; este guarda incidencias y gestiona su estado.
+
+| Función | Llamada a la API |
+| --- | --- |
+| **Formulario** (`/nueva`): título, descripción, categoría, origen y sede, todos obligatorios; validación en cliente con los mensajes de la API; la sede se destaca cuando el origen es «Sede»; botón deshabilitado durante el envío; confirmación con el número y formulario limpio | `POST /api/incidents` |
+| **Listado**: de la más reciente a la más antigua, con filtros por estado, origen, sede y categoría, sin recargar la página; estados de carga, vacío y error con «Reintentar» | `GET /api/incidents?status=…&origin=…&branch=…&category=…` |
+| **Cambio de estado** desde la fila, solo con las transiciones permitidas. Es optimista: la fila cambia al instante y vuelve al estado anterior, con el motivo, si la API falla o lo rechaza | `PATCH /api/incidents/{id}/status` |
+| **Resumen**: tarjetas por estado y barras por categoría, sede y origen, con su propia carga y su propio error (si falla, el listado sigue funcionando); se actualiza tras cada cambio de estado | `GET /api/incidents/summary` |
+
+Los controles del formulario miden 48 px de alto para los terminales táctiles del almacén. Los errores 400 de la API se
+muestran junto a su campo; los del servidor (5xx) se sustituyen por un mensaje fijo, sin trazas ni JSON. Las etiquetas
+de las sedes son las del CONTEXT. Capturas:
+[formulario con error de validación](./screenshots/screenshot%20gestor%20formulario%20validacion.png),
+[listado con datos](./screenshots/screenshot%20gestor%20listado.png) y
+[resumen con métricas](./screenshots/screenshot%20gestor%20resumen.png).
+
 ## Estructura
 
 ```text
@@ -115,6 +135,8 @@ backoffice/
 │   │   ├── page.tsx      # ruta `/`
 │   │   ├── proveedores/page.tsx  # ruta `/proveedores`
 │   │   ├── incidencias/page.tsx  # ruta `/incidencias`
+│   │   ├── gestor-incidencias/page.tsx        # ruta `/gestor-incidencias` (resumen + listado)
+│   │   ├── gestor-incidencias/nueva/page.tsx  # ruta `/gestor-incidencias/nueva` (formulario)
 │   │   ├── account/profile/page.tsx  # ruta `/account/profile`
 │   │   └── account/change-password/page.tsx  # ruta `/account/change-password` (AUTH-03)
 │   └── globals.css       # + animaciones del login (ruta y entrada)
@@ -123,11 +145,13 @@ backoffice/
 │   │                     # SupplierDirectory, SupplierForm, SupplierRow (cliente: directorio de proveedores)
 │   ├── incidencias/      # AnalizadorIncidencias (cliente), SelectorCsv (cliente), ResultadosAnalisis, ListaBarras,
 │   │                     # TablaCruce, TablaSatisfaccion, RegistrosInvalidos
+│   ├── gestor-incidencias/  # IncidentForm, IncidentDashboard, IncidentSummary, IncidentList (cliente), IncidentRow
 │   └── auth/             # AuthProvider, AuthGate, AuthShell, LoginScreen, RegisterScreen, ProfileEditor,
 │                         # SidebarAccount, UserMenu (cliente), LogoutIcon, ForgotPasswordScreen,
 │                         # ResetPasswordScreen, ChangePasswordForm
 ├── lib/
-│   ├── data/             # areas.ts, initiatives.ts, milestones.ts, baseline.ts, suppliers.ts (valores del CONTEXT)
+│   ├── data/             # areas.ts, initiatives.ts, milestones.ts, baseline.ts, suppliers.ts (valores del CONTEXT),
+│   │                     # incidents.ts (sedes, categorías, orígenes, estados y transiciones del gestor)
 │   ├── initiatives.ts    # lógica pura: filterInitiatives, countByArea, countByStatus
 │   ├── http.ts           # cliente HTTP de la API: fetchApi (URL base, Bearer y errores) y http (JSON; errores 422 por campo)
 │   ├── session.ts        # token en localStorage, caducidad (`exp`) y `next` seguro
@@ -136,9 +160,11 @@ backoffice/
 │   ├── authErrors.ts     # errores de la API en español para los formularios de cuenta
 │   ├── suppliers.ts      # llamadas a /suppliers, validación del formulario y formato de tarifas y fechas
 │   ├── incidencias.ts    # subida del CSV (FormData) y descarga de results.csv (blob)
+│   ├── incidents.ts      # gestor: llamadas a /api/incidents, validación del formulario y mensajes de error
 │   ├── formato.ts        # formato es-ES del analizador (enteros, porcentajes, medias, semanas ISO)
 │   └── nav.ts
-├── types/                # index.ts (BusinessArea, Initiative, Milestone, Supplier…), incidencias.ts y auth.ts (usuario y token)
+├── types/                # index.ts (BusinessArea, Initiative, Milestone, Supplier…), incidencias.ts (analizador),
+│                         # incidents.ts (gestor) y auth.ts (usuario y token)
 ├── .env.example          # NEXT_PUBLIC_API_BASE_URL
 └── public/logo/          # logo (copiado de uis/landing)
 ```
@@ -151,7 +177,7 @@ npm install
 npm run dev      # http://localhost:3002
 ```
 
-Para entrar (y para `/proveedores` e `/incidencias`) hace falta la API arrancada
+Para entrar (y para `/proveedores`, `/incidencias` y `/gestor-incidencias`) hace falta la API arrancada
 ([`services/api`](../../services/api/README.md), puerto 8000, con su `.env` y un usuario creado) y la URL en `.env.local` (Next.js la incrusta al compilar: tras cambiarla, reinicia `npm run dev` o repite el build). En
 Windows PowerShell:
 
@@ -179,7 +205,8 @@ npm run build
 
 No hay tests automatizados en el repo: las pruebas en navegador se ejecutan fuera de él (Edge + `playwright-core`) y
 se registran en la documentación de cada función (p. ej.
-[`docs/pruebas-analizador-incidencias.md`](../../docs/pruebas-analizador-incidencias.md) y
+[`docs/pruebas-analizador-incidencias.md`](../../docs/pruebas-analizador-incidencias.md),
+[`docs/gestor-incidencias.md`](../../docs/gestor-incidencias.md#tests) y
 [`docs/autenticacion.md`](../../docs/autenticacion.md#navegador-backoffice)). Comprobación de las rutas con la skill
 [`validate-delivery`](../../.agents/skills/validate-delivery/SKILL.md). El HTML del panel solo trae el aviso
 «Comprobando tu sesión…» (el contenido aparece tras validar el token en el navegador), así que los textos se
@@ -195,6 +222,8 @@ node ../../.agents/skills/validate-delivery/scripts/check-route.mjs "http://loca
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/account/change-password --expect "Comprobando tu sesión"
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/proveedores
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/incidencias
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/gestor-incidencias
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/gestor-incidencias/nueva
 ```
 
 ## Pendiente / fuera de alcance
@@ -210,6 +239,8 @@ node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://local
   sí tiene pantalla (`/account/change-password`, AUTH-03).
 - Recuperación de contraseña en producción: la API necesita `RESEND_API_KEY`, `MAIL_FROM` y `FRONTEND_BASE_URL` con la
   URL pública del backoffice (ver [`docs/autenticacion.md`](../../docs/autenticacion.md#recuperación-y-cambio-de-contraseña-auth-03)).
+- Gestor de incidencias: sin paginación, edición ni borrado, y sin las alertas de incidencias sin resolver que
+  menciona el CONTEXT (ver [`docs/gestor-incidencias.md`](../../docs/gestor-incidencias.md#limitaciones)).
 - Sin conexión a otros datos reales (inventario, envíos, devoluciones…): llegará con `services/` y los pipelines de
   `data/` cuando existan.
 - Mantener `lib/data/` sincronizado con `CONTEXT.es.md` y `docs/hitos.md` cuando cambien.

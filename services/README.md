@@ -11,6 +11,6 @@ Each subfolder inside `services/` must correspond to **one specific service** (f
 
 | Service | Technology | Purpose |
 | --- | --- | --- |
-| [`api/`](./api/README.md) | FastAPI + Pydantic + TinyDB (Python, uv) | Supplier directory (`/suppliers`): single source of truth for TrackFlow suppliers in the USA and Spain; and CX incident analyzer (`/api/incidents`): validation, metrics and CSV export of the helpdesk incidents file, using `packages/analisis-incidencias`. Both used by the backoffice. Local only (no authentication). |
+| [`api/`](./api/README.md) | FastAPI + Pydantic + TinyDB (Python, uv) | Supplier directory (`/suppliers`): single source of truth for TrackFlow suppliers in the USA and Spain; and CX incident analyzer (`/api/incidents`): validation, metrics and CSV export of the helpdesk incidents file, using `packages/analisis-incidencias`; and incident manager (also under `/api/incidents`): creation, filtered list, status changes and summary. All used by the backoffice. JWT-protected routes. Local only. |
 
 > _Spanish version: [README.es.md](./README.es.md)._

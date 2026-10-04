@@ -26,7 +26,7 @@ Después comprueba `git status` y `git branch --show-current`. **No trabajes en 
 | --- | --- |
 | Interfaz visual pública | `uis/website/` (la `uis/landing/` estática es del Hito 1: no se toca) |
 | Interfaz interna / admin | `uis/backoffice/` |
-| API o proceso en segundo plano | `services/` (hoy: `services/api/`, directorio de proveedores y analizador de incidencias; nuevos servicios solo si hace falta de verdad) |
+| API o proceso en segundo plano | `services/` (hoy: `services/api/`, directorio de proveedores, analizador y gestor de incidencias; nuevos servicios solo si hace falta de verdad) |
 | Tipos/utilidades usados por 2+ carpetas | `packages/` |
 | Agente de IA / skill de dominio / MCP | `agents/` / `skills/` / `mcps/` |
 | Skill para *agentes de programación* de este repo | `.agents/skills/` |

@@ -4,6 +4,7 @@
 - Usuarios y perfiles (autenticación): `services/api/db/auth.json`, variable `AUTH_DB_PATH`. Es la única fuente de
   verdad de `User` y `Profile`: no hay tablas de usuarios en ninguna otra base de datos. En el mismo fichero viven
   los enlaces de recuperación de contraseña (`password_reset_tokens`, AUTH-03).
+- Gestor de incidencias: `services/api/db/incidents.json`, variable `INCIDENTS_DB_PATH`.
 
 Los ficheros están ignorados en git; los tests apuntan las variables a ficheros temporales.
 """
@@ -72,5 +73,27 @@ def auth_db() -> Iterator[TinyDB]:
         db = TinyDB(get_auth_db_path(), create_dirs=True, encoding="utf-8", ensure_ascii=False, indent=2)
         try:
             yield db
+        finally:
+            db.close()
+
+
+DEFAULT_INCIDENTS_DB_PATH = Path(__file__).resolve().parent.parent / "db" / "incidents.json"
+INCIDENTS_TABLE = "incidents"
+
+# Candado propio, por el mismo motivo que el de usuarios: validar el token no debe esperar a las incidencias.
+_incidents_lock = threading.Lock()
+
+
+def get_incidents_db_path() -> Path:
+    return Path(os.environ.get("INCIDENTS_DB_PATH", DEFAULT_INCIDENTS_DB_PATH))
+
+
+@contextmanager
+def incidents_table() -> Iterator[Table]:
+    """Abre la base del gestor de incidencias, entrega la tabla `incidents` y la cierra al terminar."""
+    with _incidents_lock:
+        db = TinyDB(get_incidents_db_path(), create_dirs=True, encoding="utf-8", ensure_ascii=False, indent=2)
+        try:
+            yield db.table(INCIDENTS_TABLE)
         finally:
             db.close()
