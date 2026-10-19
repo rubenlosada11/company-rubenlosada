@@ -36,7 +36,7 @@ uv sync
 
 `uv sync` crea `.venv/` e instala las versiones exactas de `uv.lock` (FastAPI, Pydantic, TinyDB, uvicorn,
 python-multipart, python-jose, libpass con bcrypt y el paquete local `analisis-incidencias` en modo editable; y
-pytest + httpx2 para los tests).
+pytest + httpx2 + pytest-cov para los tests).
 
 ## Ejecución
 
@@ -400,11 +400,15 @@ idempotente: la segunda ejecución da 0 insertadas y 95 duplicadas. Tras el seed
 
 ```powershell
 uv run pytest -q
+uv run pytest --cov --cov-branch --cov-report=term-missing
 ```
 
-751 tests con pytest y `TestClient`: 278 del gestor de incidencias, 118 del directorio de proveedores (cada uno sobre una base TinyDB temporal; nunca
-tocan `db/suppliers.json`), 26 del analizador de incidencias, 145 de autenticación y 184 de recuperación y cambio de
-contraseña (AUTH-03). No hace falta `.env`: [`tests/conftest.py`](./tests/conftest.py) pone una `SECRET_KEY` de pruebas
+1042 tests con pytest: los 789 de integración con `TestClient` (gestor y analizador de incidencias, directorio de
+proveedores, autenticación, recuperación y cambio de contraseña y gestión de errores; cada uno sobre una base TinyDB
+temporal, nunca tocan `db/*.json`) y, desde AUTH-088, 253 unitarios por endpoint: 165 de autenticación en
+[`tests/auth/`](./tests/auth/) y 88 del backoffice (proveedores y gestor de incidencias) en
+[`tests/backoffice/`](./tests/backoffice/). Plan, casos, cobertura por ámbito y defectos encontrados:
+[`TESTING.md`](../../TESTING.md). No hace falta `.env`: [`tests/conftest.py`](./tests/conftest.py) pone una `SECRET_KEY` de pruebas
 y una base de usuarios temporal en cada test, borra las variables de email (ningún test envía emails de verdad) y el
 fixture `client` va autenticado. Así los tests anteriores comprueban que las rutas protegidas siguen
 funcionando con un token válido.
@@ -423,6 +427,8 @@ funcionando con un token válido.
 | [`tests/test_password_reset.py`](./tests/test_password_reset.py) | AUTH-03: enlaces (solo hash, caducidad, un solo uso, concurrencia, límite de 60 s, limpieza), `forgot-password` (misma respuesta exista o no el email), `reset-password` (tokens no válidos, cierre de sesiones), `change-password` y cambio de email con contraseña |
 | [`tests/test_errors.py`](./tests/test_errors.py) | Gestión de errores común: 500 genérico con CORS fuera del gestor, fichero de base corrupto o ilegible (`StorageError`, candado liberado), 422 sin los valores recibidos, logs sin datos personales, nombre de fichero saneado y arranque con configuración no válida |
 | [`tests/test_email.py`](./tests/test_email.py) | AUTH-03: configuración de Resend y `MAIL_FROM`, petición exacta a la API de Resend, errores del proveedor, logs sin datos sensibles y plantilla del email |
+| [`tests/auth/`](./tests/auth/) | AUTH-088: un módulo por endpoint de autenticación y autorización (registro, login, `/auth/token`, validación del token, `/me`, recuperación, reset, cambio de contraseña y los cuatro de `/users`), con reloj congelado y red bloqueada |
+| [`tests/backoffice/`](./tests/backoffice/) | API-042: un módulo por endpoint de proveedores (6) y del gestor de incidencias (5), llamando a las funciones del router |
 
 ## Gestión de errores
 

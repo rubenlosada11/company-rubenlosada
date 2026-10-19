@@ -24,8 +24,9 @@ JS es autónomo, con su propio `package.json` y `package-lock.json`, y se opera 
 | `docs/` | `hitos.md` (registro de hitos), `ARCHITECTURE_PROPOSAL.md` (propuesta de backend; no es un hito) + READMEs. |
 | `memory-bank/`, `AGENTS.md`, `.agents/` | Infraestructura para agentes (Hito 4). |
 
-No existen: `docker-compose.yml`, CI/CD (`.github/`), `Dockerfile`, base de datos de servidor. Los únicos tests
-automatizados son de Python (pytest): `services/api/tests/`, `packages/analisis-incidencias/tests/` y `scripts/tests/`.
+No existen: `docker-compose.yml`, CI/CD (`.github/`), `Dockerfile`, base de datos de servidor. Tests automatizados:
+Python (pytest) en `services/api/tests/`, `packages/analisis-incidencias/tests/` y `scripts/tests/`, y Jest en
+`uis/backoffice/lib/*.test.ts` (desde AUTH-088). Plan y resultados de las pruebas unitarias: `TESTING.md` (raíz).
 El `.gitignore` raíz contiene `node_modules/`, los cachés de Python (`__pycache__/`, `*.py[cod]`, `.pytest_cache/`) y
 `scripts/results.csv`; cada app Next.js y `services/api/` tienen el suyo.
 
@@ -40,7 +41,10 @@ El `.gitignore` raíz contiene `node_modules/`, los cachés de Python (`__pycach
 - **Backend:** `services/api/` — Python ≥ 3.12 (máquina: 3.14.6), **uv** 0.12, FastAPI 0.141, Pydantic 2.13,
   TinyDB 4.9, uvicorn, `python-multipart` (subida de ficheros), `python-jose[cryptography]` 3.5 (JWT),
   `libpass[bcrypt]` 1.9.3 (módulo `passlib`, bcrypt 5.0) y el paquete local `analisis-incidencias` (editable,
-  `[tool.uv.sources]`); desarrollo: pytest 9 + `httpx2` (Starlette 1.7 marca obsoleto `httpx` en `TestClient`).
+  `[tool.uv.sources]`); desarrollo: pytest 9 + `httpx2` (Starlette 1.7 marca obsoleto `httpx` en `TestClient`) +
+  `pytest-cov` 7.1 (cobertura; `[tool.coverage.run] source = ["app"]`).
+- **Tests JS:** solo en `uis/backoffice`: Jest 30 + `@types/jest` (dev), `jest.config.mjs` con `next/jest` (SWC y alias
+  `@/`), entorno `node` sin jsdom.
   Paquete `app/` sin `src/` (`uv_build` con `module-root = ""`), entrypoint `app.main:app`. Solo local por ahora.
   Además, `talent-pipeline-tracker` consume la API pública de Talent Tracker
   (`https://playground.4geeks.com/tracker/api/v1`).
@@ -111,8 +115,9 @@ En documentación y comandos que se le den al desarrollador: **un comando por l�
 funcionan (npm los ejecuta con `cmd.exe`).
 
 `talent-pipeline-tracker` no tiene script `typecheck` (el tipado se comprueba en `next build`); no se ha tocado.
-**Tests:** solo en Python (pytest): `services/api/`, `packages/analisis-incidencias/` y `scripts/`. Las apps JS no
-tienen: las pruebas en navegador se hacen fuera del repo (Edge + `playwright-core` en el scratchpad).
+**Tests:** Python (pytest) en `services/api/`, `packages/analisis-incidencias/` y `scripts/`; Jest en
+`uis/backoffice` (`npm test`, `npm run test:coverage`; desde AUTH-088). El resto de apps JS no tiene; las pruebas en
+navegador se hacen fuera del repo (Edge + `playwright-core` en el scratchpad).
 
 `services/api/` (desde esa carpeta, `cd services\api`):
 
@@ -124,6 +129,8 @@ tienen: las pruebas en navegador se hacen fuera del repo (Edge + `playwright-cor
 | Crear o promover el primer administrador | `uv run --env-file .env create-admin <email>` |
 | Arrancar la API (no arranca sin `SECRET_KEY`) | `uv run --env-file .env uvicorn app.main:app --reload --port 8000` |
 | Tests | `uv run pytest -q` |
+| Solo las pruebas unitarias de autenticación o del backoffice (AUTH-088, API-042) | `uv run pytest tests/auth` · `uv run pytest tests/backoffice` |
+| Cobertura de toda la API (líneas y ramas); por ámbito, ver `TESTING.md` | `uv run pytest --cov --cov-branch --cov-report=term-missing` |
 | Cargar el CSV histórico en el gestor de incidencias (idempotente; **desde la raíz del repo**, con la API parada) | `uv run --project services/api python scripts/seed_incidents.py` |
 
 Analizador de incidencias (Python ≥ 3.11 del sistema, sin instalar nada):
@@ -315,6 +322,22 @@ solo se capturaba dentro de los routers de incidencias) y sobre no tener un mane
 | `scripts/analyze.py`: `except Exception` final que solo muestra el tipo de error | Límite de una CLI para personal no técnico; el mensaje podría arrastrar datos de una fila. Con 0 registros válidos sigue terminando con 0 (decisión del desarrollador). |
 | Apps de hitos anteriores (tracker, landing, script-automatizacion) sin tocar | Áreas protegidas; quedan en «Trabajo pendiente» de `progress.md`. |
 | Un solo commit `Gestión de errores — …`, sin `docs/hitos.md` | Práctica sin hito; indicación expresa del desarrollador para esta práctica. |
+
+## Decisiones técnicas de las pruebas unitarias (AUTH-088, API-042, FE-019)
+
+Rama `feature/auth-088-tests` (2026-10-19/20), por fases; detalle, casos y cifras en `TESTING.md`.
+
+| Decisión | Motivo |
+| --- | --- |
+| Suites nuevas en `services/api/tests/auth/` y `tests/backoffice/` (paquetes con `__init__.py`), **un módulo por endpoint**; `test_auth.py` y `test_password_reset.py` no se tocan | Enunciado del ticket; sin `__init__.py` el `conftest.py` de cada carpeta chocaría con el de `tests/`. Los tests HTTP existentes siguen siendo la red de regresión. |
+| Unitarias: se llama a la función del router o del servicio con dependencias reales (bcrypt, JWT, TinyDB temporal); `TestClient` solo para el cableado `Depends` de una ruta | Probar decisiones de negocio, no FastAPI ni la serialización. Los espías envuelven la función real (solo cuentan llamadas). |
+| Reloj: fixture `clock` con `monkeypatch` de `datetime` en `app.security`, `app.services.users`, `app.services.password_reset` y `jose.jwt` (metaclase para que `isinstance` siga funcionando); `tests/auth/test_fixtures.py` vigila que el parche siga valiendo | Sin dependencia nueva (`freezegun`/`time-machine` descartados por el desarrollador). Depende de un detalle interno de python-jose. |
+| `pytest-cov` en el grupo `dev`, `[tool.coverage.run] source = ["app"]`; `.coverage` y `htmlcov/` ignorados | Medición exigida por el ticket; `--cov` sin módulo mide solo la API. |
+| Jest 30 solo en `uis/backoffice`, sin jsdom (`localStorage` simulado en `lib/session.test.ts`); `coverage/**` ignorado por ESLint | Dependencias mínimas aprobadas; `tsc` también revisa los tests. |
+| D-1: `UserCreate.password` con `StringConstraints(strip_whitespace=False)` | El registro recortaba la contraseña (heredaba `str_strip_whitespace` de `ProfileFields`) y el login no. |
+| D-2: `decode_access_token` rechaza `int(exp) <= ahora` | python-jose aceptaba el token durante el segundo exacto de `exp` (RFC 7519 §4.1.4). `int()` como jose, para que un `exp` en texto no dé 500. |
+| Pruebas de mutación manuales (cambiar el código, ver fallar el test, restaurar) en cada fase | Un test que nunca ha fallado no demuestra nada; detectó un falso positivo propio en la infraestructura. |
+| Commits `Pruebas de autenticación — …` (escalonados), sin `docs/hitos.md` | Práctica sin hito. |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 

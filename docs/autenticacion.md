@@ -179,7 +179,7 @@ contratos no cambian y siguen funcionando con un token válido: los 144 tests an
 | 401 | Token emitido antes del último cambio o restablecimiento de contraseña (AUTH-03) | `Token no válido.` |
 | 401 | Token malformado, firma incorrecta, `alg: none`, sin `sub` o sin `exp` | `Token no válido.` |
 | 401 | Usuario del token borrado o desactivado | `Token no válido.` (no revela el motivo) |
-| 401 | Token caducado | `El token ha caducado. Inicia sesión de nuevo.` |
+| 401 | Token caducado, también en el segundo exacto de su `exp` (RFC 7519; AUTH-088, D-2) | `El token ha caducado. Inicia sesión de nuevo.` |
 | 401 | Login con email inexistente o contraseña incorrecta | `Email o contraseña incorrectos.` (mismo mensaje y mismo coste bcrypt) |
 | 403 | Login correcto de una cuenta desactivada | `La cuenta está desactivada. Contacta con un administrador.` |
 | 403 | Registro sin código de invitación válido (solo con `REGISTRATION_CODE`) | `Código de invitación no válido.` |
@@ -187,6 +187,10 @@ contratos no cambian y siguen funcionando con un token válido: los 144 tests an
 | 404 | `admin`/`manager` sobre un id que no existe | `Usuario no encontrado.` |
 | 409 | Email ya registrado (alta o cambio de email) | `Ya existe un usuario con ese email.` |
 | 422 | Email sin formato, contraseña de menos de 8 caracteres o de más de 72 bytes (límite de bcrypt), rol fuera de `admin`/`manager`/`user`, campos no permitidos (también `password` en `PUT /users/{id}`), contraseña nueva igual a la actual | formato de validación de FastAPI |
+
+Las contraseñas se guardan y se comparan **tal cual se escriben**, con los espacios de los extremos incluidos, en el
+registro, el login, el restablecimiento y el cambio (AUTH-088, D-1). Pruebas unitarias por endpoint y su cobertura:
+[`TESTING.md`](../TESTING.md).
 
 Los 401 llevan `WWW-Authenticate: Bearer`. Los permisos se comprueban **antes** que la existencia: un `user` recibe 403
 también con un id que no existe, y así no puede averiguar qué ids hay.

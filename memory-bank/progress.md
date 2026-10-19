@@ -6,7 +6,7 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/error-handling-audit` (desde `origin/main` @ `2d90092`, que ya incluye las PR #3–#15).
+- **Rama de trabajo:** `feature/auth-088-tests` (desde `main` @ `7435c5f`, que ya incluye las PR #3–#16).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (práctica sin número de hito; contexto en
@@ -29,9 +29,12 @@
   Capturas del desarrollador añadidas y base real cargada con el seed. **PR #15 fusionada** (`2d90092`).
 - **Gestión de errores** (práctica sin número de hito): auditoría y corrección de la gestión de errores de backoffice,
   API y scripts, **implementada y validada** en `feature/error-handling-audit`. Las apps de hitos anteriores quedan
-  fuera por decisión del desarrollador. Entregada en un solo commit, con la rama subida y PR hacia `main`; pendiente:
-  que el desarrollador la revise y la fusione.
-- **Última actualización:** 2026-10-04.
+  fuera por decisión del desarrollador. **PR #16 fusionada** (`7435c5f`).
+- **Pruebas unitarias (AUTH-088, API-042, FE-019)** (práctica sin número de hito): suites por endpoint de la
+  autenticación (`services/api/tests/auth/`, 12 endpoints) y del backoffice (`tests/backoffice/`: proveedores y gestor
+  de incidencias), Jest en `uis/backoffice` (utilidades de autenticación, proveedores e incidencias), `TESTING.md` en la
+  raíz y dos defectos reales corregidos (D-1, D-2). Implementadas y validadas en `feature/auth-088-tests`.
+- **Última actualización:** 2026-10-20.
 
 | Componente | Estado |
 | --- | --- |
@@ -44,7 +47,8 @@
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | Autenticación (AUTH-01) | ✅ API: `User`/`Profile` en TinyDB, JWT, `/auth`, `/users`, `/profiles` y 8 rutas existentes protegidas (269 tests). Backoffice: `/login` y panel protegido (E2E 34/34). Solo local |
 | Autenticación frontend (AUTH-02) | ✅ PR #13 fusionada (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE` |
-| Gestión de errores | 🟡 Implementada y validada en `feature/error-handling-audit` (API 789 tests, paquete + scripts 196, navegador 41 + 36); un commit, rama subida y PR hacia `main`: falta fusionarla |
+| Gestión de errores | ✅ PR #16 fusionada (`7435c5f`): API 789 tests, paquete + scripts 196, navegador 41 + 36 |
+| Pruebas unitarias (AUTH-088, API-042, FE-019) | 🟡 Implementadas y validadas en `feature/auth-088-tests` (cifras en `TESTING.md`); falta la PR hacia `main` |
 | Gestor de incidencias | ✅ PR #15 fusionada (`2d90092`): paquete + scripts 192 tests, API 751 tests, navegador 69 + 64 + 33 + 44 + 22 |
 | Recuperación y cambio de contraseña (AUTH-03) | ✅ PR #14 fusionada (`f586bb3`): API completa: persistencia, email, los tres endpoints y cambio de email con contraseña (473 tests) `/forgot-password` (E2E 39/39) y `/reset-password` (E2E 51/51) enlace en `/login` (E2E 26/26) y `/account/change-password` (E2E 42/42); E2E de punta a punta 33/33 con emails reales; regresión de AUTH-02 en verde |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
@@ -1057,6 +1061,31 @@ acababan en una traza con la base corrupta.
 - Igual que en el gestor: API en `:8000` y backoffice (`npm run start`) en `:3002`, con las tres bases en el scratchpad.
   El fichero de una base se corrompe y se restaura con la API en marcha para provocar un 500 real. `db/` real sin tocar.
 
+### 2026-10-19/20 — Pruebas unitarias: AUTH-088, API-042 y FE-019 (rama `feature/auth-088-tests`)
+
+Práctica sin número de hito, guiada por un prompt del curso por fases con parada y confirmación (a partir de la
+fase 5e, el desarrollador autorizó continuar sin paradas salvo decisiones importantes). Detalle en `TESTING.md`.
+
+- **Decisiones del desarrollador:** módulos nuevos en `tests/auth/` sin tocar los existentes, `TESTING.md` en la raíz,
+  `routes/users.py` entero en el ámbito, pytest-cov, Jest sin jsdom, reloj con `monkeypatch` (sin dependencia) y
+  opción A (corregir) para D-1 y D-2.
+- **Línea base:** 789 tests de API y 196 de paquete y scripts; el ámbito de autenticación ya tenía un 99 % de líneas
+  con los tests HTTP existentes. Sin Jest.
+- **AUTH-088:** 13 módulos en `services/api/tests/auth/` (12 endpoints + infraestructura, 165 tests). Defectos reales
+  corregidos con aprobación: **D-1** (el registro recortaba los espacios de la contraseña y el login no) y **D-2**
+  (python-jose aceptaba el token en el segundo exacto de `exp`; era el caso límite sugerido en la revisión asistida
+  por IA). Jest en `uis/backoffice`: `session`, `authRules`, `authErrors` y `auth` (59 tests).
+- **API-042:** 11 módulos en `tests/backoffice/` (proveedores y gestor de incidencias, 88 tests).
+- **FE-019:** `lib/suppliers.test.ts` y `lib/incidents.test.ts` (32 tests).
+- **Validación:** API 1042 passed (`-W error::DeprecationWarning`); cobertura de líneas y ramas: AUTH-088 100 %
+  (97 % solo con la suite nueva), API-042 100 % (97 %), API completa 99 %. Jest 91 passed; lint, typecheck y build
+  del backoffice; `/` y `/login` del backoffice y `/health` de la API, 200. Una o varias mutaciones por endpoint
+  (detectaron un falso positivo en la infraestructura de tests).
+- **Hallazgos fuera de alcance (no tocados):** `next` 16.3.4 con avisos de seguridad (16.3.8 los corrige) y reutilización
+  de ids de proveedor en TinyDB: ver «Deuda técnica conocida».
+- Documentación: `TESTING.md`, `docs/autenticacion.md` (D-1 y D-2), READMEs de `services/api` y `uis/backoffice`,
+  `techContext.md`.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -1089,8 +1118,14 @@ acababan en una traza con la base corrupta.
 
 **Deuda técnica conocida**
 
-- Sin tests automatizados de JavaScript ni CI en el repo (sí hay tests de Python con pytest); las validaciones
-  dependen del flujo de `AGENTS.md` y de la skill.
+- Sin CI en el repo: los tests (pytest y, desde AUTH-088, Jest en `uis/backoffice`) y las validaciones dependen del
+  flujo de `AGENTS.md` y de la skill. El website y el tracker siguen sin tests JS.
+- **Seguridad (detectado en AUTH-088, fuera de su alcance):** `next` 16.3.4 (website y backoffice) tiene 7 avisos de
+  `npm audit`, uno *critical* (RCE en `next/og`, ≥16.2.0 <16.3.6) y varios *high*; **16.3.8** (parche, no mayor) los
+  corrige. Pendiente de confirmación: subirlo en una rama propia y revalidar ambas apps antes de desplegar.
+- Directorio de proveedores: TinyDB **reutiliza el id del último proveedor borrado** (la base se reabre en cada
+  petición y el siguiente id es el máximo + 1). Sin contrato sobre ids; el backoffice no borra (el flujo es suspender).
+  Pendiente de decidir si hace falta ids no reutilizables.
 - El backoffice publicado es anterior al login (protegido hoy con el popup de autenticación HTTP del servidor). El
   login de la app llega a `main` con la PR de `feature/auth-api`, pero necesita la API desplegada.
 - Logo, favicon e imagen duplicados por app (patrón ya usado por el tracker). Si crece, valorar `packages/`
@@ -1111,4 +1146,7 @@ acababan en una traza con la base corrupta.
    arrancar leyendo este memory bank y cerrar actualizando `progress.md`.
 4. Autenticación hecha (`feature/auth-api`): decidir los riesgos pendientes de `docs/autenticacion.md`, desplegar la
    API y luego el backoffice, y más adelante sustituir los “datos de partida” estáticos de `lib/data/`.
-5. Valorar añadir un runner de tests y CI (requiere confirmación) y automatizar `validate-delivery` en CI.
+5. Valorar añadir CI (requiere confirmación) que ejecute `uv run pytest` y `npm test` del backoffice (runners ya
+   existentes desde AUTH-088) y automatice `validate-delivery`.
+6. Pruebas unitarias (AUTH-088): revisar y fusionar la PR de `feature/auth-088-tests`; decidir la subida de `next` a
+   16.3.8 (website y backoffice) en una rama propia.
