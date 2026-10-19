@@ -34,8 +34,8 @@
   autenticación (`services/api/tests/auth/`, 12 endpoints) y del backoffice (`tests/backoffice/`: proveedores y gestor
   de incidencias), Jest en `uis/backoffice` (utilidades de autenticación, proveedores e incidencias), `TESTING.md` en la
   raíz y dos defectos reales corregidos (D-1, D-2). Implementadas y validadas en `feature/auth-088-tests`: 8 commits,
-  rama subida a `origin` (`b4930cf`) y registrada en Notion («Prácticas — Bootcamp»). **Falta la PR hacia `main`**
-  (no se crea sin indicación del desarrollador).
+  rama subida a `origin` y registrada en Notion («Prácticas — Bootcamp»). **PR #17 abierta** hacia `main` (a petición del
+  desarrollador): falta revisarla y fusionarla.
 - **Última actualización:** 2026-10-20.
 
 | Componente | Estado |
@@ -50,7 +50,7 @@
 | Autenticación (AUTH-01) | ✅ API: `User`/`Profile` en TinyDB, JWT, `/auth`, `/users`, `/profiles` y 8 rutas existentes protegidas (269 tests). Backoffice: `/login` y panel protegido (E2E 34/34). Solo local |
 | Autenticación frontend (AUTH-02) | ✅ PR #13 fusionada (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE` |
 | Gestión de errores | ✅ PR #16 fusionada (`7435c5f`): API 789 tests, paquete + scripts 196, navegador 41 + 36 |
-| Pruebas unitarias (AUTH-088, API-042, FE-019) | 🟡 Implementadas y validadas en `feature/auth-088-tests` (cifras en `TESTING.md`); rama subida, falta la PR hacia `main` |
+| Pruebas unitarias (AUTH-088, API-042, FE-019) | 🟡 Implementadas y validadas en `feature/auth-088-tests` (cifras en `TESTING.md`); PR #17 abierta, falta fusionarla |
 | Gestor de incidencias | ✅ PR #15 fusionada (`2d90092`): paquete + scripts 192 tests, API 751 tests, navegador 69 + 64 + 33 + 44 + 22 |
 | Recuperación y cambio de contraseña (AUTH-03) | ✅ PR #14 fusionada (`f586bb3`): API completa: persistencia, email, los tres endpoints y cambio de email con contraseña (473 tests) `/forgot-password` (E2E 39/39) y `/reset-password` (E2E 51/51) enlace en `/login` (E2E 26/26) y `/account/change-password` (E2E 42/42); E2E de punta a punta 33/33 con emails reales; regresión de AUTH-02 en verde |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
@@ -1088,7 +1088,8 @@ fase 5e, el desarrollador autorizó continuar sin paradas salvo decisiones impor
 - Documentación: `TESTING.md`, `docs/autenticacion.md` (D-1 y D-2), READMEs de `services/api` y `uis/backoffice`,
   `techContext.md`.
 - **Entrega:** 8 commits escalonados (`ebb5ca2` … `b4930cf`), push de `feature/auth-088-tests` a `origin` y fila nueva
-  en la base de Notion «Prácticas — Bootcamp». Sin PR: el prompt pedía no crearla por iniciativa propia.
+  en la base de Notion «Prácticas — Bootcamp». PR #17 abierta después, cuando el desarrollador lo pidió (el prompt
+  pedía no crearla por iniciativa propia).
 
 ## Trabajo pendiente
 
@@ -1152,5 +1153,5 @@ fase 5e, el desarrollador autorizó continuar sin paradas salvo decisiones impor
    API y luego el backoffice, y más adelante sustituir los “datos de partida” estáticos de `lib/data/`.
 5. Valorar añadir CI (requiere confirmación) que ejecute `uv run pytest` y `npm test` del backoffice (runners ya
    existentes desde AUTH-088) y automatice `validate-delivery`.
-6. Pruebas unitarias (AUTH-088): revisar y fusionar la PR de `feature/auth-088-tests`; decidir la subida de `next` a
+6. Pruebas unitarias (AUTH-088): revisar y fusionar la PR #17 (`feature/auth-088-tests`); decidir la subida de `next` a
    16.3.8 (website y backoffice) en una rama propia.
