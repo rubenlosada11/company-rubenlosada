@@ -211,11 +211,15 @@ npm run start
 ```bash
 npm run lint
 npm run typecheck   # next typegen && tsc --noEmit
+npm test            # Jest: tests unitarios de lib/ (lib/*.test.ts)
+npm run test:coverage
 npm run build
 ```
 
-No hay tests automatizados en el repo: las pruebas en navegador se ejecutan fuera de él (Edge + `playwright-core`) y
-se registran en la documentación de cada función (p. ej.
+Los tests unitarios de Jest (`jest.config.mjs` con `next/jest`, entorno `node`) cubren las utilidades de `lib/`:
+sesión, reglas y errores de autenticación (AUTH-088), validación y formato de proveedores e incidencias (FE-019). Plan,
+casos y resultados en [`TESTING.md`](../../TESTING.md). Las pruebas en navegador se ejecutan fuera del repo (Edge +
+`playwright-core`) y se registran en la documentación de cada función (p. ej.
 [`docs/pruebas-analizador-incidencias.md`](../../docs/pruebas-analizador-incidencias.md),
 [`docs/gestor-incidencias.md`](../../docs/gestor-incidencias.md#tests) y
 [`docs/autenticacion.md`](../../docs/autenticacion.md#navegador-backoffice)). Comprobación de las rutas con la skill

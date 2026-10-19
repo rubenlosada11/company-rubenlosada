@@ -3,6 +3,9 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+# cobertura (pytest-cov, ver TESTING.md)
+.coverage
+htmlcov/
 
 # base de datos TinyDB local (se regenera con `uv run seed`)
 db/

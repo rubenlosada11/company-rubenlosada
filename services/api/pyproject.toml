@@ -38,8 +38,13 @@ entrypoint = "app.main:app"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+[tool.coverage.run]
+# `uv run pytest --cov` mide solo el código de la API, no las dependencias ni los tests (ver TESTING.md).
+source = ["app"]
+
 [dependency-groups]
 dev = [
     "httpx2>=2.13.1",
     "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
 ]

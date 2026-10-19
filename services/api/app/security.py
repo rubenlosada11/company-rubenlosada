@@ -21,7 +21,7 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode, urlsplit
 
-from jose import jwt
+from jose import ExpiredSignatureError, jwt
 from passlib.context import CryptContext
 
 ALGORITHM = "HS256"
@@ -177,9 +177,15 @@ def decode_access_token(token: str) -> dict:
 
     Lanza `jose.ExpiredSignatureError` si ha caducado y `jose.JWTError` en cualquier otro caso.
     """
-    return jwt.decode(
+    claims = jwt.decode(
         token,
         get_secret_key(),
         algorithms=[ALGORITHM],
         options={"require_exp": True, "require_sub": True},
     )
+    # python-jose solo rechaza `exp < ahora` (en segundos enteros): en el segundo exacto de `exp` el token aún valdría.
+    # RFC 7519 §4.1.4 exige que la hora actual sea anterior a `exp` (D-2 de AUTH-088, ver TESTING.md).
+    # `int()` como jose, que ya ha comprobado que `exp` lo admite (también si llega como texto).
+    if int(claims["exp"]) <= int(datetime.now(UTC).timestamp()):
+        raise ExpiredSignatureError("Signature has expired.")
+    return claims

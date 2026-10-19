@@ -14,7 +14,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
 
 from app.models import EMAIL_PATTERN
 
@@ -136,7 +136,9 @@ class UserCreate(ProfileFields):
     """
 
     email: str
-    password: str
+    # Tal cual se escribe: `ProfileFields` recorta los textos, pero el login no, y una contraseña con espacios en los
+    # extremos dejaría de servir para entrar (D-1 de AUTH-088, ver TESTING.md).
+    password: Annotated[str, StringConstraints(strip_whitespace=False)]
     invitation_code: str | None = Field(default=None, max_length=200)
 
     _check_email = field_validator("email", mode="before")(check_email)
