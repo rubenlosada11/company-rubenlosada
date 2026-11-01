@@ -39,7 +39,7 @@ export function Sidebar() {
         <SidebarAccount />
         <p className="px-3 text-xs leading-relaxed text-blue-300">
           TrackFlow Tech · Uso interno. El resumen procede de CONTEXT.es.md; los proveedores, el análisis de
-          incidencias y el gestor de incidencias usan la API de TrackFlow.
+          incidencias, el gestor de incidencias y el inventario usan la API de TrackFlow.
         </p>
       </div>
     </aside>

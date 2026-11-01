@@ -2,7 +2,7 @@ import { AuthGate } from "@/components/auth/AuthGate";
 import { Sidebar } from "@/components/Sidebar";
 import { Topbar } from "@/components/Topbar";
 
-/** Panel interno (`/`, `/proveedores`, `/incidencias`): solo con sesión iniciada. */
+/** Panel interno (`/`, `/proveedores`, `/incidencias`, `/gestor-incidencias`, `/inventory`…): solo con sesión iniciada. */
 export default function PanelLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGate>
