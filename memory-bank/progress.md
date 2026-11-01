@@ -43,7 +43,7 @@
 - **Hito 5 — Interfaz de inventario en el backoffice:** `/inventory/products`, `/inventory/orders/inbound`,
   `/inventory/orders/outbound` y `/inventory/orders`, con un único módulo de integración (`lib/inventory.ts`).
   **Implementado y validado** en `feature/inventory-backoffice`, por fases (prompt del curso) sin paradas intermedias
-  por indicación del desarrollador, que revisará los commits y abrirá la PR. **PR #19 abierta** con las capturas: falta la revisión y la fusión.
+  por indicación del desarrollador. **PR #19 fusionada** (`01ddccb`). **Hito 5 entregado** (2026-11-01).
 - **Última actualización:** 2026-11-01.
 
 | Componente | Estado |
@@ -60,7 +60,7 @@
 | Gestión de errores | ✅ PR #16 fusionada (`7435c5f`): API 789 tests, paquete + scripts 196, navegador 41 + 36 |
 | Pruebas unitarias (AUTH-088, API-042, FE-019) | ✅ PR #17 fusionada (`39af495`); cifras en `TESTING.md` |
 | Hito 5 — Inventario (`/inventory`) | ✅ API: PR #18 fusionada (`9779fbf`; 1160 tests, 118 del inventario); Supabase conectado (2026-11-01) |
-| Hito 5 — Interfaz de inventario (backoffice) | 🟡 Implementada y validada en `feature/inventory-backoffice` (Jest 148, 57 nuevos; navegador 18 + 29 + 35 + 21 + 41 + 12/13); **PR #19 abierta** con capturas, falta revisión y fusión |
+| Hito 5 — Interfaz de inventario (backoffice) | ✅ PR #19 fusionada (`01ddccb`; Jest 148, 57 nuevos; navegador 18 + 29 + 35 + 21 + 41 + 12/13; 10 capturas). Hito 5 **entregado** |
 | Gestor de incidencias | ✅ PR #15 fusionada (`2d90092`): paquete + scripts 192 tests, API 751 tests, navegador 69 + 64 + 33 + 44 + 22 |
 | Recuperación y cambio de contraseña (AUTH-03) | ✅ PR #14 fusionada (`f586bb3`): API completa: persistencia, email, los tres endpoints y cambio de email con contraseña (473 tests) `/forgot-password` (E2E 39/39) y `/reset-password` (E2E 51/51) enlace en `/login` (E2E 26/26) y `/account/change-password` (E2E 42/42); E2E de punta a punta 33/33 con emails reales; regresión de AUTH-02 en verde |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
@@ -1194,6 +1194,9 @@ todas las fases sin confirmación salvo algo muy crítico y **parar antes de los
   personales ni tokens), explicadas en `docs/inventario.md`, enlazadas desde el README e incrustadas en la PR #19. Las
   tres del caso de las dos pestañas tienen la cabecera repetida a media altura (efecto de la captura de página
   completa, no de la app). Sin producto agotado en el listado (solo saludable, bajo y crítico).
+- **Cierre (2026-11-01):** el desarrollador revisó y fusionó la PR #19 (`01ddccb`). Rama `feature/hito-5-cierre`:
+  Hito 5 a `delivered` en `lib/data/milestones.ts` (el panel muestra «Entregado»), sin la fila «Estado» en
+  `docs/hitos.md` (como los demás hitos entregados) y texto de «Hitos del proyecto» en el README del backoffice.
 
 ## Trabajo pendiente
 
@@ -1207,8 +1210,7 @@ todas las fases sin confirmación salvo algo muy crítico y **parar antes de los
 
 **Decisiones abiertas (requieren confirmación; ver `projectbrief.md`)**
 
-- Hito 5 (inventario): decidir permisos por rol (operarios / coordinadores). La interfaz del backoffice ya existe
-  (`feature/inventory-backoffice`): Hito 5 pasa a `delivered` en `docs/hitos.md` y `milestones.ts` al fusionar su PR.
+- Hito 5 (inventario, entregado): decidir permisos por rol (operarios / coordinadores).
 - Autenticación (anterior al Hito 5): el aviso «Tu sesión ha caducado» del login falta a veces con un token ya caducado
   guardado (`AuthProvider`); decidir si se corrige en una rama propia.
 
@@ -1264,4 +1266,5 @@ todas las fases sin confirmación salvo algo muy crítico y **parar antes de los
    existentes desde AUTH-088) y automatice `validate-delivery`.
 6. Decidir la subida de `next` a 16.3.8 (website y backoffice) en una rama propia (avisos de seguridad detectados en
    AUTH-088; PR #17 ya fusionada).
-7. Hito 5: revisar y fusionar la PR #19 (`feature/inventory-backoffice`; capturas ya incluidas). Tras fusionarla, Hito 5 a `delivered` (`docs/hitos.md`, `milestones.ts`).
+7. Hito 5 entregado: revisar y fusionar la PR de cierre (`feature/hito-5-cierre`). Pendientes del hito, sin fecha:
+   permisos por rol, aviso de sesión caducada intermitente y limitaciones de `docs/inventario.md`.
