@@ -25,7 +25,7 @@ JS es autónomo, con su propio `package.json` y `package-lock.json`, y se opera 
 | `memory-bank/`, `AGENTS.md`, `.agents/` | Infraestructura para agentes (Hito 4). |
 
 No existen: `docker-compose.yml`, CI/CD (`.github/`), `Dockerfile`, base de datos de servidor (el inventario usa SQLite
-local; Supabase/PostgreSQL está previsto con `DATABASE_URL`, sin conectar). Tests automatizados:
+local; Supabase/PostgreSQL con `DATABASE_URL` y driver psycopg, preparado y probado contra PostgreSQL 16 local). Tests automatizados:
 Python (pytest) en `services/api/tests/`, `packages/analisis-incidencias/tests/` y `scripts/tests/`, y Jest en
 `uis/backoffice/lib/*.test.ts` (desde AUTH-088). Plan y resultados de las pruebas unitarias: `TESTING.md` (raíz).
 El `.gitignore` raíz contiene `node_modules/`, los cachés de Python (`__pycache__/`, `*.py[cod]`, `.pytest_cache/`) y
@@ -41,7 +41,8 @@ El `.gitignore` raíz contiene `node_modules/`, los cachés de Python (`__pycach
   externas: hooks de React. Fuentes vía `next/font/google`.
 - **Backend:** `services/api/` — Python ≥ 3.12 (máquina: 3.14.6), **uv** 0.12, FastAPI 0.141, Pydantic 2.13,
   TinyDB 4.9, uvicorn, `python-multipart` (subida de ficheros), `python-jose[cryptography]` 3.5 (JWT),
-  `libpass[bcrypt]` 1.9.3 (módulo `passlib`, bcrypt 5.0), **SQLModel 0.0.48** (SQLAlchemy 2.1.6; inventario, Hito 5)
+  `libpass[bcrypt]` 1.9.3 (módulo `passlib`, bcrypt 5.0), **SQLModel 0.0.48** (SQLAlchemy 2.1.6; inventario, Hito 5),
+  **psycopg[binary] 3.3.6** (driver de PostgreSQL/Supabase)
   y el paquete local `analisis-incidencias` (editable,
   `[tool.uv.sources]`); desarrollo: pytest 9 + `httpx2` (Starlette 1.7 marca obsoleto `httpx` en `TestClient`) +
   `pytest-cov` 7.1 (cobertura; `[tool.coverage.run] source = ["app"]`).
@@ -352,7 +353,8 @@ Contexto: `CONTEXT-gestor-inventario.es.md` (ticket TRK-0341). Documentación: `
 | --- | --- |
 | Integrado en `services/api/app/` y no en la estructura literal del briefing (`services/main.py`, `routers/`…) | La API ya existe con su autenticación; una segunda app FastAPI es un cambio de arquitectura (`AGENTS.md`). Equivalencias en `docs/inventario.md` |
 | `inventory_models.py` / `inventory_schemas.py` / `routes/inventory.py` / `services/inventory.py` | `app/models.py` ya es el de proveedores; patrón `auth_models.py`/`incident_models.py`; la carpeta de routers es `routes/` |
-| SQLModel con SQLite por defecto (`db/inventory.db`) y `DATABASE_URL` para PostgreSQL/Supabase | El briefing pide SQLModel y Supabase, pero no hay proyecto ni credenciales (área de secretos). Sin driver `psycopg`: no se puede validar y se añade al conectar |
+| SQLModel con SQLite por defecto (`db/inventory.db`) y `DATABASE_URL` para PostgreSQL/Supabase | El briefing pide SQLModel y Supabase; la contraseña es un secreto que solo pone el desarrollador en su `.env` |
+| Supabase vía *Session pooler* (`postgresql+psycopg://…:5432/postgres?sslmode=require`), `psycopg[binary]`, `connect_timeout` 10 s, RLS activado a mano en las tres tablas | La conexión directa es solo IPv6; el *Transaction pooler* no admite *prepared statements*; una base caída no cuelga peticiones; las tablas creadas por SQL no llevan RLS. Guía en `docs/inventario.md` |
 | Motor creado al primer uso (`get_engine`), `create_all` sin Alembic; se sustituye si cambia `DATABASE_URL` | Si la base falla, solo falla el inventario (500 genérico); los tests usan una base SQLite por test. `TestClient` sin `with` no ejecuta el `lifespan` |
 | SQLite: `check_same_thread=False` + `PRAGMA foreign_keys=ON` en cada conexión | Pool de hilos de FastAPI; SQLite no comprueba las FK por defecto |
 | `current_stock` = stock del almacén del SKU + `stock_by_warehouse` `{LA, ZGZ}`; listado con desglose, nunca total | Regla 6 y nota de evaluación «por almacén, no agregado». Los movimientos llevan su propio `warehouse` (opcional; por defecto el del SKU) |
@@ -364,7 +366,7 @@ Contexto: `CONTEXT-gestor-inventario.es.md` (ticket TRK-0341). Documentación: `
 | `created_at` `DateTime(timezone=True)`; los schemas devuelven siempre UTC | SQLite pierde la zona horaria al leer |
 | `quantity` entero estricto > 0 y ≤ 2.147.483.647 | Rechaza `"5"`, `5.0` y `true`; cabe en `INTEGER` de PostgreSQL |
 | Seed `uv run seed-inventory [email]`: firmado por un usuario existente (primer admin activo por defecto); SKUs por código; movimientos solo si no hay ninguno | Regla 4 (UUIDs reales de TinyDB) e idempotencia sin duplicar movimientos |
-| `.env.example` sin tocar | Área que requiere confirmación; `DATABASE_URL` documentada en el README de la API |
+| `.env.example` con `# DATABASE_URL="…"` comentada | Autorizado por el desarrollador (2026-11-01); comentada = SQLite local |
 | Hito con número: commits `Hito 5 — …` escalonados, entrada en `docs/hitos.md` y en `lib/data/milestones.ts` (`in-progress`); iniciativa «API de inventario unificada» como `foundation` | El briefing es el Hito 5; convención de hitos (memoria del desarrollador) |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente

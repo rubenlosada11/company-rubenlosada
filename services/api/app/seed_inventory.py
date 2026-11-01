@@ -183,15 +183,20 @@ def main() -> int:
         print(f"Error: {error}", file=sys.stderr)
         return 1
     except ImportError as error:
-        # `DATABASE_URL` de PostgreSQL (Supabase) sin su driver instalado.
+        # `DATABASE_URL` con un driver que la API no instala (p. ej. `postgresql+psycopg2://`) o sin `uv sync`.
         print(
-            f"Error: falta el driver de la base de datos ({error.name}). Para PostgreSQL: uv add \"psycopg[binary]\".",
+            f"Error: falta el driver de la base de datos ({error.name}). La API usa psycopg: escribe la URL como "
+            "postgresql+psycopg://… y ejecuta uv sync.",
             file=sys.stderr,
         )
         return 1
     except (SQLAlchemyError, OSError) as error:
         # Base no disponible o URL incorrecta. Solo el tipo de error: el mensaje podría llevar la URL con contraseña.
-        print(f"Error: no se puede usar la base del inventario ({type(error).__name__}).", file=sys.stderr)
+        print(
+            f"Error: no se puede usar la base del inventario ({type(error).__name__}). Revisa DATABASE_URL (host, "
+            "usuario y contraseña) y, en Supabase, que el proyecto no esté pausado.",
+            file=sys.stderr,
+        )
         return 1
 
     print(f"Base de datos: {_safe_url(get_database_url())}")

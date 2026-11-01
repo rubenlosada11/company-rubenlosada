@@ -25,7 +25,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from sqlalchemy import Engine, event
+from sqlalchemy import Engine, event, make_url
 from sqlmodel import Session, SQLModel, create_engine
 from tinydb import TinyDB
 from tinydb.table import Table
@@ -145,6 +145,7 @@ def incidents_table() -> Iterator[Table]:
 # --- Inventario (Hito 5): SQLModel ---------------------------------------------------------------------------------
 
 DEFAULT_INVENTORY_DB_PATH = Path(__file__).resolve().parent.parent / "db" / "inventory.db"
+POSTGRES_CONNECT_TIMEOUT_SECONDS = 10
 
 # Un solo motor a la vez: se crea al primer uso y se sustituye si cambia `DATABASE_URL` (los tests usan una base
 # temporal por test). El candado evita crear dos motores a la vez desde dos hilos.
@@ -189,7 +190,10 @@ def get_engine() -> Engine:
             event.listen(engine, "connect", _enable_sqlite_foreign_keys)
         else:
             # `pool_pre_ping`: descarta conexiones cerradas por el servidor (p. ej. el pooler de Supabase).
-            engine = create_engine(url, pool_pre_ping=True)
+            # Con psycopg, una base inalcanzable falla a los pocos segundos en vez de dejar la petición colgada.
+            is_psycopg = make_url(url).get_driver_name() == "psycopg"
+            connect_args = {"connect_timeout": POSTGRES_CONNECT_TIMEOUT_SECONDS} if is_psycopg else {}
+            engine = create_engine(url, pool_pre_ping=True, connect_args=connect_args)
 
         # Registra las tablas (SKU, StockEntry, StockExit) en `SQLModel.metadata` antes de crearlas.
         import app.inventory_models  # noqa: F401

@@ -22,7 +22,7 @@ API de TrackFlow con cuatro módulos, protegidos con autenticación JWT:
 
 **Stack:** Python ≥ 3.12, [uv](https://docs.astral.sh/uv/), FastAPI, Pydantic y TinyDB (base de datos en un fichero
 JSON) para proveedores, incidencias y usuarios, una elección deliberada de esos ejercicios. El inventario usa SQLModel
-(SQLAlchemy) sobre SQLite en local. Sin Docker. La consumen
+(SQLAlchemy) sobre SQLite en local o PostgreSQL/Supabase (driver psycopg). Sin Docker. La consumen
 las páginas `/proveedores`, `/incidencias` y `/gestor-incidencias` del [backoffice](../../uis/backoffice/README.md).
 
 > Todas las rutas de proveedores e incidencias exigen un token (`Authorization: Bearer`). Solo son públicas
@@ -75,7 +75,7 @@ uv run --env-file .env uvicorn app.main:app --reload --port 8000
 | `AUTH_DB_PATH` | `services/api/db/auth.json` | Fichero de TinyDB de usuarios y perfiles |
 | `SUPPLIERS_DB_PATH` | `services/api/db/suppliers.json` | Fichero de TinyDB de proveedores |
 | `INCIDENTS_DB_PATH` | `services/api/db/incidents.json` | Fichero de TinyDB del gestor de incidencias |
-| `DATABASE_URL` | SQLite en `services/api/db/inventory.db` | Base SQL del inventario (URL de SQLAlchemy). Para Supabase/PostgreSQL ver [`docs/inventario.md`](../../docs/inventario.md#conectar-supabase-pendiente) |
+| `DATABASE_URL` | SQLite en `services/api/db/inventory.db` | Base SQL del inventario (URL de SQLAlchemy). Para Supabase/PostgreSQL (cadena *Session pooler*, `postgresql+psycopg://…?sslmode=require`, entre comillas) ver [`docs/inventario.md`](../../docs/inventario.md#conectar-supabase) |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3002,http://127.0.0.1:3002` | Orígenes del navegador autorizados (el backoffice). Admite la cabecera `Authorization` y expone `Content-Disposition` para las descargas |
 
 ## Seeder
@@ -429,6 +429,10 @@ uv run seed-inventory
 uv run seed-inventory operario@trackflow.test
 ```
 
+- **Supabase:** pon `DATABASE_URL` en el `.env` y ejecuta `uv run --env-file .env seed-inventory` (crea las tablas y
+  carga los datos) y la API con `--env-file .env`. Guía paso a paso, con la activación de RLS:
+  [`docs/inventario.md`](../../docs/inventario.md#conectar-supabase).
+
 ## Tests
 
 ```powershell
@@ -436,9 +440,9 @@ uv run pytest -q
 uv run pytest --cov --cov-branch --cov-report=term-missing
 ```
 
-1158 tests con pytest: los 789 de integración con `TestClient` (gestor y analizador de incidencias, directorio de
+1160 tests con pytest: los 789 de integración con `TestClient` (gestor y analizador de incidencias, directorio de
 proveedores, autenticación, recuperación y cambio de contraseña y gestión de errores; cada uno sobre una base TinyDB
-temporal, nunca tocan `db/*.json`), los 116 del inventario (Hito 5, con una base SQLite temporal por test) y, desde AUTH-088, 253 unitarios por endpoint: 165 de autenticación en
+temporal, nunca tocan `db/*.json`), los 118 del inventario (Hito 5, con una base SQLite temporal por test) y, desde AUTH-088, 253 unitarios por endpoint: 165 de autenticación en
 [`tests/auth/`](./tests/auth/) y 88 del backoffice (proveedores y gestor de incidencias) en
 [`tests/backoffice/`](./tests/backoffice/). Plan, casos, cobertura por ámbito y defectos encontrados:
 [`TESTING.md`](../../TESTING.md). No hace falta `.env`: [`tests/conftest.py`](./tests/conftest.py) pone una `SECRET_KEY` de pruebas
@@ -497,7 +501,7 @@ Los datos se guardan con **TinyDB** en un fichero JSON en disco, así que sobrev
 | Cambiar la ruta | variable de entorno `SUPPLIERS_DB_PATH` (los tests usan un fichero temporal) |
 | Usuarios y perfiles | `services/api/db/auth.json`, tablas `users` y `profiles` (el `id` es un UUID); variable `AUTH_DB_PATH` |
 | Incidencias del gestor | `services/api/db/incidents.json`, tabla `incidents` (el `id` es el `doc_id`); variable `INCIDENTS_DB_PATH` |
-| Inventario (SQL) | `services/api/db/inventory.db` (SQLite), tablas `skus`, `stock_entries` y `stock_exits`; variable `DATABASE_URL` |
+| Inventario (SQL) | `services/api/db/inventory.db` (SQLite) o Supabase, tablas `skus`, `stock_entries` y `stock_exits`; variable `DATABASE_URL` |
 | Git | `db/` está en `.gitignore`: la base local no se versiona |
 
 El acceso está en [`app/database.py`](./app/database.py): cada uso abre el fichero, trabaja con la tabla y lo cierra
@@ -567,6 +571,6 @@ Las del backoffice (proveedores con filtros y análisis de incidencias) están e
   Pydantic, no TinyDB (ver [`docs/gestor-incidencias.md`](../../docs/gestor-incidencias.md#limitaciones)).
 - El último análisis de incidencias vive en memoria: se pierde al reiniciar, es compartido por todos los usuarios y con
   varios workers la exportación podría no encontrarlo.
-- Inventario: sin conexión a Supabase todavía (SQLite local), sin migraciones ni paginación, sin permisos por rol y con
-  la regla de stock protegida para un solo worker en SQLite (ver
+- Inventario: Supabase preparado, pero cada desarrollador pone su propia `DATABASE_URL` en el `.env`; sin migraciones
+  ni paginación, sin permisos por rol y con la regla de stock protegida para un solo worker en SQLite (ver
   [`docs/inventario.md`](../../docs/inventario.md#limitaciones-conocidas)).

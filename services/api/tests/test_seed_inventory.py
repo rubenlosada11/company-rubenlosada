@@ -209,11 +209,23 @@ def test_main_with_email_argument(make_user, monkeypatch, capsys):
 
 
 def test_main_explains_a_missing_postgresql_driver_without_the_password(admin, monkeypatch, capsys):
-    monkeypatch.setenv("DATABASE_URL", "postgresql://postgres:SuperSecreta@127.0.0.1:1/postgres")
+    # La API instala psycopg; pg8000 no está, así que simula una URL con un driver que falta.
+    monkeypatch.setenv("DATABASE_URL", "postgresql+pg8000://postgres:SuperSecreta@127.0.0.1:1/postgres")
     monkeypatch.setattr("sys.argv", ["seed-inventory"])
     assert main() == 1
     output = capsys.readouterr()
-    assert "falta el driver de la base de datos (psycopg)" in output.err
+    assert "falta el driver de la base de datos (pg8000)" in output.err
+    assert "postgresql+psycopg://" in output.err
+    assert "SuperSecreta" not in output.err + output.out
+
+
+def test_main_reports_an_unreachable_postgresql_without_the_password(admin, monkeypatch, capsys):
+    # Supabase pausado, host incorrecto o sin red: nada escucha en el puerto 1.
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://postgres:SuperSecreta@127.0.0.1:1/postgres")
+    monkeypatch.setattr("sys.argv", ["seed-inventory"])
+    assert main() == 1
+    output = capsys.readouterr()
+    assert "no se puede usar la base del inventario (OperationalError)" in output.err
     assert "SuperSecreta" not in output.err + output.out
 
 

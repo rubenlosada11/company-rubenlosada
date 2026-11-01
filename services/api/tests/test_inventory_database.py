@@ -1,7 +1,7 @@
 """Tests del motor SQLModel del inventario (`app/database.py`: `get_engine`, `get_db`, `DATABASE_URL`)."""
 
 import pytest
-from sqlalchemy import inspect
+from sqlalchemy import inspect, make_url
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
@@ -49,3 +49,19 @@ def test_get_db_yields_a_session_and_closes_it():
     assert isinstance(session, Session)
     with pytest.raises(StopIteration):
         next(dependency)
+
+
+def test_postgresql_engine_uses_psycopg_with_a_connect_timeout(monkeypatch):
+    captured = {}
+
+    def fake_create_engine(url, **kwargs):
+        captured.update(url=url, **kwargs)
+        raise RuntimeError("sin conexión en el test")
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://postgres:x@127.0.0.1:1/postgres")
+    monkeypatch.setattr(database, "create_engine", fake_create_engine)
+    with pytest.raises(RuntimeError):
+        database.get_engine()
+    assert captured["connect_args"] == {"connect_timeout": database.POSTGRES_CONNECT_TIMEOUT_SECONDS}
+    assert captured["pool_pre_ping"] is True
+    assert make_url(captured["url"]).get_driver_name() == "psycopg"  # driver por defecto de SQLAlchemy 2.1

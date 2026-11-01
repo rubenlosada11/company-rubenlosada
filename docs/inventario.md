@@ -37,9 +37,9 @@ Petición ─► routes/inventory.py ─► services/inventory.py ─► SQLMode
 - **ORM:** SQLModel (SQLAlchemy 2) — única dependencia nueva de la API.
 - **Desarrollo local (por defecto):** SQLite en `services/api/db/inventory.db` (carpeta ignorada en git). Las tablas se
   crean solas la primera vez que se usa el inventario (`SQLModel.metadata.create_all`), sin migraciones.
-- **Supabase / PostgreSQL:** se define `DATABASE_URL` con la cadena de conexión de Supabase. No se ha conectado a
-  ningún proyecto de Supabase (no hay credenciales en el repo) ni se ha instalado el driver; ver
-  [Conectar Supabase](#conectar-supabase-pendiente).
+- **Supabase / PostgreSQL:** se define `DATABASE_URL` con la cadena *Session pooler* de Supabase. La API trae el
+  driver `psycopg[binary]` (conexión con 10 s de tiempo máximo) y está probada contra PostgreSQL 16; la contraseña
+  solo va en tu `.env`. Pasos en [Conectar Supabase](#conectar-supabase).
 - **Usuarios:** no hay tabla ni modelo `User` en SQL (regla 4). `user_uuid` es el UUID del usuario en TinyDB, el `sub`
   del JWT, sin clave foránea (vive en otra base).
 
@@ -183,21 +183,119 @@ cd services\api
 uv run pytest tests/test_inventory.py tests/test_seed_inventory.py tests/test_inventory_database.py
 ```
 
-116 tests (HTTP de los 6 endpoints, reglas 1–6, salidas simultáneas, base no disponible, seed y motor SQL), cada uno con su propia base
+118 tests (HTTP de los 6 endpoints, reglas 1–6, salidas simultáneas, base no disponible, seed y motor SQL), cada uno con su propia base
 SQLite temporal (el `conftest.py` fija `DATABASE_URL`: nunca tocan `db/inventory.db` ni una base real). Cobertura de
 líneas y ramas: 100 % en modelos, schemas, router y servicio; 95 % en el seed. Además se hicieron 8 pruebas de mutación
 manuales (quitar el candado, `>` por `>=`, sumar los almacenes, quitar cada regla de `tracking_number`, tomar
 `user_uuid` del cuerpo, quitar la autenticación): todas hacen fallar algún test.
 
-## Conectar Supabase (pendiente)
+**Contra PostgreSQL real (2026-11-01):** con un PostgreSQL 16 local (`pgserver`, fuera del repo) pasaron los 107 tests
+del inventario que usan la base (incluidas las 10 salidas simultáneas con `SELECT … FOR UPDATE`; los 4 restantes
+cambian `DATABASE_URL` a propósito), el seed (dos veces, sin duplicar) y los 6 endpoints con `curl`, antes y después de
+activar RLS. Esquema creado: `timestamptz` en `created_at`, claves foráneas e índice único en `skus.sku`.
 
-No ejecutado: requiere un proyecto de Supabase y su contraseña, que no están en el repo (área de secretos).
+## Conectar Supabase
 
-1. Instalar el driver de PostgreSQL en la API: `uv add "psycopg[binary]"` (sin él, la API responde 500 en `/inventory`
-   y el seed explica qué falta).
-2. En `services/api/.env` (nunca en git): `DATABASE_URL="postgresql+psycopg://postgres.<proyecto>:<contraseña>@<host>:5432/postgres"`
-   (cadena *Session pooler* de Supabase, entre comillas).
-3. `uv run --env-file .env seed-inventory` crea las tablas y carga los datos.
+La API ya trae el driver de PostgreSQL (`psycopg[binary]`) y se probó contra un **PostgreSQL 16 local** (los 107 tests
+del inventario que usan la base, el seed y los 6 endpoints, también con RLS activado). **Conectado el 2026-11-01** al
+proyecto de Supabase del equipo (PostgreSQL 17, *Session pooler* en `eu-west-1`, SSL): seed cargado (6 SKUs, 7
+entradas, 4 salidas), RLS activado en las tres tablas y stock por almacén correcto. La contraseña solo va en el `.env`
+de cada desarrollador (nunca en git ni en un chat); quien quiera usar la misma base repite los pasos 2–4 y 6.
+
+Comandos en **PowerShell**, uno por línea, desde `services\api`.
+
+### 1. Crear (o elegir) el proyecto
+
+1. Entra en <https://supabase.com/dashboard> con la cuenta de TrackFlow.
+2. **New project** → organización de la cuenta, nombre `trackflow` (o el que prefieras), **Database Password** con
+   *Generate a password* y **guárdala en tu gestor de contraseñas** (Supabase no la vuelve a mostrar). Región: la más
+   cercana a donde corra la API (p. ej. *West EU (Ireland)* si la arrancas desde España). Plan Free.
+3. Espera a que el proyecto termine de crearse (un par de minutos).
+
+Si ya tienes un proyecto, sirve el mismo: las tablas `skus`, `stock_entries` y `stock_exits` se crean en el esquema
+`public` y no tocan nada más (si ya existieran tablas con esos nombres, avisa antes de seguir).
+
+### 2. Copiar la cadena de conexión *Session pooler*
+
+1. En el proyecto, botón **Connect** (arriba) → cadena de conexión → método **Session pooler**.
+2. Copia la URI. Tiene esta forma (el host exacto, `aws-<n>-<región>.pooler.supabase.com`, cópialo tal cual):
+   `postgresql://postgres.<project-ref>:[YOUR-PASSWORD]@<host-del-pooler>:5432/postgres`
+
+Por qué *Session pooler*: la conexión directa (`db.<project-ref>.supabase.co`) solo funciona por IPv6 salvo que se pague
+el complemento IPv4, y el *Transaction pooler* (puerto 6543) no admite *prepared statements*, que psycopg usa.
+
+### 3. Ponerla en `services/api/.env`
+
+Edita tu `.env` (ignorado en git; si no existe, `Copy-Item .env.example .env`) y añade la línea con estos cambios sobre
+la URI copiada:
+
+- prefijo `postgresql+psycopg://` en vez de `postgresql://`;
+- tu contraseña en lugar de `[YOUR-PASSWORD]` (sin los corchetes);
+- `?sslmode=require` al final (cifra la conexión);
+- todo **entre comillas dobles**.
+
+```dotenv
+DATABASE_URL="postgresql+psycopg://postgres.<project-ref>:<contraseña>@<host-del-pooler>:5432/postgres?sslmode=require"
+```
+
+Si la contraseña tiene `@ : / ? # % &` o espacios, codifícala antes de pegarla (la generada por Supabase no suele
+tenerlos):
+
+```powershell
+[uri]::EscapeDataString('tu-contraseña')
+```
+
+### 4. Instalar dependencias, crear las tablas y cargar los datos
+
+```powershell
+cd services\api
+uv sync
+uv run --env-file .env seed-inventory
+```
+
+La primera ejecución crea las tablas y carga 6 SKUs, 7 entradas y 4 salidas, firmadas por el primer administrador de
+`db/auth.json` (o el email que pases: `uv run --env-file .env seed-inventory <email>`). Si la repites, no duplica nada.
+La URL que imprime oculta la contraseña. Si falla con `OperationalError`, revisa host, usuario
+(`postgres.<project-ref>`, con el punto), contraseña y que el proyecto no esté pausado.
+
+### 5. Activar RLS en las tres tablas
+
+En Supabase → **SQL Editor** → *New query*, ejecuta:
+
+```sql
+alter table public.skus enable row level security;
+alter table public.stock_entries enable row level security;
+alter table public.stock_exits enable row level security;
+```
+
+Por qué: las tablas creadas por SQL (como hace SQLModel) no llevan RLS. Desde el 30-10-2026 Supabase ya no las expone en
+su API pública (Data API) sin un `GRANT`, pero activar RLS sin políticas cierra esa puerta igualmente si algún día se
+expone el esquema. A la API de TrackFlow no le afecta: se conecta como `postgres`, dueño de las tablas (probado en
+local: lecturas y escrituras siguen funcionando). Comprueba después **Advisors → Security Advisor**: no debería quedar
+ningún aviso de estas tablas.
+
+### 6. Arrancar la API y comprobarlo
+
+```powershell
+uv run --env-file .env uvicorn app.main:app --reload --port 8000
+```
+
+1. En Supabase → **Table Editor**: `skus` (6 filas), `stock_entries` (7) y `stock_exits` (4).
+2. En <http://localhost:8000/docs>: **Authorize** con tu usuario y `GET /inventory/products` → `CLT-SNK-W-42` con
+   `current_stock` 53, `CSM-SRM-030` con 117, etc. (ver [Datos semilla](#datos-semilla)).
+3. Una salida de 29 unidades de `CLT-SNK-W-42-Z` (`sku_id` 2, `ZGZ`) → 400 «Insufficient stock … Available: 28,
+   requested: 29.»
+
+### Volver a SQLite y otras notas
+
+- Para volver a la base local, comenta la línea `DATABASE_URL` del `.env` y reinicia la API. Los datos de Supabase y
+  de `db/inventory.db` son independientes.
+- **Los tests nunca usan Supabase:** `tests/conftest.py` fija una base SQLite temporal en cada test.
+- Si se filtra la contraseña: Supabase → **Project Settings → Database → Reset database password** y actualiza el
+  `.env`.
+- El plan Free **pausa el proyecto** tras unos días sin uso; se reactiva desde el panel (mientras tanto, `/inventory`
+  responde 500 y el resto de la API sigue funcionando).
+- Solo cambia la base del inventario: usuarios, proveedores e incidencias siguen en TinyDB (`db/*.json`).
 
 ## Limitaciones conocidas
 
