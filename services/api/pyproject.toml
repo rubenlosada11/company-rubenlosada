@@ -20,6 +20,8 @@ dependencies = [
 seed = "app.seed:main"
 # `uv run create-admin <email>`: crea (o promueve) el primer administrador en TinyDB.
 create-admin = "app.create_admin:main"
+# `uv run seed-inventory [email]`: SKUs y movimientos de ejemplo del inventario (Hito 5, idempotente).
+seed-inventory = "app.seed_inventory:main"
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13"]
