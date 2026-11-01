@@ -39,7 +39,7 @@
   [`CONTEXT-gestor-inventario.es.md`](../CONTEXT-gestor-inventario.es.md); ticket TRK-0341): API `/inventory` en
   `services/api` con SQLModel (SQLite local, `DATABASE_URL` para Supabase), stock calculado por almacén y seed
   `uv run seed-inventory`. **Implementado y validado** en `feature/inventory-orm`; documentación en `docs/inventario.md`.
-  Commits `Hito 5 — …` hechos (6, escalonados), Supabase conectado y comprobado, PR hacia `main` abierta: falta
+  Commits `Hito 5 — …` hechos (6, escalonados), Supabase conectado y comprobado, rama subida a `origin` y **PR #18 abierta** hacia `main`: falta
   revisarla y fusionarla.
 - **Última actualización:** 2026-10-31.
 
@@ -56,7 +56,7 @@
 | Autenticación frontend (AUTH-02) | ✅ PR #13 fusionada (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE` |
 | Gestión de errores | ✅ PR #16 fusionada (`7435c5f`): API 789 tests, paquete + scripts 196, navegador 41 + 36 |
 | Pruebas unitarias (AUTH-088, API-042, FE-019) | ✅ PR #17 fusionada (`39af495`); cifras en `TESTING.md` |
-| Hito 5 — Inventario (`/inventory`) | 🟡 Implementado y validado en `feature/inventory-orm` (API 1158 tests, 116 del inventario; 8 mutaciones detectadas); 6 commits; Supabase conectado (2026-11-01) y comprobado; PR hacia `main` abierta |
+| Hito 5 — Inventario (`/inventory`) | 🟡 Implementado y validado en `feature/inventory-orm` (API 1160 tests, 118 del inventario; 8 mutaciones detectadas); Supabase conectado (2026-11-01) y comprobado; **PR #18 abierta**, falta fusionarla |
 | Gestor de incidencias | ✅ PR #15 fusionada (`2d90092`): paquete + scripts 192 tests, API 751 tests, navegador 69 + 64 + 33 + 44 + 22 |
 | Recuperación y cambio de contraseña (AUTH-03) | ✅ PR #14 fusionada (`f586bb3`): API completa: persistencia, email, los tres endpoints y cambio de email con contraseña (473 tests) `/forgot-password` (E2E 39/39) y `/reset-password` (E2E 51/51) enlace en `/login` (E2E 26/26) y `/account/change-password` (E2E 42/42); E2E de punta a punta 33/33 con emails reales; regresión de AUTH-02 en verde |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
@@ -1150,6 +1150,8 @@ todas las fases sin confirmación salvo algo muy crítico y **parar antes de los
   scratchpad que no imprime la contraseña ni lee el `.env`: PostgreSQL 17 vía *Session pooler* (`eu-west-1`, puerto
   5432, `sslmode=require`, SSL en uso), `skus` 6 · `stock_entries` 7 · `stock_exits` 4, RLS activado en las tres y
   stock 53/28/52/117/35/50; API del desarrollador en `:8000` con `/health` 200.
+- **Entrega:** sexto commit `bcd90bd` (driver y guía de Supabase), push de `feature/inventory-orm` (`main` sin cambios
+  desde `39af495`) y **PR #18** hacia `main` con las validaciones reales; capturas, a mano por el desarrollador.
 
 ## Trabajo pendiente
 
@@ -1219,5 +1221,5 @@ todas las fases sin confirmación salvo algo muy crítico y **parar antes de los
    existentes desde AUTH-088) y automatice `validate-delivery`.
 6. Decidir la subida de `next` a 16.3.8 (website y backoffice) en una rama propia (avisos de seguridad detectados en
    AUTH-088; PR #17 ya fusionada).
-7. Hito 5: revisar y fusionar la PR de `feature/inventory-orm`; después, Hito 5 a `delivered` (`docs/hitos.md`,
+7. Hito 5: revisar y fusionar la PR #18 (`feature/inventory-orm`); después, Hito 5 a `delivered` (`docs/hitos.md`,
    `milestones.ts`).
