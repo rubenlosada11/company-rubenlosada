@@ -224,6 +224,23 @@ de prueba con bases temporales y `next start`: productos 18/18, entrada 29/29, s
 backend y el cambio rápido de producto), historial 21/21, integración 41/41 (navegación, stock coherente al volver al
 listado, axe WCAG A/AA sin incidencias en las cuatro vistas, 390 y 768 px) y sesión 12/13 (ver limitaciones).
 
+**Capturas de la interfaz:** tomadas por el desarrollador en local (API con SQLite y datos semilla, usuario ficticio),
+en [`uis/backoffice/screenshots/gestión de inventario/`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/). Las tres de «Salida 400»
+reproducen el caso del stock que cambia entre que se consulta y se envía: el backend tiene la última palabra.
+
+| Evidencia | Qué muestra | Captura |
+| --- | --- | --- |
+| Listado de productos | `/inventory/products`: 6 SKUs con `current_stock` y su nivel (saludable, bajo, crítico) y las tarjetas de recuento | [`Listado de productos.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Listado%20de%20productos.jpeg) |
+| Entrada: formulario | Producto elegido por nombre · SKU · almacén y su stock actual (9, crítico) antes de registrar 25 unidades | [`Registro de entrada producto.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Registro%20de%20entrada%20producto.jpeg) |
+| Entrada: confirmación | «Entrada n.º 8 registrada» con el stock nuevo (34) y el formulario limpio | [`Registro de entrada producto confirmación y stock actual.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Registro%20de%20entrada%20producto%20confirmaci%C3%B3n%20y%20stock%20actual.jpeg) |
+| Salida: aviso de stock | Despacho de 56 con 52 disponibles: aviso junto a la cantidad y botón desactivado | [`Registro de salida con aviso de stock.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Registro%20de%20salida%20con%20aviso%20de%20stock.jpeg) |
+| Salida 400 (1/3): pestaña A | Pérdida de 20 con 28 disponibles, válida, sin enviar | [`Registro salida pestaña A sin enviar.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Registro%20salida%20pesta%C3%B1a%20A%20sin%20enviar.jpeg) |
+| Salida 400 (2/3): pestaña B | Otra salida de 15 del mismo producto en otra pestaña: quedan 13 | [`Registro salida pestaña B y actualización de stock.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Registro%20salida%20pesta%C3%B1a%20B%20y%20actualizaci%C3%B3n%20de%20stock.jpeg) |
+| Salida 400 (3/3): pestaña A enviada | La API rechaza la salida (400) y el mensaje sale en español junto a la cantidad; el stock se vuelve a pedir (13) | [`Registro salida pestaña A enviada y aviso stock.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Registro%20salida%20pesta%C3%B1a%20A%20enviada%20y%20aviso%20stock.jpeg) |
+| Historial completo | `/inventory/orders`: 15 movimientos con tipo, producto, cantidad con signo, fecha, detalle y `user_uuid` («Tú») | [`Historial de movimientos completo.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Historial%20de%20movimientos%20completo.jpeg) |
+| Historial filtrado | Filtro por producto: los 4 movimientos de un SKU | [`Historial de movimientos completo con filtro producto.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Historial%20de%20movimientos%20completo%20con%20filtro%20producto.jpeg) |
+| Ruta protegida | Sin sesión, `/inventory/products` lleva a `/login?next=%2Finventory%2Fproducts` | [`Ruta protegida.png`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Ruta%20protegida.png) |
+
 ## Conectar Supabase
 
 La API ya trae el driver de PostgreSQL (`psycopg[binary]`) y se probó contra un **PostgreSQL 16 local** (los 107 tests

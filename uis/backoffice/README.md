@@ -148,6 +148,7 @@ cada página enlaza además con las otras tres. `/inventory` lleva al listado de
 - Las entradas y salidas se registran en el almacén del SKU (la API lo usa por defecto; el formulario no envía
   `warehouse`).
 - Fechas en `es-ES` y en la zona horaria del navegador, como el gestor de incidencias.
+- Capturas en [`screenshots/gestión de inventario/`](./screenshots/gesti%C3%B3n%20de%20inventario/): [listado](./screenshots/gesti%C3%B3n%20de%20inventario/Listado%20de%20productos.jpeg), [entrada](./screenshots/gesti%C3%B3n%20de%20inventario/Registro%20de%20entrada%20producto%20confirmaci%C3%B3n%20y%20stock%20actual.jpeg), [aviso de stock](./screenshots/gesti%C3%B3n%20de%20inventario/Registro%20de%20salida%20con%20aviso%20de%20stock.jpeg), [400 de la API](./screenshots/gesti%C3%B3n%20de%20inventario/Registro%20salida%20pesta%C3%B1a%20A%20enviada%20y%20aviso%20stock.jpeg), [historial](./screenshots/gesti%C3%B3n%20de%20inventario/Historial%20de%20movimientos%20completo.jpeg) y [ruta protegida](./screenshots/gesti%C3%B3n%20de%20inventario/Ruta%20protegida.png); las diez, con qué muestra cada una, en [`docs/inventario.md`](../../docs/inventario.md#interfaz-en-el-backoffice).
 
 ## Qué ocurre cuando algo falla
 
