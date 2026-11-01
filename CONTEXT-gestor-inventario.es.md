@@ -1,8 +1,6 @@
 # BRIEFING — Hito 5: Gestión de Inventario Backend
 ## Empresa: TrackFlow
 
-**Ruta:** `05-backend-inventory-orm/trackflow-BRIEFING.es.md`
-
 ---
 
 ## Tu Empresa

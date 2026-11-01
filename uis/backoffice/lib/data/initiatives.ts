@@ -14,7 +14,7 @@ export const INITIATIVES: readonly Initiative[] = [
     detail: "Stock en tiempo real de cualquier SKU en cualquiera de los dos almacenes.",
     status: "foundation",
     foundation:
-      "Hito 5 (services/api, /inventory): SKUs, entradas y salidas con stock calculado por almacén. Falta la interfaz, la base de producción y datos reales.",
+      "Hito 5 (services/api, /inventory): SKUs, entradas y salidas con stock calculado por almacén, e interfaz en el backoffice (/inventory). Falta la base de producción y datos reales.",
   },
   {
     id: "wh-order-ingestion",

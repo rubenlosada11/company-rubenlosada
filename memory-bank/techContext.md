@@ -47,7 +47,7 @@ El `.gitignore` raíz contiene `node_modules/`, los cachés de Python (`__pycach
   `[tool.uv.sources]`); desarrollo: pytest 9 + `httpx2` (Starlette 1.7 marca obsoleto `httpx` en `TestClient`) +
   `pytest-cov` 7.1 (cobertura; `[tool.coverage.run] source = ["app"]`).
 - **Tests JS:** solo en `uis/backoffice`: Jest 30 + `@types/jest` (dev), `jest.config.mjs` con `next/jest` (SWC y alias
-  `@/`), entorno `node` sin jsdom.
+  `@/`), entorno `node` sin jsdom. `lib/inventory.test.ts` simula `fetch` y `window` (Hito 5).
   Paquete `app/` sin `src/` (`uv_build` con `module-root = ""`), entrypoint `app.main:app`. Solo local por ahora.
   Además, `talent-pipeline-tracker` consume la API pública de Talent Tracker
   (`https://playground.4geeks.com/tracker/api/v1`).
@@ -368,6 +368,27 @@ Contexto: `CONTEXT-gestor-inventario.es.md` (ticket TRK-0341). Documentación: `
 | Seed `uv run seed-inventory [email]`: firmado por un usuario existente (primer admin activo por defecto); SKUs por código; movimientos solo si no hay ninguno | Regla 4 (UUIDs reales de TinyDB) e idempotencia sin duplicar movimientos |
 | `.env.example` con `# DATABASE_URL="…"` comentada | Autorizado por el desarrollador (2026-11-01); comentada = SQLite local |
 | Hito con número: commits `Hito 5 — …` escalonados, entrada en `docs/hitos.md` y en `lib/data/milestones.ts` (`in-progress`); iniciativa «API de inventario unificada» como `foundation` | El briefing es el Hito 5; convención de hitos (memoria del desarrollador) |
+
+## Decisiones técnicas del Hito 5 — Interfaz de inventario (backoffice)
+
+Rama `feature/inventory-backoffice` (2026-11-01). Documentación: `uis/backoffice/README.md` («Qué muestran las rutas
+`/inventory/…`») y `docs/inventario.md` («Interfaz en el backoffice»).
+
+| Decisión | Motivo |
+| --- | --- |
+| Rutas `app/(panel)/inventory/{products,orders,orders/inbound,orders/outbound}`; `/inventory` redirige a products | Rutas del prompt sin el prefijo `/backoffice` (es la raíz de la app); el grupo `(panel)` ya las protege con `AuthGate` |
+| `lib/inventory.ts` único punto de llamada, sobre `lib/http.ts` (nueva opción `baseUrl` en `ApiOptions` y `http.get`) | Reutiliza Bearer, 401 → logout, tiempo máximo y errores; ningún componente llama a `fetch` |
+| `NEXT_PUBLIC_INVENTORY_API_URL` con respaldo en `NEXT_PUBLIC_API_BASE_URL` | La pide el prompt; hoy es la misma API y el token solo vale en ella. Solo URL: nunca secretos |
+| Guards de forma en las respuestas (`isProduct`, `isStockEntry`, `isStockExit`, `isMovement`) | «Respuestas inesperadas» del prompt sin `any` ni `as`; un 200 raro da un mensaje legible |
+| Umbrales de presentación `STOCK_THRESHOLDS` (crítico ≤ 10, bajo ≤ 30; agotado ≤ 0) | El CONTEXT no define mínimos; elegidos con los datos semilla y documentados como no oficiales |
+| Stock reactivo con `GET /inventory/products/{id}` (`useProductStock`): `AbortController` + resultado ligado a `skuId` y versión | Endpoint real; evita mostrar el stock anterior y que una respuesta antigua pise la nueva |
+| Bloqueo de envío solo con dato fiable; el 400 de la regla 2 se traduce (regex del mensaje literal) y va a `quantity` | La API es la autoridad; el texto del briefing está en inglés y la UI nunca muestra inglés técnico |
+| Movimientos sin `warehouse` en el cuerpo (almacén del SKU) | Es lo que hace la API por defecto y lo que muestra el formulario; `current_stock` es el de ese almacén |
+| Selector «nombre · SKU · almacén»; preselección por `?sku_id=` leída en el servidor (`searchParams`) | El mismo nombre existe en LA y ZGZ; patrón de `/login`; un id inexistente se avisa y se ignora |
+| Historial con filtros de la API (`warehouse`, `sku_id`), clave `movement_type-id`, «Tú» con `useAuth` | Entradas y salidas tienen numeración propia; sin endpoint de usuarios para cualquier rol |
+| Tablas: `relative` + región enfocable en el historial | Hallazgos reales: `sr-only` ensanchaba la página en móvil; axe `scrollable-region-focusable` |
+| `Badge` con tono `red` | Stock crítico/agotado; sin tocar los tonos existentes |
+| Pruebas en navegador fuera del repo con una API de prueba (`:8021`, bases temporales) y backoffice en `:3003` | Convención del repo; no tocar el `.env` ni Supabase del desarrollador |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 
