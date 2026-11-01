@@ -17,5 +17,7 @@ This folder holds **cross-cutting documentation** for the monorepo: architecture
 - [`pruebas-analizador-incidencias.md`](./pruebas-analizador-incidencias.md) — analyzer test record (in Spanish).
 - [`gestor-incidencias.md`](./gestor-incidencias.md) — centralized incident manager: model, historical CSV seed,
   endpoints, backoffice pages, error handling, tests and limitations (in Spanish).
+- [`inventario.md`](./inventario.md) — Milestone 5, inventory backend: `/inventory` API with SQLModel, mapping to the
+  briefing's file structure, per-warehouse stock rules, seed data, Supabase and limitations (in Spanish).
 - [`despliegue-api.md`](./despliegue-api.md) — deployment instructions (not executed) for `services/api` and the
   production backoffice: tarball, `uv`, variables, proxy, authentication and checks (in Spanish).

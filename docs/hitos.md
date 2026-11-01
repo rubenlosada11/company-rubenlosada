@@ -38,3 +38,13 @@ negocio completo en [`CONTEXT.es.md`](../CONTEXT.es.md) y [`CONTEXT-trackflow.es
 | Descripción | Infraestructura para agentes de programación: memory bank (`projectbrief`, `techContext`, `progress`), protocolo `AGENTS.md` (lectura inicial, flujo previo a cada commit, áreas que requieren confirmación), regla `project-conventions` (`scope: always`) y skill `validate-delivery` con dos scripts de comprobación. Además, dos aplicaciones Next.js independientes derivadas de `CONTEXT.es.md`: web corporativa pública (`website`, puerto 3001) y aplicación interna (`backoffice`, puerto 3002). Sin backend. |
 | Demo pública | Website: [websitetrackflow.rubenlosada.com](https://websitetrackflow.rubenlosada.com/) · Backoffice: [backofficetrackflow.rubenlosada.com](https://backofficetrackflow.rubenlosada.com/) |
 | Detalle | [`memory-bank/progress.md`](../memory-bank/progress.md), [`uis/website/README.md`](../uis/website/README.md), [`uis/backoffice/README.md`](../uis/backoffice/README.md) |
+
+## Hito 5 — Gestión de inventario backend
+
+| | |
+| --- | --- |
+| Estado | En curso: pasa a entregado al fusionar su Pull Request en `main` |
+| Carpeta | [`services/api/`](../services/api/) (`/inventory`) |
+| Descripción | API de inventario unificada de los almacenes de Los Ángeles y Zaragoza (ticket TRK-0341): SKUs, recepciones de mercancía (`StockEntry`) y salidas por despacho o pérdida (`StockExit`) con **SQLModel** (SQLite en local, preparada para PostgreSQL/Supabase con `DATABASE_URL`). El stock nunca se guarda: se calcula como entradas menos salidas y **por almacén**; ninguna salida puede dejarlo en negativo. Autenticación JWT existente (usuarios en TinyDB) y datos semilla con `uv run seed-inventory`. Sin interfaz. |
+| Demo pública | — (API solo en local) |
+| Detalle | [`docs/inventario.md`](./inventario.md), [`services/api/README.md`](../services/api/README.md#inventario-hito-5) |

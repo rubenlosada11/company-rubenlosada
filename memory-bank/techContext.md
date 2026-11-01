@@ -18,13 +18,14 @@ JS es autónomo, con su propio `package.json` y `package-lock.json`, y se opera 
 | `uis/backoffice/` | Hito 4. Aplicación interna (Next.js). |
 | `packages/shared/` | `@repo/shared-types`: tipos de dominio (`Carrier`, `Shipment`, `ReturnRequest`, `Client`) y utilidades TS puras. `dist/` está versionado. |
 | `packages/analisis-incidencias/` | Paquete Python (solo biblioteca estándar, `uv_build`, `src/`): carga, validación, métricas y exportación del CSV de incidencias de CX. Lo usan `scripts/analyze.py` y `services/api`. Contexto: `CONTEXT-incidencias.es.md`. Incluye `gestor.py`: valores, validación, transiciones y mapeos del gestor de incidencias (`CONTEXT-gestor-incidencias.es.md`), que usan la API y `scripts/seed_incidents.py`. |
-| `services/api/` | **FastAPI + Pydantic + TinyDB**, Python gestionado con **uv** (`pyproject.toml` + `uv.lock` propios), tests con `pytest`. Directorio de proveedores (`/suppliers`, contexto `CONTEXT-directorio.md`), analizador de incidencias (`/api/incidents`, contexto `CONTEXT-incidencias.es.md`), gestor de incidencias (también en `/api/incidents`; `docs/gestor-incidencias.md`) y autenticación JWT (`/auth`, `/users`, `/profiles`; `docs/autenticacion.md`), con recuperación y cambio de contraseña y emails por Resend (AUTH-03). |
+| `services/api/` | **FastAPI + Pydantic + TinyDB**, Python gestionado con **uv** (`pyproject.toml` + `uv.lock` propios), tests con `pytest`. Directorio de proveedores (`/suppliers`, contexto `CONTEXT-directorio.md`), analizador de incidencias (`/api/incidents`, contexto `CONTEXT-incidencias.es.md`), gestor de incidencias (también en `/api/incidents`; `docs/gestor-incidencias.md`) y autenticación JWT (`/auth`, `/users`, `/profiles`; `docs/autenticacion.md`), con recuperación y cambio de contraseña y emails por Resend (AUTH-03), e inventario del Hito 5 (`/inventory`, **SQLModel** sobre SQLite local; `docs/inventario.md`). |
 | `scripts/` | `analyze.py`: CLI del analizador de incidencias (+ `incidents-trackflow.csv` de prueba y `tests/`). `seed_incidents.py`: carga ese CSV en el gestor de incidencias (necesita el entorno de la API). |
 | `agents/`, `skills/`, `mcps/`, `workflows/`, `data/`, `infra/`, `internal/`, `shared/` | Solo README/plantillas (`agents/_template`, `skills/_template`). |
 | `docs/` | `hitos.md` (registro de hitos), `ARCHITECTURE_PROPOSAL.md` (propuesta de backend; no es un hito) + READMEs. |
 | `memory-bank/`, `AGENTS.md`, `.agents/` | Infraestructura para agentes (Hito 4). |
 
-No existen: `docker-compose.yml`, CI/CD (`.github/`), `Dockerfile`, base de datos de servidor. Tests automatizados:
+No existen: `docker-compose.yml`, CI/CD (`.github/`), `Dockerfile`, base de datos de servidor (el inventario usa SQLite
+local; Supabase/PostgreSQL está previsto con `DATABASE_URL`, sin conectar). Tests automatizados:
 Python (pytest) en `services/api/tests/`, `packages/analisis-incidencias/tests/` y `scripts/tests/`, y Jest en
 `uis/backoffice/lib/*.test.ts` (desde AUTH-088). Plan y resultados de las pruebas unitarias: `TESTING.md` (raíz).
 El `.gitignore` raíz contiene `node_modules/`, los cachés de Python (`__pycache__/`, `*.py[cod]`, `.pytest_cache/`) y
@@ -40,7 +41,8 @@ El `.gitignore` raíz contiene `node_modules/`, los cachés de Python (`__pycach
   externas: hooks de React. Fuentes vía `next/font/google`.
 - **Backend:** `services/api/` — Python ≥ 3.12 (máquina: 3.14.6), **uv** 0.12, FastAPI 0.141, Pydantic 2.13,
   TinyDB 4.9, uvicorn, `python-multipart` (subida de ficheros), `python-jose[cryptography]` 3.5 (JWT),
-  `libpass[bcrypt]` 1.9.3 (módulo `passlib`, bcrypt 5.0) y el paquete local `analisis-incidencias` (editable,
+  `libpass[bcrypt]` 1.9.3 (módulo `passlib`, bcrypt 5.0), **SQLModel 0.0.48** (SQLAlchemy 2.1.6; inventario, Hito 5)
+  y el paquete local `analisis-incidencias` (editable,
   `[tool.uv.sources]`); desarrollo: pytest 9 + `httpx2` (Starlette 1.7 marca obsoleto `httpx` en `TestClient`) +
   `pytest-cov` 7.1 (cobertura; `[tool.coverage.run] source = ["app"]`).
 - **Tests JS:** solo en `uis/backoffice`: Jest 30 + `@types/jest` (dev), `jest.config.mjs` con `next/jest` (SWC y alias
@@ -48,8 +50,8 @@ El `.gitignore` raíz contiene `node_modules/`, los cachés de Python (`__pycach
   Paquete `app/` sin `src/` (`uv_build` con `module-root = ""`), entrypoint `app.main:app`. Solo local por ahora.
   Además, `talent-pipeline-tracker` consume la API pública de Talent Tracker
   (`https://playground.4geeks.com/tracker/api/v1`).
-- **Arquitectura objetivo propuesta (no implementada; hoy `services/api/` solo contiene el directorio de
-  proveedores con TinyDB):** una única app **FastAPI** en
+- **Arquitectura objetivo propuesta (no implementada; hoy `services/api/` contiene proveedores, incidencias y
+  autenticación sobre TinyDB e inventario sobre SQLModel, sin la división por dominios):** una única app **FastAPI** en
   `services/api/` como **monolito modular por dominios** (`commercial`, `last_mile`, `reverse_logistics`,
   `warehouse`, `customer_service`, `reporting`, `identity`), capas router → servicio → repositorio, capa
   `integrations/` para transportistas/SGA/ERP, API en `/api/v1`, configuración con `pydantic-settings`, CORS con
@@ -131,6 +133,8 @@ navegador se hacen fuera del repo (Edge + `playwright-core` en el scratchpad).
 | Tests | `uv run pytest -q` |
 | Solo las pruebas unitarias de autenticación o del backoffice (AUTH-088, API-042) | `uv run pytest tests/auth` · `uv run pytest tests/backoffice` |
 | Cobertura de toda la API (líneas y ramas); por ámbito, ver `TESTING.md` | `uv run pytest --cov --cov-branch --cov-report=term-missing` |
+| Cargar los SKUs y movimientos de ejemplo del inventario (idempotente; necesita un usuario en TinyDB: por defecto el primer admin) | `uv run seed-inventory` · `uv run seed-inventory <email>` |
+| Solo los tests del inventario (Hito 5) | `uv run pytest tests/test_inventory.py tests/test_seed_inventory.py tests/test_inventory_database.py` |
 | Cargar el CSV histórico en el gestor de incidencias (idempotente; **desde la raíz del repo**, con la API parada) | `uv run --project services/api python scripts/seed_incidents.py` |
 
 Analizador de incidencias (Python ≥ 3.11 del sistema, sin instalar nada):
@@ -338,6 +342,30 @@ Rama `feature/auth-088-tests` (2026-10-19/20), por fases; detalle, casos y cifra
 | D-2: `decode_access_token` rechaza `int(exp) <= ahora` | python-jose aceptaba el token durante el segundo exacto de `exp` (RFC 7519 §4.1.4). `int()` como jose, para que un `exp` en texto no dé 500. |
 | Pruebas de mutación manuales (cambiar el código, ver fallar el test, restaurar) en cada fase | Un test que nunca ha fallado no demuestra nada; detectó un falso positivo propio en la infraestructura. |
 | Commits `Pruebas de autenticación — …` (escalonados), sin `docs/hitos.md` | Práctica sin hito. |
+
+## Decisiones técnicas del Hito 5 — Gestión de inventario backend
+
+Contexto: `CONTEXT-gestor-inventario.es.md` (ticket TRK-0341). Documentación: `docs/inventario.md`. Rama
+`feature/inventory-orm` (2026-10-31), sin paradas intermedias por indicación del desarrollador.
+
+| Decisión | Motivo |
+| --- | --- |
+| Integrado en `services/api/app/` y no en la estructura literal del briefing (`services/main.py`, `routers/`…) | La API ya existe con su autenticación; una segunda app FastAPI es un cambio de arquitectura (`AGENTS.md`). Equivalencias en `docs/inventario.md` |
+| `inventory_models.py` / `inventory_schemas.py` / `routes/inventory.py` / `services/inventory.py` | `app/models.py` ya es el de proveedores; patrón `auth_models.py`/`incident_models.py`; la carpeta de routers es `routes/` |
+| SQLModel con SQLite por defecto (`db/inventory.db`) y `DATABASE_URL` para PostgreSQL/Supabase | El briefing pide SQLModel y Supabase, pero no hay proyecto ni credenciales (área de secretos). Sin driver `psycopg`: no se puede validar y se añade al conectar |
+| Motor creado al primer uso (`get_engine`), `create_all` sin Alembic; se sustituye si cambia `DATABASE_URL` | Si la base falla, solo falla el inventario (500 genérico); los tests usan una base SQLite por test. `TestClient` sin `with` no ejecuta el `lifespan` |
+| SQLite: `check_same_thread=False` + `PRAGMA foreign_keys=ON` en cada conexión | Pool de hilos de FastAPI; SQLite no comprueba las FK por defecto |
+| `current_stock` = stock del almacén del SKU + `stock_by_warehouse` `{LA, ZGZ}`; listado con desglose, nunca total | Regla 6 y nota de evaluación «por almacén, no agregado». Los movimientos llevan su propio `warehouse` (opcional; por defecto el del SKU) |
+| Salida: comprobar y escribir bajo `threading.Lock` + `SELECT … FOR UPDATE` del SKU | Dos salidas simultáneas no gastan el mismo stock (test con 10 hilos). El candado cubre un solo worker |
+| Mensaje de stock insuficiente literal en inglés; el resto, en español | El briefing fija el texto; convención del repo para los demás |
+| `tracking_number` validado en `StockExitCreate` (`validate_default`) → 422 en el campo; vacío = nulo | «Error de validación» del briefing; también cuando el campo no se envía |
+| `user_uuid` = `sub` del JWT; `id`/`created_at`/`user_uuid` del cuerpo se ignoran | Regla 4 sin modelo `User` en SQL; nadie firma movimientos por otro |
+| Código `sku` único sin distinguir mayúsculas → 409 (comprobación + índice único) | El mensaje de la regla 2 identifica el SKU por su código |
+| `created_at` `DateTime(timezone=True)`; los schemas devuelven siempre UTC | SQLite pierde la zona horaria al leer |
+| `quantity` entero estricto > 0 y ≤ 2.147.483.647 | Rechaza `"5"`, `5.0` y `true`; cabe en `INTEGER` de PostgreSQL |
+| Seed `uv run seed-inventory [email]`: firmado por un usuario existente (primer admin activo por defecto); SKUs por código; movimientos solo si no hay ninguno | Regla 4 (UUIDs reales de TinyDB) e idempotencia sin duplicar movimientos |
+| `.env.example` sin tocar | Área que requiere confirmación; `DATABASE_URL` documentada en el README de la API |
+| Hito con número: commits `Hito 5 — …` escalonados, entrada en `docs/hitos.md` y en `lib/data/milestones.ts` (`in-progress`); iniciativa «API de inventario unificada» como `foundation` | El briefing es el Hito 5; convención de hitos (memoria del desarrollador) |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 
