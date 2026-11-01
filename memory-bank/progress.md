@@ -43,7 +43,8 @@
 - **Hito 5 — Interfaz de inventario en el backoffice:** `/inventory/products`, `/inventory/orders/inbound`,
   `/inventory/orders/outbound` y `/inventory/orders`, con un único módulo de integración (`lib/inventory.ts`).
   **Implementado y validado** en `feature/inventory-backoffice`, por fases (prompt del curso) sin paradas intermedias
-  por indicación del desarrollador. **PR #19 fusionada** (`01ddccb`). **Hito 5 entregado** (2026-11-01).
+  por indicación del desarrollador. **PR #19 fusionada** (`01ddccb`). **Hito 5 entregado** (2026-11-01): PR #20 de
+  cierre fusionada (`7f6a1b6`) y registrado en Notion («Hitos — TrackFlow» y «Prácticas — Bootcamp»).
 - **Última actualización:** 2026-11-01.
 
 | Componente | Estado |
@@ -1197,6 +1198,14 @@ todas las fases sin confirmación salvo algo muy crítico y **parar antes de los
 - **Cierre (2026-11-01):** el desarrollador revisó y fusionó la PR #19 (`01ddccb`). Rama `feature/hito-5-cierre`:
   Hito 5 a `delivered` en `lib/data/milestones.ts` (el panel muestra «Entregado»), sin la fila «Estado» en
   `docs/hitos.md` (como los demás hitos entregados) y texto de «Hitos del proyecto» en el README del backoffice.
+  **PR #20 fusionada** por el desarrollador (`7f6a1b6`, 2026-11-01 23:05).
+- **Notion (2026-11-01):** a petición del desarrollador, registro de las dos partes del hito (API y backoffice) en la
+  página «AI Engineering»: ficha «Hito 5 — Gestión de inventario (API + backoffice)» en «Hitos — TrackFlow» (formato
+  del Hito 4, Completado, sin demo pública) y entrada en «Prácticas — Bootcamp» con una guía didáctica para la
+  defensa (herramientas, reglas, decisiones, Supabase, interfaz, pruebas, teoría, preguntas probables y guion de
+  demo). Secciones nuevas en «Chuleta · Levantar APIs y webs» (inventario con Supabase) y en «Apuntes de SQL» (SQL del
+  Hito 5). Sin cambios en «Demos públicas» (el hito no está desplegado). Horas de fusión en Notion tomadas de
+  `mergedAt` (PR #18 19:05, #19 22:33, #20 23:05, hora local).
 
 ## Trabajo pendiente
 
@@ -1266,5 +1275,5 @@ todas las fases sin confirmación salvo algo muy crítico y **parar antes de los
    existentes desde AUTH-088) y automatice `validate-delivery`.
 6. Decidir la subida de `next` a 16.3.8 (website y backoffice) en una rama propia (avisos de seguridad detectados en
    AUTH-088; PR #17 ya fusionada).
-7. Hito 5 entregado: revisar y fusionar la PR de cierre (`feature/hito-5-cierre`). Pendientes del hito, sin fecha:
+7. Hito 5 entregado (PR #18–#20 fusionadas; registrado en Notion). Pendientes del hito, sin fecha:
    permisos por rol, aviso de sesión caducada intermitente y limitaciones de `docs/inventario.md`.
