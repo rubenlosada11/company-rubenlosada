@@ -367,7 +367,7 @@ Contexto: `CONTEXT-gestor-inventario.es.md` (ticket TRK-0341). Documentación: `
 | `quantity` entero estricto > 0 y ≤ 2.147.483.647 | Rechaza `"5"`, `5.0` y `true`; cabe en `INTEGER` de PostgreSQL |
 | Seed `uv run seed-inventory [email]`: firmado por un usuario existente (primer admin activo por defecto); SKUs por código; movimientos solo si no hay ninguno | Regla 4 (UUIDs reales de TinyDB) e idempotencia sin duplicar movimientos |
 | `.env.example` con `# DATABASE_URL="…"` comentada | Autorizado por el desarrollador (2026-11-01); comentada = SQLite local |
-| Hito con número: commits `Hito 5 — …` escalonados, entrada en `docs/hitos.md` y en `lib/data/milestones.ts` (`in-progress`); iniciativa «API de inventario unificada» como `foundation` | El briefing es el Hito 5; convención de hitos (memoria del desarrollador) |
+| Hito con número: commits `Hito 5 — …` escalonados, entrada en `docs/hitos.md` y en `lib/data/milestones.ts` (`in-progress`; `delivered` tras fusionar las PR #18 y #19); iniciativa «API de inventario unificada» como `foundation` | El briefing es el Hito 5; convención de hitos (memoria del desarrollador) |
 
 ## Decisiones técnicas del Hito 5 — Interfaz de inventario (backoffice)
 

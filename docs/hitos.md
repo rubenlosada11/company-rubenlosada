@@ -43,7 +43,6 @@ negocio completo en [`CONTEXT.es.md`](../CONTEXT.es.md) y [`CONTEXT-trackflow.es
 
 | | |
 | --- | --- |
-| Estado | En curso: pasa a entregado al fusionar su Pull Request en `main` |
 | Carpeta | [`services/api/`](../services/api/) (`/inventory`) y [`uis/backoffice/`](../uis/backoffice/) (`/inventory/…`) |
 | Descripción | API de inventario unificada de los almacenes de Los Ángeles y Zaragoza (ticket TRK-0341): SKUs, recepciones de mercancía (`StockEntry`) y salidas por despacho o pérdida (`StockExit`) con **SQLModel** (SQLite en local, preparada para PostgreSQL/Supabase con `DATABASE_URL`). El stock nunca se guarda: se calcula como entradas menos salidas y **por almacén**; ninguna salida puede dejarlo en negativo. Autenticación JWT existente (usuarios en TinyDB) y datos semilla con `uv run seed-inventory`. Interfaz de operaciones en el backoffice: productos con indicadores de stock, registro de entradas y de salidas (con stock reactivo y aviso de stock insuficiente) e historial de movimientos de solo lectura. |
 | Demo pública | — (API solo en local) |
