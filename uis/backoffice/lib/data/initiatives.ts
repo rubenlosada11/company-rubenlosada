@@ -3,7 +3,7 @@ import type { Initiative } from "@/types";
 /**
  * Fuente: CONTEXT.es.md, apartado “Qué necesitan” de cada departamento.
  * Todas son necesidades identificadas; solo se marcan como `foundation` las que ya tienen base técnica real
- * en el repo (Hito 2, packages/shared). Ninguna está implementada como producto.
+ * en el repo (Hito 2, packages/shared; Hito 5, API de inventario). Ninguna está implementada como producto.
  */
 export const INITIATIVES: readonly Initiative[] = [
   // Operaciones de almacén
@@ -12,7 +12,9 @@ export const INITIATIVES: readonly Initiative[] = [
     areaId: "warehouse",
     title: "API de inventario unificada",
     detail: "Stock en tiempo real de cualquier SKU en cualquiera de los dos almacenes.",
-    status: "identified",
+    status: "foundation",
+    foundation:
+      "Hito 5 (services/api, /inventory): SKUs, entradas y salidas con stock calculado por almacén. Falta la interfaz, la base de producción y datos reales.",
   },
   {
     id: "wh-order-ingestion",

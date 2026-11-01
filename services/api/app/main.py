@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.errors import UnexpectedErrorMiddleware, unexpected_error, validation_error
-from app.routes import auth, incident_manager, incidents, profiles, suppliers, users
+from app.routes import auth, incident_manager, incidents, inventory, profiles, suppliers, users
 from app.security import ConfigError, check_auth_config
 from app.services.email import check_email_config
 
@@ -47,8 +47,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title="TrackFlow API",
     description=(
-        "Directorio de proveedores de TrackFlow (USA + Spain), analizador de incidencias de CX y gestor de "
-        "incidencias. "
+        "Directorio de proveedores de TrackFlow (USA + Spain), analizador de incidencias de CX, gestor de "
+        "incidencias e inventario unificado de los almacenes de Los Ángeles y Zaragoza (`/inventory`). "
         "Autenticación con Bearer JWT: `POST /auth/login` (o el botón «Authorize»)."
     ),
     version="0.1.0",
@@ -83,6 +83,7 @@ app.include_router(profiles.router)
 app.include_router(suppliers.router)
 app.include_router(incidents.router)
 app.include_router(incident_manager.router)
+app.include_router(inventory.router)
 
 
 # Errores que no gestiona ningún router (ver `app/errors.py`): 422 sin los valores recibidos y, como último recurso

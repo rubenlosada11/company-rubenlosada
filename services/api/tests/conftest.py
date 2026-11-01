@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.auth_models import Role, UserCreate
-from app.database import suppliers_table
+from app.database import dispose_engine, suppliers_table
 from app.main import app
 from app.security import create_access_token
 from app.seed import seed
@@ -36,6 +36,15 @@ def incidents_db_path(tmp_path, monkeypatch):
     path = tmp_path / "db" / "incidents.json"
     monkeypatch.setenv("INCIDENTS_DB_PATH", str(path))
     return path
+
+
+@pytest.fixture(autouse=True)
+def inventory_db_url(tmp_path, monkeypatch):
+    """Base SQLite temporal del inventario en todos los tests (nunca toca `db/inventory.db` ni una base real)."""
+    url = f"sqlite:///{(tmp_path / 'db' / 'inventory.db').as_posix()}"
+    monkeypatch.setenv("DATABASE_URL", url)
+    yield url
+    dispose_engine()
 
 
 @pytest.fixture

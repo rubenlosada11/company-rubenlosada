@@ -1,15 +1,17 @@
 [project]
 name = "trackflow-api"
 version = "0.1.0"
-description = "API de TrackFlow: directorio de proveedores (FastAPI + Pydantic + TinyDB) y analizador de incidencias."
+description = "API de TrackFlow: directorio de proveedores, incidencias y autenticación (FastAPI + Pydantic + TinyDB) e inventario (SQLModel)."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "analisis-incidencias",
     "fastapi>=0.141.1",
     "libpass[bcrypt]>=1.9.3",
+    "psycopg[binary]>=3.3.6",
     "python-jose[cryptography]>=3.5.0",
     "python-multipart>=0.0.32",
+    "sqlmodel>=0.0.48",
     "tinydb>=4.9.0",
     "uvicorn>=0.54.0",
 ]
@@ -19,6 +21,8 @@ dependencies = [
 seed = "app.seed:main"
 # `uv run create-admin <email>`: crea (o promueve) el primer administrador en TinyDB.
 create-admin = "app.create_admin:main"
+# `uv run seed-inventory [email]`: SKUs y movimientos de ejemplo del inventario (Hito 5, idempotente).
+seed-inventory = "app.seed_inventory:main"
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13"]

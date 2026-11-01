@@ -6,7 +6,7 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/auth-088-tests` (desde `main` @ `7435c5f`, que ya incluye las PR #3–#16).
+- **Rama de trabajo:** `feature/inventory-orm` (desde `main` @ `39af495`, que ya incluye las PR #3–#17).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (práctica sin número de hito; contexto en
@@ -34,9 +34,14 @@
   autenticación (`services/api/tests/auth/`, 12 endpoints) y del backoffice (`tests/backoffice/`: proveedores y gestor
   de incidencias), Jest en `uis/backoffice` (utilidades de autenticación, proveedores e incidencias), `TESTING.md` en la
   raíz y dos defectos reales corregidos (D-1, D-2). Implementadas y validadas en `feature/auth-088-tests`: 8 commits,
-  rama subida a `origin` y registrada en Notion («Prácticas — Bootcamp»). **PR #17 abierta** hacia `main` (a petición del
-  desarrollador): falta revisarla y fusionarla.
-- **Última actualización:** 2026-10-20.
+  rama subida a `origin` y registrada en Notion («Prácticas — Bootcamp»). **PR #17 fusionada** (`39af495`).
+- **Hito 5 — Gestión de inventario backend** (contexto en
+  [`CONTEXT-gestor-inventario.es.md`](../CONTEXT-gestor-inventario.es.md); ticket TRK-0341): API `/inventory` en
+  `services/api` con SQLModel (SQLite local, `DATABASE_URL` para Supabase), stock calculado por almacén y seed
+  `uv run seed-inventory`. **Implementado y validado** en `feature/inventory-orm`; documentación en `docs/inventario.md`.
+  Commits `Hito 5 — …` hechos (6, escalonados), Supabase conectado y comprobado, rama subida a `origin` y **PR #18 abierta** hacia `main`: falta
+  revisarla y fusionarla.
+- **Última actualización:** 2026-10-31.
 
 | Componente | Estado |
 | --- | --- |
@@ -50,7 +55,8 @@
 | Autenticación (AUTH-01) | ✅ API: `User`/`Profile` en TinyDB, JWT, `/auth`, `/users`, `/profiles` y 8 rutas existentes protegidas (269 tests). Backoffice: `/login` y panel protegido (E2E 34/34). Solo local |
 | Autenticación frontend (AUTH-02) | ✅ PR #13 fusionada (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE` |
 | Gestión de errores | ✅ PR #16 fusionada (`7435c5f`): API 789 tests, paquete + scripts 196, navegador 41 + 36 |
-| Pruebas unitarias (AUTH-088, API-042, FE-019) | 🟡 Implementadas y validadas en `feature/auth-088-tests` (cifras en `TESTING.md`); PR #17 abierta, falta fusionarla |
+| Pruebas unitarias (AUTH-088, API-042, FE-019) | ✅ PR #17 fusionada (`39af495`); cifras en `TESTING.md` |
+| Hito 5 — Inventario (`/inventory`) | 🟡 Implementado y validado en `feature/inventory-orm` (API 1160 tests, 118 del inventario; 8 mutaciones detectadas); Supabase conectado (2026-11-01) y comprobado; **PR #18 abierta**, falta fusionarla |
 | Gestor de incidencias | ✅ PR #15 fusionada (`2d90092`): paquete + scripts 192 tests, API 751 tests, navegador 69 + 64 + 33 + 44 + 22 |
 | Recuperación y cambio de contraseña (AUTH-03) | ✅ PR #14 fusionada (`f586bb3`): API completa: persistencia, email, los tres endpoints y cambio de email con contraseña (473 tests) `/forgot-password` (E2E 39/39) y `/reset-password` (E2E 51/51) enlace en `/login` (E2E 26/26) y `/account/change-password` (E2E 42/42); E2E de punta a punta 33/33 con emails reales; regresión de AUTH-02 en verde |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
@@ -1091,6 +1097,62 @@ fase 5e, el desarrollador autorizó continuar sin paradas salvo decisiones impor
   en la base de Notion «Prácticas — Bootcamp». PR #17 abierta después, cuando el desarrollador lo pidió (el prompt
   pedía no crearla por iniciativa propia).
 
+### 2026-10-31 — Hito 5: Gestión de inventario backend (rama `feature/inventory-orm`)
+
+Briefing `CONTEXT-gestor-inventario.es.md` (Hito 5, ticket TRK-0341 de Andrés Kim). El desarrollador pidió ejecutar
+todas las fases sin confirmación salvo algo muy crítico y **parar antes de los commits** con un resumen.
+
+- **Ubicación:** integrado en `services/api/app/` (no una segunda app en `services/`): `database.py` (motor SQLModel +
+  `get_db`), `inventory_models.py`, `inventory_schemas.py`, `routes/inventory.py`, `services/inventory.py` y
+  `seed_inventory.py`. Tabla de equivalencias con la estructura del briefing en `docs/inventario.md`.
+- **Base de datos:** SQLModel 0.0.48 (SQLAlchemy 2.1.6), única dependencia nueva. SQLite en `db/inventory.db` por
+  defecto; `DATABASE_URL` para PostgreSQL/Supabase (no conectado: sin credenciales ni driver `psycopg`). Tablas creadas
+  al primer uso, sin migraciones.
+- **Reglas:** stock calculado (dos `SUM` agrupados por SKU y almacén), salida rechazada antes de escribir con el mensaje
+  literal del briefing (candado + `with_for_update`), `tracking_number` validado en el schema (422), `user_uuid` del
+  token (TinyDB), `warehouse` en los tres modelos. **Regla 6:** `current_stock` = stock del almacén del SKU +
+  `stock_by_warehouse` con LA y ZGZ por separado; el listado muestra el desglose, nunca un total.
+- **Decisiones propias** (detalle en `techContext.md`): código `sku` único sin distinguir mayúsculas (409), `warehouse`
+  opcional en los movimientos (por defecto el del SKU), rutas protegidas con JWT, filtros `warehouse`/`sku_id`, seed
+  firmado por un usuario existente de TinyDB e idempotente.
+- **Validación:** API 1158 passed (`-W error::DeprecationWarning`; 116 del inventario); cobertura del inventario 100 %
+  en modelos, schemas, router y servicio y 95 % en el seed; 8 mutaciones manuales detectadas; API arrancada en `:8021`
+  con bases temporales: `/health` 200 y los 6 endpoints probados con `curl` (401, 200, 201, 400 literal, 404, 409, 422)
+  sin errores en el log; también `:8000` (`/health`, `/docs` y `/inventory/*` → 200). `uv lock --check` OK. Backoffice
+  (Hito 5 «En curso» en `milestones.ts` e iniciativa de inventario como base técnica): lint, typecheck, Jest 91 passed y
+  build OK; `npm run start` + `check-route.mjs` → `/` 200 con «Gestión de inventario backend» y `/login` 200, sin errores
+  en el servidor. `check-hygiene.mjs` OK.
+- **No tocado (requiere confirmación):** `.env.example` (añadir `DATABASE_URL` comentada), Supabase y el driver.
+- **Commits (2026-11-01):** el desarrollador aprobó el plan e incluir el CONTEXT. Cinco commits `Hito 5 — …` (briefing y
+  motor SQLModel; schemas, reglas y endpoints; seed; backoffice; documentación y memory bank). Cada uno validado sobre
+  su propio índice exportado (`git checkout-index`): suite completa de la API en los dos primeros y tests del
+  inventario en el tercero (mismo código que la carpeta de trabajo, 1158 passed). También autorizó la línea
+  `DATABASE_URL` comentada en `.env.example` y pidió conectar Supabase (su cuenta ya existe): va en un commit aparte.
+
+### 2026-11-01 — Hito 5: preparación de Supabase (rama `feature/inventory-orm`)
+
+- **Driver:** `psycopg[binary]` 3.3.6 (autorizado al pedir la conexión). Con PostgreSQL, `connect_timeout` de 10 s
+  (`POSTGRES_CONNECT_TIMEOUT_SECONDS`) para que una base inalcanzable no deje la petición colgada.
+- **Seed:** mensajes nuevos para driver ausente (pide `postgresql+psycopg://` y `uv sync`) y base inalcanzable (revisar
+  `DATABASE_URL` y que el proyecto no esté pausado), sin mostrar la contraseña. +2 tests (118 del inventario).
+- **`.env.example`:** `# DATABASE_URL="postgresql+psycopg://postgres.<project-ref>:<contraseña>@<host-del-pooler>:5432/postgres?sslmode=require"`
+  comentada (autorizado).
+- **Guía** paso a paso en `docs/inventario.md` («Conectar Supabase»): proyecto, cadena *Session pooler* (IPv4; la
+  directa es IPv6 y el *Transaction pooler* no admite *prepared statements*), `.env`, `uv sync`, seed, **RLS** en las
+  tres tablas (desde el 30-10-2026 Supabase no expone tablas nuevas en la Data API sin `GRANT`; RLS como segunda
+  barrera) y comprobación.
+- **Validación contra PostgreSQL 16 real** (`pgserver` en el scratchpad, fuera del repo; Docker Desktop estaba
+  parado y no se arrancó): 107 tests del inventario con un plugin de pytest que redirige la URL (los 4 restantes
+  cambian `DATABASE_URL` a propósito), seed dos veces (idempotente) y API en `:8021` con `curl` (200, 201, 400 literal,
+  404, 409, 422) antes y después de activar RLS; esquema con `timestamptz`, FKs e índice único. Procesos parados.
+- **Conectado (2026-11-01):** el desarrollador creó el proyecto en su cuenta de Supabase, puso `DATABASE_URL` en su
+  `.env`, ejecutó el seed y el SQL de RLS. Comprobado por el agente con `uv run --env-file .env` y un script del
+  scratchpad que no imprime la contraseña ni lee el `.env`: PostgreSQL 17 vía *Session pooler* (`eu-west-1`, puerto
+  5432, `sslmode=require`, SSL en uso), `skus` 6 · `stock_entries` 7 · `stock_exits` 4, RLS activado en las tres y
+  stock 53/28/52/117/35/50; API del desarrollador en `:8000` con `/health` 200.
+- **Entrega:** sexto commit `bcd90bd` (driver y guía de Supabase), push de `feature/inventory-orm` (`main` sin cambios
+  desde `39af495`) y **PR #18** hacia `main` con las validaciones reales; capturas, a mano por el desarrollador.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -1102,6 +1164,10 @@ fase 5e, el desarrollador autorizó continuar sin paradas salvo decisiones impor
 - Tras fusionar cada PR, actualizar la rama local: `git checkout main` y `git pull`.
 
 **Decisiones abiertas (requieren confirmación; ver `projectbrief.md`)**
+
+- Hito 5 (inventario): decidir permisos por rol (operarios / coordinadores) y si hace falta una
+  página del inventario en el backoffice. Hito 5 pasa a `delivered` en `docs/hitos.md` y `milestones.ts` al fusionar
+  su PR.
 
 - Despliegue de la API (`docs/despliegue-api.md`): topología (A subdominio / B mismo host) y, si es A, el subdominio
   y su DNS; quitar el Basic Auth del proxy delante de la API (choca con el Bearer). **Desplegar la API antes que el
@@ -1153,5 +1219,7 @@ fase 5e, el desarrollador autorizó continuar sin paradas salvo decisiones impor
    API y luego el backoffice, y más adelante sustituir los “datos de partida” estáticos de `lib/data/`.
 5. Valorar añadir CI (requiere confirmación) que ejecute `uv run pytest` y `npm test` del backoffice (runners ya
    existentes desde AUTH-088) y automatice `validate-delivery`.
-6. Pruebas unitarias (AUTH-088): revisar y fusionar la PR #17 (`feature/auth-088-tests`); decidir la subida de `next` a
-   16.3.8 (website y backoffice) en una rama propia.
+6. Decidir la subida de `next` a 16.3.8 (website y backoffice) en una rama propia (avisos de seguridad detectados en
+   AUTH-088; PR #17 ya fusionada).
+7. Hito 5: revisar y fusionar la PR #18 (`feature/inventory-orm`); después, Hito 5 a `delivered` (`docs/hitos.md`,
+   `milestones.ts`).

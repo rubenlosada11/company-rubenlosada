@@ -1,6 +1,6 @@
-# TrackFlow API — Directorio de proveedores, analizador y gestor de incidencias
+# TrackFlow API — Proveedores, incidencias e inventario
 
-API de TrackFlow con tres módulos, protegidos con autenticación JWT:
+API de TrackFlow con cuatro módulos, protegidos con autenticación JWT:
 
 - **Directorio de proveedores** (`/suppliers`): el registro centralizado que sustituye a las hojas de cálculo de Carlos
   Vega (Carrier Operations) y Ana Whitfield (Warehouse Operations) y unifica los mercados de USA y España. Fuente de
@@ -12,12 +12,17 @@ API de TrackFlow con tres módulos, protegidos con autenticación JWT:
   de las incidencias de TrackFlow, con el CSV del analizador como datos iniciales. Fuente de verdad:
   [`CONTEXT-gestor-incidencias.es.md`](../../CONTEXT-gestor-incidencias.es.md). Ver
   [Gestor de incidencias](#gestor-de-incidencias).
+- **Inventario (Hito 5)** (`/inventory`): SKUs de los almacenes de Los Ángeles y Zaragoza y sus entradas y salidas de
+  stock, con el stock calculado siempre por almacén. Base SQL con **SQLModel** (SQLite en local; PostgreSQL/Supabase
+  con `DATABASE_URL`). Fuente de verdad: [`CONTEXT-gestor-inventario.es.md`](../../CONTEXT-gestor-inventario.es.md).
+  Ver [Inventario](#inventario-hito-5) y la documentación completa en [`docs/inventario.md`](../../docs/inventario.md).
 - **Autenticación** (`/auth`, `/users`, `/profiles`): usuarios y perfiles en TinyDB, login con JWT Bearer y protección
   de rutas. Ver [Autenticación](#autenticación) y la documentación completa en
   [`docs/autenticacion.md`](../../docs/autenticacion.md).
 
 **Stack:** Python ≥ 3.12, [uv](https://docs.astral.sh/uv/), FastAPI, Pydantic y TinyDB (base de datos en un fichero
-JSON). Sin ORM, Docker ni base de datos de servidor: TinyDB es una elección deliberada de este ejercicio. La consumen
+JSON) para proveedores, incidencias y usuarios, una elección deliberada de esos ejercicios. El inventario usa SQLModel
+(SQLAlchemy) sobre SQLite en local o PostgreSQL/Supabase (driver psycopg). Sin Docker. La consumen
 las páginas `/proveedores`, `/incidencias` y `/gestor-incidencias` del [backoffice](../../uis/backoffice/README.md).
 
 > Todas las rutas de proveedores e incidencias exigen un token (`Authorization: Bearer`). Solo son públicas
@@ -35,7 +40,7 @@ uv sync
 ```
 
 `uv sync` crea `.venv/` e instala las versiones exactas de `uv.lock` (FastAPI, Pydantic, TinyDB, uvicorn,
-python-multipart, python-jose, libpass con bcrypt y el paquete local `analisis-incidencias` en modo editable; y
+python-multipart, python-jose, libpass con bcrypt, SQLModel y el paquete local `analisis-incidencias` en modo editable; y
 pytest + httpx2 + pytest-cov para los tests).
 
 ## Ejecución
@@ -70,6 +75,7 @@ uv run --env-file .env uvicorn app.main:app --reload --port 8000
 | `AUTH_DB_PATH` | `services/api/db/auth.json` | Fichero de TinyDB de usuarios y perfiles |
 | `SUPPLIERS_DB_PATH` | `services/api/db/suppliers.json` | Fichero de TinyDB de proveedores |
 | `INCIDENTS_DB_PATH` | `services/api/db/incidents.json` | Fichero de TinyDB del gestor de incidencias |
+| `DATABASE_URL` | SQLite en `services/api/db/inventory.db` | Base SQL del inventario (URL de SQLAlchemy). Para Supabase/PostgreSQL (cadena *Session pooler*, `postgresql+psycopg://…?sslmode=require`, entre comillas) ver [`docs/inventario.md`](../../docs/inventario.md#conectar-supabase) |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3002,http://127.0.0.1:3002` | Orígenes del navegador autorizados (el backoffice). Admite la cabecera `Authorization` y expone `Content-Disposition` para las descargas |
 
 ## Seeder
@@ -396,6 +402,37 @@ idempotente: la segunda ejecución da 0 insertadas y 95 duplicadas. Tras el seed
 29 `open`, 52 `resolved` y 14 `discarded`; y 14 `lost_parcel`, 45 `carrier_issue`, 19 `delivery_failure` y 17
 `returns_issue`, los valores esperados del CONTEXT. Para empezar de cero, borra `db\incidents.json` y repítelo.
 
+## Inventario (Hito 5)
+
+Endpoints en [`app/routes/inventory.py`](./app/routes/inventory.py), tablas SQLModel en
+[`app/inventory_models.py`](./app/inventory_models.py), schemas en [`app/inventory_schemas.py`](./app/inventory_schemas.py)
+y reglas de negocio en [`app/services/inventory.py`](./app/services/inventory.py). Documentación completa (equivalencia
+con la estructura del briefing, reglas, decisiones, Supabase y limitaciones): [`docs/inventario.md`](../../docs/inventario.md).
+
+| Método y ruta | Éxito | Errores |
+| --- | --- | --- |
+| `GET /inventory/products` | 200 + SKUs con `current_stock` y `stock_by_warehouse` (filtro opcional `warehouse`) | 422 |
+| `POST /inventory/products` | 201 + SKU con stock 0 | 409 código repetido · 422 |
+| `GET /inventory/products/{id}` | 200 + SKU con su stock | 404 · 422 |
+| `POST /inventory/orders/inbound` | 201 + `StockEntry` | 404 SKU inexistente · 422 |
+| `POST /inventory/orders/outbound` | 201 + `StockExit` | 400 `Insufficient stock for SKU '…'. Available: n, requested: m.` · 404 · 422 (`dispatch` sin `tracking_number`, `loss` con él) |
+| `GET /inventory/orders` | 200 + entradas y salidas con los datos del SKU, de la más reciente a la más antigua (filtros `warehouse`, `sku_id`) | 422 |
+
+- Todos exigen `Authorization: Bearer <token>` (401 sin él). `user_uuid` es siempre el usuario del token (TinyDB).
+- **Stock por almacén:** `current_stock` es el stock en el almacén del SKU y `stock_by_warehouse` el de LA y ZGZ por
+  separado; nunca se suman. Cada salida se comprueba contra el stock de su almacén, antes de escribir.
+- Datos semilla (6 SKUs del briefing, 7 entradas y 4 salidas), idempotentes y firmados por un usuario de TinyDB (el
+  primer administrador o el del email indicado):
+
+```powershell
+uv run seed-inventory
+uv run seed-inventory operario@trackflow.test
+```
+
+- **Supabase:** pon `DATABASE_URL` en el `.env` y ejecuta `uv run --env-file .env seed-inventory` (crea las tablas y
+  carga los datos) y la API con `--env-file .env`. Guía paso a paso, con la activación de RLS:
+  [`docs/inventario.md`](../../docs/inventario.md#conectar-supabase).
+
 ## Tests
 
 ```powershell
@@ -403,9 +440,9 @@ uv run pytest -q
 uv run pytest --cov --cov-branch --cov-report=term-missing
 ```
 
-1042 tests con pytest: los 789 de integración con `TestClient` (gestor y analizador de incidencias, directorio de
+1160 tests con pytest: los 789 de integración con `TestClient` (gestor y analizador de incidencias, directorio de
 proveedores, autenticación, recuperación y cambio de contraseña y gestión de errores; cada uno sobre una base TinyDB
-temporal, nunca tocan `db/*.json`) y, desde AUTH-088, 253 unitarios por endpoint: 165 de autenticación en
+temporal, nunca tocan `db/*.json`), los 118 del inventario (Hito 5, con una base SQLite temporal por test) y, desde AUTH-088, 253 unitarios por endpoint: 165 de autenticación en
 [`tests/auth/`](./tests/auth/) y 88 del backoffice (proveedores y gestor de incidencias) en
 [`tests/backoffice/`](./tests/backoffice/). Plan, casos, cobertura por ámbito y defectos encontrados:
 [`TESTING.md`](../../TESTING.md). No hace falta `.env`: [`tests/conftest.py`](./tests/conftest.py) pone una `SECRET_KEY` de pruebas
@@ -427,6 +464,9 @@ funcionando con un token válido.
 | [`tests/test_password_reset.py`](./tests/test_password_reset.py) | AUTH-03: enlaces (solo hash, caducidad, un solo uso, concurrencia, límite de 60 s, limpieza), `forgot-password` (misma respuesta exista o no el email), `reset-password` (tokens no válidos, cierre de sesiones), `change-password` y cambio de email con contraseña |
 | [`tests/test_errors.py`](./tests/test_errors.py) | Gestión de errores común: 500 genérico con CORS fuera del gestor, fichero de base corrupto o ilegible (`StorageError`, candado liberado), 422 sin los valores recibidos, logs sin datos personales, nombre de fichero saneado y arranque con configuración no válida |
 | [`tests/test_email.py`](./tests/test_email.py) | AUTH-03: configuración de Resend y `MAIL_FROM`, petición exacta a la API de Resend, errores del proveedor, logs sin datos sensibles y plantilla del email |
+| [`tests/test_inventory.py`](./tests/test_inventory.py) | Inventario: los 6 endpoints, 401, 409, 404, 422, regla de stock insuficiente con el mensaje literal, `tracking_number` según `exit_type`, stock por almacén, salidas simultáneas, `user_uuid` del token y base no disponible |
+| [`tests/test_seed_inventory.py`](./tests/test_seed_inventory.py) | Inventario: SKUs idénticos al briefing, mínimos de los datos semilla, stock resultante, idempotencia, usuario de TinyDB y salida por consola |
+| [`tests/test_inventory_database.py`](./tests/test_inventory_database.py) | Inventario: `DATABASE_URL`, creación de tablas, cambio de motor y claves foráneas en SQLite |
 | [`tests/auth/`](./tests/auth/) | AUTH-088: un módulo por endpoint de autenticación y autorización (registro, login, `/auth/token`, validación del token, `/me`, recuperación, reset, cambio de contraseña y los cuatro de `/users`), con reloj congelado y red bloqueada |
 | [`tests/backoffice/`](./tests/backoffice/) | API-042: un módulo por endpoint de proveedores (6) y del gestor de incidencias (5), llamando a las funciones del router |
 
@@ -461,6 +501,7 @@ Los datos se guardan con **TinyDB** en un fichero JSON en disco, así que sobrev
 | Cambiar la ruta | variable de entorno `SUPPLIERS_DB_PATH` (los tests usan un fichero temporal) |
 | Usuarios y perfiles | `services/api/db/auth.json`, tablas `users` y `profiles` (el `id` es un UUID); variable `AUTH_DB_PATH` |
 | Incidencias del gestor | `services/api/db/incidents.json`, tabla `incidents` (el `id` es el `doc_id`); variable `INCIDENTS_DB_PATH` |
+| Inventario (SQL) | `services/api/db/inventory.db` (SQLite) o Supabase, tablas `skus`, `stock_entries` y `stock_exits`; variable `DATABASE_URL` |
 | Git | `db/` está en `.gitignore`: la base local no se versiona |
 
 El acceso está en [`app/database.py`](./app/database.py): cada uso abre el fichero, trabaja con la tabla y lo cierra
@@ -470,29 +511,33 @@ El acceso está en [`app/database.py`](./app/database.py): cada uso abre el fich
 
 ```text
 services/api/
-├── pyproject.toml        # dependencias (incl. ../../packages/analisis-incidencias), scripts `seed` y `create-admin`
+├── pyproject.toml        # dependencias (incl. ../../packages/analisis-incidencias), scripts `seed`, `create-admin` y `seed-inventory`
 ├── uv.lock
 ├── .env.example          # SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES, REGISTRATION_CODE, RESEND_API_KEY, MAIL_FROM… (copiar a .env, ignorado)
 ├── app/
 │   ├── main.py           # FastAPI, CORS, JSON UTF-8, logger `trackflow`, /health, comprobación de SECRET_KEY
 │   ├── models.py         # modelos Pydantic de proveedores y valores válidos del CONTEXT
 │   ├── incident_models.py  # modelos del gestor de incidencias (valores y reglas del paquete compartido)
+│   ├── inventory_models.py   # tablas SQLModel del inventario: SKU, StockEntry, StockExit
+│   ├── inventory_schemas.py  # schemas de petición y respuesta del inventario (current_stock calculado)
 │   ├── auth_models.py    # User, Profile, Role, PasswordResetToken y schemas de entrada/salida de autenticación
 │   ├── security.py       # bcrypt, JWT, código de invitación y enlaces de recuperación (configuración desde el entorno)
 │   ├── email_templates.py  # email de recuperación de contraseña (HTML + texto)
 │   ├── dependencies.py   # OAuth2PasswordBearer + get_current_user
-│   ├── database.py       # TinyDB (proveedores, usuarios e incidencias)
+│   ├── database.py       # TinyDB (proveedores, usuarios e incidencias) + motor SQLModel y get_db (inventario)
 │   ├── seed.py           # `uv run seed`
 │   ├── create_admin.py   # `uv run create-admin <email>`
+│   ├── seed_inventory.py # `uv run seed-inventory [email]`
 │   ├── services/         # users.py, profiles.py (CRUD en TinyDB), password_reset.py (enlaces), email.py (Resend),
-│   │                     # incidents.py (gestor de incidencias)
+│   │                     # incidents.py (gestor de incidencias), inventory.py (stock y reglas del inventario)
 │   └── routes/
 │       ├── auth.py       # /auth
 │       ├── users.py      # /users
 │       ├── profiles.py   # /profiles
 │       ├── suppliers.py  # /suppliers
 │       ├── incidents.py  # /api/incidents (analizador: /analyze y /results/export)
-│       └── incident_manager.py  # /api/incidents (gestor: alta, listado, detalle, estado y resumen)
+│       ├── incident_manager.py  # /api/incidents (gestor: alta, listado, detalle, estado y resumen)
+│       └── inventory.py  # /inventory (SKUs y movimientos de stock)
 ├── tests/
 └── db/                   # base local (ignorada en git)
 ```
@@ -526,3 +571,6 @@ Las del backoffice (proveedores con filtros y análisis de incidencias) están e
   Pydantic, no TinyDB (ver [`docs/gestor-incidencias.md`](../../docs/gestor-incidencias.md#limitaciones)).
 - El último análisis de incidencias vive en memoria: se pierde al reiniciar, es compartido por todos los usuarios y con
   varios workers la exportación podría no encontrarlo.
+- Inventario: Supabase preparado, pero cada desarrollador pone su propia `DATABASE_URL` en el `.env`; sin migraciones
+  ni paginación, sin permisos por rol y con la regla de stock protegida para un solo worker en SQLite (ver
+  [`docs/inventario.md`](../../docs/inventario.md#limitaciones-conocidas)).

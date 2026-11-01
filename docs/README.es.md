@@ -15,5 +15,7 @@ Esta carpeta contiene la **documentación transversal** del monorepo: guías de 
 - [`pruebas-analizador-incidencias.md`](./pruebas-analizador-incidencias.md) — registro de pruebas del analizador.
 - [`gestor-incidencias.md`](./gestor-incidencias.md) — gestor de incidencias centralizado: modelo, seed del CSV
   histórico, endpoints, páginas del backoffice, manejo de errores, tests y limitaciones.
+- [`inventario.md`](./inventario.md) — Hito 5, gestión de inventario backend: API `/inventory` con SQLModel,
+  equivalencia con la estructura del briefing, reglas de stock por almacén, datos semilla, Supabase y limitaciones.
 - [`despliegue-api.md`](./despliegue-api.md) — instrucciones (no ejecutadas) para desplegar `services/api` y conectar
   el backoffice de producción: tarball, `uv`, variables, proxy, autenticación y verificación.
