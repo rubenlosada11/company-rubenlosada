@@ -2,8 +2,9 @@
 
 Aplicación interna de TrackFlow Tech. Muestra la estructura del negocio, el backlog de iniciativas de TrackFlow
 Tech y el estado de los hitos del proyecto **a partir del contexto de empresa** (ruta `/`), el **directorio de
-proveedores** (ruta `/proveedores`), el **analizador de incidencias** de CX (ruta `/incidencias`) y el **gestor de
-incidencias** (rutas `/gestor-incidencias` y `/gestor-incidencias/nueva`), estos tres conectados a la API [`services/api`](../../services/api/README.md). **Se entra con login** (ruta `/login`) o creando
+proveedores** (ruta `/proveedores`), el **analizador de incidencias** de CX (ruta `/incidencias`), el **gestor de
+incidencias** (rutas `/gestor-incidencias` y `/gestor-incidencias/nueva`) y la **gestión de inventario** del Hito 5
+(rutas `/inventory/…`, ver [Inventario](#qué-muestran-las-rutas-inventory)), estos cuatro conectados a la API [`services/api`](../../services/api/README.md). **Se entra con login** (ruta `/login`) o creando
 una cuenta (ruta `/register`), con un token JWT; cada usuario edita sus datos de contacto en `/account/profile`, cambia
 su contraseña en `/account/change-password` y, si la olvida, la recupera por email desde `/forgot-password` (ver
 [Acceso](#acceso-login-registro-perfil-y-contraseña)).
@@ -27,7 +28,7 @@ Next.js (App Router) + React + TypeScript + Tailwind CSS, con las mismas version
 | --- | --- | --- |
 | `/login` | pública | Email y contraseña → `POST /auth/login` → token en `localStorage` → `GET /auth/me` → vuelve a `?next=` (solo rutas internas) o a `/`. Mensajes de la API en español (credenciales incorrectas, cuenta desactivada, API caída, sesión caducada o cerrada). |
 | `/register` | pública | Email, contraseña, nombre, teléfono y dirección (opcionales) y código de invitación → `POST /users` → login automático → `/`. Errores por campo (los de la API, traducidos); 409 con enlace al login; 403 si el código no es válido. |
-| `/`, `/proveedores`, `/incidencias`, `/gestor-incidencias`, `/gestor-incidencias/nueva` | **privada** | Panel. Sin sesión → `/login?next=<ruta>`. |
+| `/`, `/proveedores`, `/incidencias`, `/gestor-incidencias`, `/gestor-incidencias/nueva`, `/inventory/products`, `/inventory/orders/inbound`, `/inventory/orders/outbound`, `/inventory/orders` | **privada** | Panel. Sin sesión → `/login?next=<ruta>`. |
 | `/account/profile` | **privada** | `GET /auth/me`: email y rol (solo lectura) y nombre, teléfono y dirección editables con `PUT /profiles/me`. Tarjeta «Seguridad» con el acceso al cambio de contraseña. |
 | `/forgot-password` | pública | AUTH-03. Email → `POST /auth/forgot-password` → «Revisa tu correo» con un mensaje **fijo** que no revela si el email existe. Se llega desde «¿Olvidaste tu contraseña?» del login. |
 | `/reset-password?token=…` | pública | AUTH-03. Enlace del email (sin `Referer`). Nueva contraseña + confirmación → `POST /auth/reset-password` → `/login?motivo=restablecida`. Sin token o con un enlace no válido, caducado o usado: aviso y «Volver a recuperar contraseña». |
@@ -120,6 +121,35 @@ de las sedes son las del CONTEXT. Capturas:
 [listado con datos](./screenshots/screenshot%20gestor%20listado.png) y
 [resumen con métricas](./screenshots/screenshot%20gestor%20resumen.png).
 
+## Qué muestran las rutas `/inventory/…`
+
+Interfaz del inventario unificado de Los Ángeles y Zaragoza (Hito 5), sobre la API `/inventory` ya existente.
+Entidades, campos y reglas: [`CONTEXT-gestor-inventario.es.md`](../../CONTEXT-gestor-inventario.es.md); API y
+decisiones: [`docs/inventario.md`](../../docs/inventario.md). En el menú: **Inventario** e **Historial de movimientos**;
+cada página enlaza además con las otras tres. `/inventory` lleva al listado de productos.
+
+| Ruta | Qué hace | Llamada a la API |
+| --- | --- | --- |
+| `/inventory/products` | SKUs con nombre, código, cliente, categoría, almacén y **`current_stock`** (el del almacén del SKU; si hay unidades en el otro almacén se indican aparte, nunca sumadas). Indicador de nivel con color y texto: *Stock saludable*, *Stock bajo*, *Stock crítico* o *Agotado*, y tarjetas con el recuento. Cada fila tiene **Registrar entrada** y **Registrar salida** (`?sku_id=<id>`). Carga, error con «Reintentar», listado vacío y «Actualizar» (un fallo al actualizar conserva la tabla) | `GET /inventory/products` |
+| `/inventory/orders/inbound` | Recepción de mercancía: producto (selector por nombre · SKU · almacén, nunca un id escrito a mano), cantidad y referencia del cliente. Muestra el stock actual del producto elegido. Confirmación con el stock nuevo y formulario limpio; los errores conservan lo escrito | `GET /inventory/products`, `GET /inventory/products/{id}`, `POST /inventory/orders/inbound` |
+| `/inventory/orders/outbound` | Despacho o pérdida: producto, tipo de salida, número de seguimiento (solo en despachos) y cantidad. Al elegir producto se pide su stock a la API y se muestra antes de escribir la cantidad; si la cantidad lo supera (o el producto está agotado) aparece un aviso junto al campo y no se puede enviar. El **400 de stock insuficiente** de la API se muestra en español junto a la cantidad, sin limpiar el formulario, y se vuelve a pedir el stock | `GET /inventory/products`, `GET /inventory/products/{id}`, `POST /inventory/orders/outbound` |
+| `/inventory/orders` | Historial **de solo lectura**: fecha, tipo (entrada / salida con su tipo, con color, icono, signo y texto), producto, almacén, cantidad, referencia o seguimiento y `user_uuid` (marcado «Tú» si es el usuario conectado). Filtros de la API por almacén y producto | `GET /inventory/orders?warehouse=…&sku_id=…` |
+
+- **Una sola capa de integración:** [`lib/inventory.ts`](./lib/inventory.ts) (`inventoryApi`). Usa `lib/http.ts`, que
+  añade el Bearer de la sesión y gestiona 401, tiempo máximo y errores de red. Ningún componente llama a `fetch`. Las
+  respuestas se comprueban antes de mostrarlas: un 200 con otra forma da un mensaje legible.
+- **Umbrales de stock:** son **de presentación, no reglas de negocio** (el CONTEXT no define mínimos):
+  agotado ≤ 0, crítico 1–10, bajo 11–30 y saludable > 30, en `STOCK_THRESHOLDS` de `lib/inventory.ts`.
+- **Cambios rápidos de producto en la salida:** cada consulta de stock se cancela al cambiar de producto y su
+  resultado solo se usa si corresponde a la selección actual. Mientras llega se muestra «Consultando el stock
+  actual…», nunca el stock del producto anterior.
+- **La API manda:** la validación de cliente es una ayuda; el backend vuelve a comprobar el stock (regla 2) y su
+  respuesta es la definitiva.
+- Las entradas y salidas se registran en el almacén del SKU (la API lo usa por defecto; el formulario no envía
+  `warehouse`).
+- Fechas en `es-ES` y en la zona horaria del navegador, como el gestor de incidencias.
+- Capturas en [`screenshots/gestión de inventario/`](./screenshots/gesti%C3%B3n%20de%20inventario/): [listado](./screenshots/gesti%C3%B3n%20de%20inventario/Listado%20de%20productos.jpeg), [entrada](./screenshots/gesti%C3%B3n%20de%20inventario/Registro%20de%20entrada%20producto%20confirmaci%C3%B3n%20y%20stock%20actual.jpeg), [aviso de stock](./screenshots/gesti%C3%B3n%20de%20inventario/Registro%20de%20salida%20con%20aviso%20de%20stock.jpeg), [400 de la API](./screenshots/gesti%C3%B3n%20de%20inventario/Registro%20salida%20pesta%C3%B1a%20A%20enviada%20y%20aviso%20stock.jpeg), [historial](./screenshots/gesti%C3%B3n%20de%20inventario/Historial%20de%20movimientos%20completo.jpeg) y [ruta protegida](./screenshots/gesti%C3%B3n%20de%20inventario/Ruta%20protegida.png); las diez, con qué muestra cada una, en [`docs/inventario.md`](../../docs/inventario.md#interfaz-en-el-backoffice).
+
 ## Qué ocurre cuando algo falla
 
 Todas las pantallas que llaman a la API muestran un mensaje en español, sin códigos HTTP ni detalles técnicos, y una
@@ -146,6 +176,7 @@ backoffice/
 │   │   ├── incidencias/page.tsx  # ruta `/incidencias`
 │   │   ├── gestor-incidencias/page.tsx        # ruta `/gestor-incidencias` (resumen + listado)
 │   │   ├── gestor-incidencias/nueva/page.tsx  # ruta `/gestor-incidencias/nueva` (formulario)
+│   │   ├── inventory/    # `/inventory` (→ products), products/, orders/ (historial), orders/inbound/, orders/outbound/
 │   │   ├── account/profile/page.tsx  # ruta `/account/profile`
 │   │   └── account/change-password/page.tsx  # ruta `/account/change-password` (AUTH-03)
 │   ├── error.tsx, global-error.tsx, not-found.tsx  # límites de error y 404 (también `(panel)/error.tsx`, con el menú)
@@ -156,12 +187,15 @@ backoffice/
 │   ├── incidencias/      # AnalizadorIncidencias (cliente), SelectorCsv (cliente), ResultadosAnalisis, ListaBarras,
 │   │                     # TablaCruce, TablaSatisfaccion, RegistrosInvalidos
 │   ├── gestor-incidencias/  # IncidentForm, IncidentDashboard, IncidentSummary, IncidentList (cliente), IncidentRow
+│   ├── inventory/        # ProductList, InboundForm, OutboundForm, MovementHistory (cliente), formParts (selector de
+│   │                     # producto, ficha de stock, useProducts, useProductStock), StockBadge, InventoryHeader
 │   └── auth/             # AuthProvider, AuthGate, AuthShell, LoginScreen, RegisterScreen, ProfileEditor,
 │                         # SidebarAccount, UserMenu (cliente), LogoutIcon, ForgotPasswordScreen,
 │                         # ResetPasswordScreen, ChangePasswordForm
 ├── lib/
 │   ├── data/             # areas.ts, initiatives.ts, milestones.ts, baseline.ts, suppliers.ts (valores del CONTEXT),
-│   │                     # incidents.ts (sedes, categorías, orígenes, estados y transiciones del gestor)
+│   │                     # incidents.ts (sedes, categorías, orígenes, estados y transiciones del gestor),
+│   │                     # inventory.ts (almacenes, categorías y tipos de salida del inventario)
 │   ├── initiatives.ts    # lógica pura: filterInitiatives, countByArea, countByStatus
 │   ├── http.ts           # cliente HTTP de la API: fetchApi (URL base, Bearer, tiempo máximo y errores), http (JSON;
 │   │                     # errores de validación por campo, en español) y apiErrorMessage (mensaje para el usuario)
@@ -172,11 +206,12 @@ backoffice/
 │   ├── suppliers.ts      # llamadas a /suppliers, validación del formulario y formato de tarifas y fechas
 │   ├── incidencias.ts    # subida del CSV (FormData) y descarga de results.csv (blob)
 │   ├── incidents.ts      # gestor: llamadas a /api/incidents, validación del formulario y mensajes de error
+│   ├── inventory.ts      # inventario: inventoryApi (/inventory), umbrales de stock, validaciones y errores
 │   ├── formato.ts        # formato es-ES del analizador (enteros, porcentajes, medias, semanas ISO)
 │   └── nav.ts
 ├── types/                # index.ts (BusinessArea, Initiative, Milestone, Supplier…), incidencias.ts (analizador),
-│                         # incidents.ts (gestor) y auth.ts (usuario y token)
-├── .env.example          # NEXT_PUBLIC_API_BASE_URL
+│                         # incidents.ts (gestor), inventory.ts (inventario) y auth.ts (usuario y token)
+├── .env.example          # NEXT_PUBLIC_API_BASE_URL y NEXT_PUBLIC_INVENTORY_API_URL
 └── public/logo/          # logo (copiado de uis/landing)
 ```
 
@@ -188,13 +223,23 @@ npm install
 npm run dev      # http://localhost:3002
 ```
 
-Para entrar (y para `/proveedores`, `/incidencias` y `/gestor-incidencias`) hace falta la API arrancada
+Para entrar (y para `/proveedores`, `/incidencias`, `/gestor-incidencias` e `/inventory`) hace falta la API arrancada
 ([`services/api`](../../services/api/README.md), puerto 8000, con su `.env` y un usuario creado) y la URL en `.env.local` (Next.js la incrusta al compilar: tras cambiarla, reinicia `npm run dev` o repite el build). En
 Windows PowerShell:
 
 ```powershell
 Copy-Item .env.example .env.local
 ```
+
+Variables (`.env.example`; las dos van al navegador, así que **nunca** llevan tokens ni claves):
+
+| Variable | Valor local | Para qué |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8000` | API de TrackFlow: login y todas las secciones |
+| `NEXT_PUBLIC_INVENTORY_API_URL` | `http://localhost:8000` | API del inventario. Opcional: vacía o sin definir, se usa `NEXT_PUBLIC_API_BASE_URL` (hoy es la misma API y valida el mismo token) |
+
+Para tener datos en el inventario, en `services\api`: `uv run seed-inventory` (necesita un usuario creado; ver
+[`docs/inventario.md`](../../docs/inventario.md)).
 
 Producción local (también en el puerto 3002), un comando por línea:
 
@@ -217,7 +262,9 @@ npm run build
 ```
 
 Los tests unitarios de Jest (`jest.config.mjs` con `next/jest`, entorno `node`) cubren las utilidades de `lib/`:
-sesión, reglas y errores de autenticación (AUTH-088), validación y formato de proveedores e incidencias (FE-019). Plan,
+sesión, reglas y errores de autenticación (AUTH-088), validación y formato de proveedores e incidencias (FE-019) y la
+capa del inventario (`lib/inventory.test.ts`: peticiones con Bearer, URL, cuerpos, 400/401/403/404/422/500, error de
+red, respuestas vacías e inesperadas, umbrales y validaciones; Hito 5). Plan,
 casos y resultados en [`TESTING.md`](../../TESTING.md). Las pruebas en navegador se ejecutan fuera del repo (Edge +
 `playwright-core`) y se registran en la documentación de cada función (p. ej.
 [`docs/pruebas-analizador-incidencias.md`](../../docs/pruebas-analizador-incidencias.md),
@@ -239,6 +286,10 @@ node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://local
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/incidencias
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/gestor-incidencias
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/gestor-incidencias/nueva
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/inventory/products --expect "Comprobando tu sesión"
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/inventory/orders/inbound --expect "Comprobando tu sesión"
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/inventory/orders/outbound --expect "Comprobando tu sesión"
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/inventory/orders --expect "Comprobando tu sesión"
 ```
 
 ## Pendiente / fuera de alcance
@@ -256,6 +307,11 @@ node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://local
   URL pública del backoffice (ver [`docs/autenticacion.md`](../../docs/autenticacion.md#recuperación-y-cambio-de-contraseña-auth-03)).
 - Gestor de incidencias: sin paginación, edición ni borrado, y sin las alertas de incidencias sin resolver que
   menciona el CONTEXT (ver [`docs/gestor-incidencias.md`](../../docs/gestor-incidencias.md#limitaciones)).
-- Sin conexión a otros datos reales (inventario, envíos, devoluciones…): llegará con `services/` y los pipelines de
-  `data/` cuando existan.
+- Inventario: sin alta de SKUs en la interfaz (la API tiene `POST /inventory/products`; no lo pide el hito), sin
+  paginación, sin elegir un almacén distinto del del SKU en los movimientos y sin permisos por rol (cualquier usuario
+  autenticado registra movimientos). El historial muestra el `user_uuid`, no el nombre (no hay un endpoint de usuarios
+  para cualquier rol). Si se entra sin sesión a un formulario con `?sku_id=`, tras el login se vuelve al formulario sin
+  el producto (el `next` del login guarda la ruta, no la consulta). Umbrales de stock orientativos (ver arriba).
+- Sin conexión a otros datos reales (envíos, devoluciones…): llegará con `services/` y los pipelines de `data/`
+  cuando existan.
 - Mantener `lib/data/` sincronizado con `CONTEXT.es.md` y `docs/hitos.md` cuando cambien.

@@ -6,8 +6,9 @@ que sale (despacho a un cliente o pérdida confirmada). El stock **nunca se guar
 menos salidas, y por almacén. Fuente de verdad de entidades, campos, rutas, reglas y datos semilla:
 [`CONTEXT-gestor-inventario.es.md`](../CONTEXT-gestor-inventario.es.md).
 
-Es el **Hito 5** del proyecto (ver [`hitos.md`](./hitos.md)). Solo backend: vive en la API existente
-([`services/api`](../services/api/README.md)), con su autenticación JWT de TinyDB. No hay página en el backoffice.
+Es el **Hito 5** del proyecto (ver [`hitos.md`](./hitos.md)). La API vive en la existente
+([`services/api`](../services/api/README.md)), con su autenticación JWT de TinyDB, y el backoffice tiene su interfaz
+de operaciones en `/inventory/…` (ver [Interfaz en el backoffice](#interfaz-en-el-backoffice)).
 
 ## Arquitectura
 
@@ -194,6 +195,52 @@ del inventario que usan la base (incluidas las 10 salidas simultáneas con `SELE
 cambian `DATABASE_URL` a propósito), el seed (dos veces, sin duplicar) y los 6 endpoints con `curl`, antes y después de
 activar RLS. Esquema creado: `timestamptz` en `created_at`, claves foráneas e índice único en `skus.sku`.
 
+## Interfaz en el backoffice
+
+Cuatro vistas en [`uis/backoffice`](../uis/backoffice/README.md#qué-muestran-las-rutas-inventory), dentro del panel
+protegido (sin sesión → `/login?next=<ruta>`; un 401 de la API cierra la sesión):
+
+| Ruta del backoffice | Qué hace | Endpoints |
+| --- | --- | --- |
+| `/inventory/products` | SKUs con `current_stock`, desglose del otro almacén si tiene unidades, indicador de nivel y accesos a registrar entrada o salida del producto (`?sku_id=`) | `GET /inventory/products` |
+| `/inventory/orders/inbound` | Recepción: producto por nombre, cantidad y referencia; stock actual del producto elegido | `GET /inventory/products`, `GET /inventory/products/{id}`, `POST /inventory/orders/inbound` |
+| `/inventory/orders/outbound` | Despacho o pérdida con stock reactivo, aviso y bloqueo si la cantidad supera el stock, y el 400 de la regla 2 en español junto a la cantidad | `GET /inventory/products`, `GET /inventory/products/{id}`, `POST /inventory/orders/outbound` |
+| `/inventory/orders` | Historial de solo lectura con producto, cantidad, tipo, fecha y `user_uuid`; filtros por almacén y producto | `GET /inventory/orders` |
+
+- **Integración:** un único módulo, [`uis/backoffice/lib/inventory.ts`](../uis/backoffice/lib/inventory.ts), sobre el
+  cliente común `lib/http.ts` (Bearer de la sesión, 401, tiempo máximo y errores). URL:
+  `NEXT_PUBLIC_INVENTORY_API_URL` o, si no está, `NEXT_PUBLIC_API_BASE_URL` (la misma API, que valida el mismo token).
+- **Umbrales de stock** (de presentación, no de negocio): agotado ≤ 0, crítico 1–10, bajo 11–30, saludable > 30.
+- **Regla 2 en la interfaz:** el aviso de stock insuficiente es una ayuda; el backend sigue decidiendo. Si el stock ha
+  cambiado desde que se consultó, la API responde 400 y el formulario muestra
+  «Stock insuficiente para el SKU … : hay N unidades disponibles y has pedido M unidades.», conserva los datos y vuelve
+  a pedir el stock.
+- **Regla 6:** la interfaz muestra `current_stock` (almacén del SKU) y, aparte, el stock del otro almacén; nunca un total.
+  Los movimientos se registran en el almacén del SKU (el formulario no envía `warehouse`).
+
+**Pruebas de la interfaz (2026-11-01):** Jest `lib/inventory.test.ts` (57 tests, 99 % de líneas de `lib/inventory.ts`;
+3 mutaciones detectadas) y pruebas en navegador fuera del repo (Edge + `playwright-core` + `axe-core`) contra una API
+de prueba con bases temporales y `next start`: productos 18/18, entrada 29/29, salida 35/35 (incluido un 400 real del
+backend y el cambio rápido de producto), historial 21/21, integración 41/41 (navegación, stock coherente al volver al
+listado, axe WCAG A/AA sin incidencias en las cuatro vistas, 390 y 768 px) y sesión 12/13 (ver limitaciones).
+
+**Capturas de la interfaz:** tomadas por el desarrollador en local (API con SQLite y datos semilla, usuario ficticio),
+en [`uis/backoffice/screenshots/gestión de inventario/`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/). Las tres de «Salida 400»
+reproducen el caso del stock que cambia entre que se consulta y se envía: el backend tiene la última palabra.
+
+| Evidencia | Qué muestra | Captura |
+| --- | --- | --- |
+| Listado de productos | `/inventory/products`: 6 SKUs con `current_stock` y su nivel (saludable, bajo, crítico) y las tarjetas de recuento | [`Listado de productos.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Listado%20de%20productos.jpeg) |
+| Entrada: formulario | Producto elegido por nombre · SKU · almacén y su stock actual (9, crítico) antes de registrar 25 unidades | [`Registro de entrada producto.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Registro%20de%20entrada%20producto.jpeg) |
+| Entrada: confirmación | «Entrada n.º 8 registrada» con el stock nuevo (34) y el formulario limpio | [`Registro de entrada producto confirmación y stock actual.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Registro%20de%20entrada%20producto%20confirmaci%C3%B3n%20y%20stock%20actual.jpeg) |
+| Salida: aviso de stock | Despacho de 56 con 52 disponibles: aviso junto a la cantidad y botón desactivado | [`Registro de salida con aviso de stock.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Registro%20de%20salida%20con%20aviso%20de%20stock.jpeg) |
+| Salida 400 (1/3): pestaña A | Pérdida de 20 con 28 disponibles, válida, sin enviar | [`Registro salida pestaña A sin enviar.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Registro%20salida%20pesta%C3%B1a%20A%20sin%20enviar.jpeg) |
+| Salida 400 (2/3): pestaña B | Otra salida de 15 del mismo producto en otra pestaña: quedan 13 | [`Registro salida pestaña B y actualización de stock.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Registro%20salida%20pesta%C3%B1a%20B%20y%20actualizaci%C3%B3n%20de%20stock.jpeg) |
+| Salida 400 (3/3): pestaña A enviada | La API rechaza la salida (400) y el mensaje sale en español junto a la cantidad; el stock se vuelve a pedir (13) | [`Registro salida pestaña A enviada y aviso stock.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Registro%20salida%20pesta%C3%B1a%20A%20enviada%20y%20aviso%20stock.jpeg) |
+| Historial completo | `/inventory/orders`: 15 movimientos con tipo, producto, cantidad con signo, fecha, detalle y `user_uuid` («Tú») | [`Historial de movimientos completo.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Historial%20de%20movimientos%20completo.jpeg) |
+| Historial filtrado | Filtro por producto: los 4 movimientos de un SKU | [`Historial de movimientos completo con filtro producto.jpeg`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Historial%20de%20movimientos%20completo%20con%20filtro%20producto.jpeg) |
+| Ruta protegida | Sin sesión, `/inventory/products` lleva a `/login?next=%2Finventory%2Fproducts` | [`Ruta protegida.png`](../uis/backoffice/screenshots/gesti%C3%B3n%20de%20inventario/Ruta%20protegida.png) |
+
 ## Conectar Supabase
 
 La API ya trae el driver de PostgreSQL (`psycopg[binary]`) y se probó contra un **PostgreSQL 16 local** (los 107 tests
@@ -305,4 +352,10 @@ uv run --env-file .env uvicorn app.main:app --reload --port 8000
 - **Permisos:** cualquier usuario autenticado puede registrar SKUs y movimientos, como en proveedores e incidencias. El
   briefing distingue operarios de almacén (entradas) y coordinadores logísticos (salidas), pero TinyDB solo tiene los
   roles `admin` · `manager` · `user`: pendiente de decidir si se restringe.
-- **Sin interfaz:** no hay página del inventario en el backoffice.
+- **Interfaz:** sin alta de SKUs (la API la tiene, el hito no la pide), sin elegir otro almacén en los movimientos
+  y con el `user_uuid` en el historial en lugar del nombre. Si se entra sin sesión a un formulario con `?sku_id=`, tras
+  el login se pierde el producto preseleccionado (el `next` guarda la ruta, no la consulta).
+- **Aviso «sesión caducada» intermitente (anterior al hito):** con un token ya caducado guardado, el login a veces
+  aparece sin el aviso «Tu sesión ha caducado» (`motivo=caducada`). La redirección al login sí ocurre siempre. Se
+  reproduce igual en `/proveedores`, así que está en la autenticación común (`AuthProvider`/`AuthGate`), fuera de este
+  hito.

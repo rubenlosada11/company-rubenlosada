@@ -8,4 +8,6 @@ export const NAV_ITEMS = [
   { label: "Análisis de incidencias", href: "/incidencias" },
   { label: "Incidencias", href: "/gestor-incidencias" },
   { label: "Registrar incidencia", href: "/gestor-incidencias/nueva" },
+  { label: "Inventario", href: "/inventory/products" },
+  { label: "Historial de movimientos", href: "/inventory/orders" },
 ] as const;

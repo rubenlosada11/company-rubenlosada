@@ -6,7 +6,7 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/inventory-orm` (desde `main` @ `39af495`, que ya incluye las PR #3–#17).
+- **Rama de trabajo:** `feature/inventory-backoffice` (desde `main` @ `9779fbf`, que ya incluye las PR #3–#18).
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (práctica sin número de hito; contexto en
@@ -39,9 +39,12 @@
   [`CONTEXT-gestor-inventario.es.md`](../CONTEXT-gestor-inventario.es.md); ticket TRK-0341): API `/inventory` en
   `services/api` con SQLModel (SQLite local, `DATABASE_URL` para Supabase), stock calculado por almacén y seed
   `uv run seed-inventory`. **Implementado y validado** en `feature/inventory-orm`; documentación en `docs/inventario.md`.
-  Commits `Hito 5 — …` hechos (6, escalonados), Supabase conectado y comprobado, rama subida a `origin` y **PR #18 abierta** hacia `main`: falta
-  revisarla y fusionarla.
-- **Última actualización:** 2026-10-31.
+  Commits `Hito 5 — …` hechos (6, escalonados), Supabase conectado y comprobado y **PR #18 fusionada** (`9779fbf`).
+- **Hito 5 — Interfaz de inventario en el backoffice:** `/inventory/products`, `/inventory/orders/inbound`,
+  `/inventory/orders/outbound` y `/inventory/orders`, con un único módulo de integración (`lib/inventory.ts`).
+  **Implementado y validado** en `feature/inventory-backoffice`, por fases (prompt del curso) sin paradas intermedias
+  por indicación del desarrollador, que revisará los commits y abrirá la PR. **PR #19 abierta** con las capturas: falta la revisión y la fusión.
+- **Última actualización:** 2026-11-01.
 
 | Componente | Estado |
 | --- | --- |
@@ -56,7 +59,8 @@
 | Autenticación frontend (AUTH-02) | ✅ PR #13 fusionada (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE` |
 | Gestión de errores | ✅ PR #16 fusionada (`7435c5f`): API 789 tests, paquete + scripts 196, navegador 41 + 36 |
 | Pruebas unitarias (AUTH-088, API-042, FE-019) | ✅ PR #17 fusionada (`39af495`); cifras en `TESTING.md` |
-| Hito 5 — Inventario (`/inventory`) | 🟡 Implementado y validado en `feature/inventory-orm` (API 1160 tests, 118 del inventario; 8 mutaciones detectadas); Supabase conectado (2026-11-01) y comprobado; **PR #18 abierta**, falta fusionarla |
+| Hito 5 — Inventario (`/inventory`) | ✅ API: PR #18 fusionada (`9779fbf`; 1160 tests, 118 del inventario); Supabase conectado (2026-11-01) |
+| Hito 5 — Interfaz de inventario (backoffice) | 🟡 Implementada y validada en `feature/inventory-backoffice` (Jest 148, 57 nuevos; navegador 18 + 29 + 35 + 21 + 41 + 12/13); **PR #19 abierta** con capturas, falta revisión y fusión |
 | Gestor de incidencias | ✅ PR #15 fusionada (`2d90092`): paquete + scripts 192 tests, API 751 tests, navegador 69 + 64 + 33 + 44 + 22 |
 | Recuperación y cambio de contraseña (AUTH-03) | ✅ PR #14 fusionada (`f586bb3`): API completa: persistencia, email, los tres endpoints y cambio de email con contraseña (473 tests) `/forgot-password` (E2E 39/39) y `/reset-password` (E2E 51/51) enlace en `/login` (E2E 26/26) y `/account/change-password` (E2E 42/42); E2E de punta a punta 33/33 con emails reales; regresión de AUTH-02 en verde |
 | `uis/backoffice/proveedores` | ✅ Implementado y validado en local (E2E 47/47); en producción muestra el aviso de API no configurada |
@@ -1153,6 +1157,44 @@ todas las fases sin confirmación salvo algo muy crítico y **parar antes de los
 - **Entrega:** sexto commit `bcd90bd` (driver y guía de Supabase), push de `feature/inventory-orm` (`main` sin cambios
   desde `39af495`) y **PR #18** hacia `main` con las validaciones reales; capturas, a mano por el desarrollador.
 
+### 2026-11-01 — Hito 5: interfaz de inventario en el backoffice (rama `feature/inventory-backoffice`)
+
+- **Contexto:** prompt del curso «Hito 5 — Backoffice · Gestión de inventario» (12 fases). El desarrollador pidió avanzar
+  por las fases sin parar, siguiendo las recomendaciones del agente, y detenerse en los commits.
+- **Rama:** la PR #18 ya estaba fusionada, así que se creó `feature/inventory-backoffice` desde `origin/main`
+  (`9779fbf`). El cambio local del desarrollador en `CONTEXT-gestor-inventario.es.md` (quita la línea «Ruta:») no lo
+  toca el agente; el desarrollador pidió incluirlo en el commit de documentación.
+- **Discrepancias resueltas:** rutas `/backoffice/inventory/…` del prompt = `/inventory/…` de la app (el backoffice es
+  la raíz de su dominio); `NEXT_PUBLIC_INVENTORY_API_URL` añadida a `.env.example` con respaldo en
+  `NEXT_PUBLIC_API_BASE_URL` (misma API y mismo token); commits `Hito 5 — …` escalonados (convención del repo) en
+  lugar de `feat(...)`, y sin coautoría de IA (lo pide el prompt).
+- **Código:** `types/inventory.ts`, `lib/data/inventory.ts`, `lib/inventory.ts` (+ `lib/inventory.test.ts`),
+  `components/inventory/` (ProductList, InboundForm, OutboundForm, MovementHistory, formParts, StockBadge,
+  InventoryHeader) y `app/(panel)/inventory/` (4 páginas + redirección de `/inventory`). Cambios pequeños en
+  `lib/http.ts` (opción `baseUrl`), `Badge` (tono `red`), `nav.ts`, `Sidebar` y textos de `milestones.ts` e
+  `initiatives.ts`. Sin dependencias nuevas.
+- **Validación:** lint, typecheck, Jest 148 passed (57 nuevos; `lib/inventory.ts` 99 % de líneas; 3 mutaciones
+  detectadas), `npm run build` OK, `next start` + `check-route.mjs` → las 4 rutas, `/inventory` y las del panel
+  anterior 200 sin errores en el servidor. Navegador (Edge + playwright-core + axe-core en el scratchpad) contra una API
+  de prueba en `:8021` con TinyDB y SQLite temporales (sin tocar el `.env` ni Supabase del desarrollador): productos
+  18/18, entrada 29/29, salida 35/35, historial 21/21, integración 41/41, sesión 12/13. Una mutación de la protección
+  contra respuestas antiguas (stock reactivo) hace fallar la prueba.
+- **Hallazgos corregidos durante las pruebas:** desbordamiento horizontal en móvil del historial (textos `sr-only` con
+  posición absoluta fuera del contenedor con scroll) y región desplazable sin foco de teclado (axe
+  `scrollable-region-focusable`).
+- **Hallazgo anterior al hito, no corregido:** con un token ya caducado guardado, el login a veces aparece sin
+  `motivo=caducada` (también en `/proveedores`; doble ejecución del efecto de `AuthProvider`). La redirección sí ocurre.
+- **Commits (2026-11-01):** el desarrollador aprobó el plan. Tres commits `Hito 5 — …` escalonados (capa de
+  integración; vistas; documentación, memory bank y su cambio del CONTEXT), sin coautoría de IA (`90c71ad`,
+  `76d8359`, `84e496a`). Con su visto bueno, rama subida a `origin` y **PR #19** abierta hacia `main` (`MERGEABLE`,
+  sin cambios entrantes). Título con la convención del repo (`Hito 5 — …`) en lugar del `feat(backoffice): …` del
+  prompt.
+- **Capturas (2026-11-01):** 10, tomadas por el desarrollador en local (API con SQLite, usuario ficticio
+  `tu.email@trackflow.test`) en `uis/backoffice/screenshots/gestión de inventario/`; revisadas por el agente (sin datos
+  personales ni tokens), explicadas en `docs/inventario.md`, enlazadas desde el README e incrustadas en la PR #19. Las
+  tres del caso de las dos pestañas tienen la cabecera repetida a media altura (efecto de la captura de página
+  completa, no de la app). Sin producto agotado en el listado (solo saludable, bajo y crítico).
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -1165,9 +1207,10 @@ todas las fases sin confirmación salvo algo muy crítico y **parar antes de los
 
 **Decisiones abiertas (requieren confirmación; ver `projectbrief.md`)**
 
-- Hito 5 (inventario): decidir permisos por rol (operarios / coordinadores) y si hace falta una
-  página del inventario en el backoffice. Hito 5 pasa a `delivered` en `docs/hitos.md` y `milestones.ts` al fusionar
-  su PR.
+- Hito 5 (inventario): decidir permisos por rol (operarios / coordinadores). La interfaz del backoffice ya existe
+  (`feature/inventory-backoffice`): Hito 5 pasa a `delivered` en `docs/hitos.md` y `milestones.ts` al fusionar su PR.
+- Autenticación (anterior al Hito 5): el aviso «Tu sesión ha caducado» del login falta a veces con un token ya caducado
+  guardado (`AuthProvider`); decidir si se corrige en una rama propia.
 
 - Despliegue de la API (`docs/despliegue-api.md`): topología (A subdominio / B mismo host) y, si es A, el subdominio
   y su DNS; quitar el Basic Auth del proxy delante de la API (choca con el Bearer). **Desplegar la API antes que el
@@ -1221,5 +1264,4 @@ todas las fases sin confirmación salvo algo muy crítico y **parar antes de los
    existentes desde AUTH-088) y automatice `validate-delivery`.
 6. Decidir la subida de `next` a 16.3.8 (website y backoffice) en una rama propia (avisos de seguridad detectados en
    AUTH-088; PR #17 ya fusionada).
-7. Hito 5: revisar y fusionar la PR #18 (`feature/inventory-orm`); después, Hito 5 a `delivered` (`docs/hitos.md`,
-   `milestones.ts`).
+7. Hito 5: revisar y fusionar la PR #19 (`feature/inventory-backoffice`; capturas ya incluidas). Tras fusionarla, Hito 5 a `delivered` (`docs/hitos.md`, `milestones.ts`).

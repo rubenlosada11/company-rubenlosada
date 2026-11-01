@@ -149,6 +149,11 @@ export interface ApiOptions {
    * `false`: endpoint público (login, registro); sin token, y su 401/403 es un error normal del formulario.
    */
   auth?: boolean;
+  /**
+   * URL base de otra API compatible (mismo token y mismo formato de errores), p. ej. la del inventario
+   * (`NEXT_PUBLIC_INVENTORY_API_URL`). Sin valor, `NEXT_PUBLIC_API_BASE_URL`.
+   */
+  baseUrl?: string;
 }
 
 /**
@@ -159,8 +164,13 @@ export interface ApiOptions {
  * con `UNAUTHORIZED_EVENT` para volver al login. También sin token: así no queda un estado «autenticado» falso si el
  * token desaparece con la aplicación abierta.
  */
-export async function fetchApi(path: string, init?: RequestInit, { auth = true }: ApiOptions = {}): Promise<Response> {
-  if (!API_BASE_URL) {
+export async function fetchApi(
+  path: string,
+  init?: RequestInit,
+  { auth = true, baseUrl }: ApiOptions = {}
+): Promise<Response> {
+  const apiUrl = baseUrl?.replace(/\/+$/, "") || API_BASE_URL;
+  if (!apiUrl) {
     throw new ApiError(
       IS_DEVELOPMENT
         ? "Falta la variable NEXT_PUBLIC_API_BASE_URL. Crea uis/backoffice/.env.local a partir de .env.example y reinicia el backoffice."
@@ -187,13 +197,13 @@ export async function fetchApi(path: string, init?: RequestInit, { auth = true }
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, signal: controller.signal });
+    res = await fetch(`${apiUrl}${path}`, { ...init, headers, signal: controller.signal });
   } catch (error) {
     if (timedOut) throw new ApiError(TIMEOUT_MESSAGE, 0);
     if (isAbortError(error)) throw error;
     throw new ApiError(
       IS_DEVELOPMENT
-        ? `No se pudo conectar con la API de TrackFlow (${API_BASE_URL}). Comprueba que está arrancada.`
+        ? `No se pudo conectar con la API de TrackFlow (${apiUrl}). Comprueba que está arrancada.`
         : CONNECTION_MESSAGE,
       0
     );
@@ -240,7 +250,8 @@ async function request<T>(path: string, init?: RequestInit, options?: ApiOptions
 }
 
 export const http = {
-  get: <T>(path: string, signal?: AbortSignal) => request<T>(path, { method: "GET", signal }),
+  get: <T>(path: string, signal?: AbortSignal, options?: ApiOptions) =>
+    request<T>(path, { method: "GET", signal }, options),
   post: <T>(path: string, body: unknown, options?: ApiOptions) =>
     request<T>(path, { method: "POST", body: JSON.stringify(body) }, options),
   put: <T>(path: string, body: unknown) => request<T>(path, { method: "PUT", body: JSON.stringify(body) }),

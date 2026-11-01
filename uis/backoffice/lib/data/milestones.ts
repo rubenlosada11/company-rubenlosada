@@ -45,7 +45,7 @@ export const MILESTONES: readonly Milestone[] = [
     name: "Gestión de inventario backend",
     status: "in-progress", // pasa a "delivered" al fusionar su PR en main
     summary:
-      "API de inventario unificada de Los Ángeles y Zaragoza (/inventory): SKUs, entradas y salidas de stock con SQLModel y stock calculado por almacén.",
-    paths: ["services/api/"],
+      "API de inventario unificada de Los Ángeles y Zaragoza (/inventory): SKUs, entradas y salidas de stock con SQLModel y stock calculado por almacén, con su interfaz de operaciones en el backoffice.",
+    paths: ["services/api/", "uis/backoffice/"],
   },
 ];
