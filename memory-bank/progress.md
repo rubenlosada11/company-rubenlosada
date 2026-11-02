@@ -1318,6 +1318,9 @@ push y antes de la PR**. Detalle completo en `docs/serialization-audit.md`.
   Verificación manual en Swagger UI (Edge, «Try it out») de registro, login, Authorize, `/auth/me`, `/suppliers`,
   `POST /api/incidents` y forgot-password; `curl` del analizador, CSV, inventario y `DELETE`; registro desde el
   backoffice contra la API de prueba. Siempre con bases temporales en el scratchpad (API :8031, backoffice :3013).
+- **Capturas** (a petición del desarrollador, tras abrir la PR #24): 10 en `docs/screenshots/serialization-audit/`,
+  hechas con Playwright + Edge contra la API de prueba; en Swagger solo la respuesta, sin `curl`, cuerpo de la petición
+  ni JWT (sustituido por un texto). Título de la PR cambiado a «Auditoría de Serialización del Backend».
 
 ## Trabajo pendiente
 

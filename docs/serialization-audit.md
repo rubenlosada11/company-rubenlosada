@@ -389,3 +389,24 @@ errores en la página.
   no guarda si `response_model` vino del decorador o de la anotación.
 - Los esquemas de entrada de proveedores, incidencias e inventario **ignoran** (no rechazan) `id`, `status`,
   `created_at`, `updated_at` y `user_uuid`; es la decisión documentada de cada práctica y está cubierta por tests.
+
+## 18. Capturas
+
+Tomadas el 2026-11-02 con Playwright y Edge contra la API de prueba (bases temporales, `:8031`) y el backoffice
+compilado contra ella (`:3013`), en [`screenshots/serialization-audit/`](./screenshots/serialization-audit/). En Swagger
+solo se captura la respuesta del servidor: el `curl`, la URL y el cuerpo de la petición (con la contraseña de prueba)
+quedan fuera, y el JWT del login se sustituye por «token oculto en la captura». Usuarios y datos son de prueba.
+
+| Captura | Qué muestra |
+| --- | --- |
+| [01](./screenshots/serialization-audit/01-registro-sin-email.png) | `POST /users` → 201 `RegisterResponse`: id, rol, estado, fecha y perfil, **sin email** |
+| [02](./screenshots/serialization-audit/02-login-solo-token.png) | `POST /auth/login` → 200 solo con `access_token`, `token_type` y `expires_in` |
+| [03](./screenshots/serialization-audit/03-auth-me-con-email.png) | `GET /auth/me` → 200: la única respuesta de autenticación con el email; sin hash ni `password_changed_at` |
+| [04](./screenshots/serialization-audit/04-forgot-password-generico.png) | `POST /auth/forgot-password` con un email **no registrado** → 200 con el mensaje genérico |
+| [05](./screenshots/serialization-audit/05-proveedores-listado.png) | `GET /suppliers` → 200 con los 11 campos de `Supplier` |
+| [06](./screenshots/serialization-audit/06-incidencia-alta-campos-del-servidor.png) | `POST /api/incidents` enviando `status: "resolved"` e `id: 99` → 201 con `status: "open"` e `id: 1` (los pone el servidor) |
+| [07](./screenshots/serialization-audit/07-analizador-resultado.png) | `POST /api/incidents/analyze` con el CSV real → 200 `ResultadoAnalisis` |
+| [08](./screenshots/serialization-audit/08-exportacion-csv.png) | `GET /api/incidents/results/export` → 200 `text/csv` con `Content-Disposition` |
+| [09](./screenshots/serialization-audit/09-openapi-registerresponse.png) | Esquema `RegisterResponse` publicado en OpenAPI (`/docs` → Schemas) |
+| [10](./screenshots/serialization-audit/10-backoffice-registro-panel.png) | Backoffice: tras registrarse en `/register` entra al panel con su nombre (registro → login → `/auth/me`) |
+
