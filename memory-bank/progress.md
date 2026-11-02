@@ -1278,6 +1278,7 @@ agente gestionara las mediciones y las capturas de Lighthouse.
   - W1 (`fetchPriority="high"` en el hero) **descartada**: Lantern +100 ms de LCP móvil y A/B con throttling de DevTools sin diferencia (2149 vs 2152 ms). W2 (logo del website con `sizes="180px"`, `eager`, sin preload): móvil 96 → 97, LCP 2639 → 2584 ms, TBT 106 → 56 ms; logo de 3840 px/9,4 KB a 384 px/6,6 KB.
   - W3 (AVIF en `images.formats` del website): peso 277 → 257 KiB, hero 39,8 → 22,2 KB, logo 6,6 → 4,4 KB; puntuación y LCP sin cambio fuera del ruido (97; 2584 → 2596 ms). Se mantiene por el ahorro de datos.
   - W4 (números del proceso del website de `blue-200` a `blue-500`, contraste 1,41 → 3,73:1): accesibilidad 96 → 100 en escritorio y móvil.
+  - B2 (resumen del gestor reserva su alto durante la primera carga): `/gestor-incidencias` escritorio CLS 0,133 → 0 y rendimiento 95 → 99; comprobado en navegador que el listado no se mueve (908 px antes y después) y sin errores de consola.
 
 ## Trabajo pendiente
 

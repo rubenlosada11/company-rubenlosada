@@ -5,6 +5,9 @@ import { ListaBarras } from "@/components/incidencias/ListaBarras";
 import { StatCard } from "@/components/StatCard";
 import {
   branchLabel,
+  INCIDENT_BRANCHES,
+  INCIDENT_CATEGORIES,
+  INCIDENT_ORIGINS,
   INCIDENT_STATUSES,
   incidentCategoryLabel,
   originLabel,
@@ -82,14 +85,20 @@ export function IncidentSummary({ version }: IncidentSummaryProps) {
   }
 
   if (!summary) {
+    // Primera carga: se reserva el alto exacto del resumen (la misma estructura, invisible) para que el listado de
+    // debajo no salte al llegar los datos (CLS). Encima, el aviso de carga.
     return (
-      <p
-        role="status"
-        aria-busy="true"
-        className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-600 shadow-sm"
-      >
-        Cargando resumen…
-      </p>
+      <div className="relative" aria-busy="true">
+        <p
+          role="status"
+          className="absolute inset-x-0 top-0 z-10 rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-600 shadow-sm"
+        >
+          Cargando resumen…
+        </p>
+        <div className="invisible" aria-hidden="true">
+          <SummaryContent summary={PLACEHOLDER_SUMMARY} />
+        </div>
+      </div>
     );
   }
 
@@ -99,7 +108,28 @@ export function IncidentSummary({ version }: IncidentSummaryProps) {
       <p role="status" className="sr-only">
         {loading ? "Actualizando resumen…" : `Resumen actualizado: ${total} incidencias.`}
       </p>
+      <SummaryContent summary={summary} />
+    </div>
+  );
+}
 
+/** Ceros con todas las claves que devuelve la API: misma estructura (y alto) que el resumen real. */
+const zeros = <K extends string>(options: readonly { value: K }[]) =>
+  Object.fromEntries(options.map((option) => [option.value, 0])) as Record<K, number>;
+
+const PLACEHOLDER_SUMMARY: IncidentSummaryData = {
+  // Con `total` > 0 se pinta la variante con barras, que es la que tendrá la página con incidencias.
+  total: 1,
+  by_status: zeros(INCIDENT_STATUSES),
+  by_category: zeros(INCIDENT_CATEGORIES),
+  by_origin: zeros(INCIDENT_ORIGINS),
+  by_branch: zeros(INCIDENT_BRANCHES),
+};
+
+function SummaryContent({ summary }: { summary: IncidentSummaryData }) {
+  const { total } = summary;
+  return (
+    <div className="space-y-5">
       <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Incidencias" value={entero(total)} detail="Total registradas" />
         {INCIDENT_STATUSES.map((status) => (
