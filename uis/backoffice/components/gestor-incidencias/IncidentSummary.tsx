@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { ListaBarras } from "@/components/incidencias/ListaBarras";
 import { StatCard } from "@/components/StatCard";
 import {
@@ -14,6 +13,7 @@ import {
 } from "@/lib/data/incidents";
 import { entero, porcentaje } from "@/lib/formato";
 import { incidentErrorMessage, incidentsApi } from "@/lib/incidents";
+import { useApiRequest } from "@/lib/useApiRequest";
 import type {
   IncidentBranch,
   IncidentCategory,
@@ -30,13 +30,6 @@ const STATUS_CARD_LABELS: Record<IncidentStatus, string> = {
   discarded: "Descartadas",
 };
 
-interface SummaryResult {
-  /** Petición (versión + reintento) a la que corresponde el resultado: si no coincide con la actual, está cargando. */
-  key: string;
-  summary: IncidentSummaryData | null;
-  error: string | null;
-}
-
 interface IncidentSummaryProps {
   /** Cambia cuando el listado modifica datos (p. ej. un cambio de estado): el resumen se vuelve a pedir. */
   version: number;
@@ -47,26 +40,13 @@ interface IncidentSummaryProps {
  * falla, el resto de la página (el listado) sigue funcionando.
  */
 export function IncidentSummary({ version }: IncidentSummaryProps) {
-  const [retryToken, setRetryToken] = useState(0);
-  const [result, setResult] = useState<SummaryResult | null>(null);
-
-  const requestKey = `${version}|${retryToken}`;
-  const loading = result?.key !== requestKey;
+  const request = useApiRequest(String(version), (signal) => incidentsApi.summary(signal), (reason) =>
+    incidentErrorMessage(reason, "cargar el resumen")
+  );
+  const { loading, reload } = request;
   // Mientras se actualiza se mantienen los últimos totales, atenuados, en lugar de vaciar el panel.
-  const summary = result?.summary ?? null;
-  const error = !loading ? (result?.error ?? null) : null;
-
-  useEffect(() => {
-    const controller = new AbortController();
-    incidentsApi
-      .summary(controller.signal)
-      .then((data) => setResult({ key: requestKey, summary: data, error: null }))
-      .catch((reason: unknown) => {
-        if (controller.signal.aborted) return;
-        setResult({ key: requestKey, summary: null, error: incidentErrorMessage(reason, "cargar el resumen") });
-      });
-    return () => controller.abort();
-  }, [requestKey]);
+  const summary = request.data;
+  const error = !loading ? request.error : null;
 
   if (error) {
     return (
@@ -75,7 +55,7 @@ export function IncidentSummary({ version }: IncidentSummaryProps) {
         <p className="mt-1">{error} El listado sigue disponible.</p>
         <button
           type="button"
-          onClick={() => setRetryToken((token) => token + 1)}
+          onClick={reload}
           className="mt-3 min-h-11 rounded-full border border-red-300 bg-white px-5 text-sm font-bold text-red-800 transition hover:bg-red-100"
         >
           Reintentar

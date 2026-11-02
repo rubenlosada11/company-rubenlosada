@@ -1,28 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { StatCard } from "@/components/StatCard";
 import { categoryLabel, warehouseLabel } from "@/lib/data/inventory";
-import {
-  formatQuantity,
-  inventoryApi,
-  inventoryErrorMessage,
-  STOCK_THRESHOLDS,
-  stockLevel,
-} from "@/lib/inventory";
+import { formatQuantity, STOCK_THRESHOLDS, stockLevel } from "@/lib/inventory";
 import type { Product, Warehouse } from "@/types/inventory";
+import { useProducts } from "./formParts";
 import { StockBadge } from "./StockBadge";
 
 const actionClasses =
   "inline-flex min-h-10 items-center justify-center rounded-full px-4 text-sm font-bold whitespace-nowrap transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600";
-
-interface ListResult {
-  /** Carga a la que corresponde el resultado: si no coincide con la actual, se está actualizando. */
-  key: number;
-  products: Product[];
-  error: string | null;
-}
 
 /** Stock del SKU en el otro almacén, si lo tiene (regla 6: se muestra aparte, nunca sumado a `current_stock`). */
 function otherWarehouse(product: Product): { warehouse: Warehouse; stock: number } | null {
@@ -32,29 +19,9 @@ function otherWarehouse(product: Product): { warehouse: Warehouse; stock: number
 }
 
 export function ProductList() {
-  const [reloadKey, setReloadKey] = useState(0);
-  const [result, setResult] = useState<ListResult | null>(null);
-
-  const loading = result?.key !== reloadKey;
-  const products = result?.products ?? [];
-
-  // Datos siempre de la API: cada visita a la página (y cada «Actualizar») vuelve a pedir el stock calculado.
-  useEffect(() => {
-    const controller = new AbortController();
-    inventoryApi
-      .listProducts(controller.signal)
-      .then((list) => setResult({ key: reloadKey, products: list, error: null }))
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        // Se conserva lo que ya se mostraba: un fallo al actualizar no vacía la tabla.
-        setResult((current) => ({
-          key: reloadKey,
-          products: current?.products ?? [],
-          error: inventoryErrorMessage(error, "cargar los productos"),
-        }));
-      });
-    return () => controller.abort();
-  }, [reloadKey]);
+  // Datos siempre de la API: cada visita a la página (y cada «Actualizar») vuelve a pedir el stock calculado. Un
+  // fallo al actualizar no vacía la tabla: se conservan los últimos productos.
+  const { products, loading, error, settled, reload } = useProducts();
 
   const counts = { healthy: 0, low: 0, alert: 0 };
   for (const product of products) {
@@ -64,8 +31,7 @@ export function ProductList() {
     else counts.alert += 1;
   }
 
-  const firstLoad = result === null;
-  const reload = () => setReloadKey((key) => key + 1);
+  const firstLoad = !settled;
 
   return (
     <div className="space-y-6">
@@ -92,7 +58,7 @@ export function ProductList() {
             ? firstLoad
               ? "Cargando productos…"
               : "Actualizando el stock…"
-            : result?.error && products.length === 0
+            : error && products.length === 0
               ? "Sin datos"
               : `${products.length} ${products.length === 1 ? "producto" : "productos"}`}
         </p>
@@ -110,12 +76,12 @@ export function ProductList() {
         </button>
       </div>
 
-      {result?.error && !loading ? (
+      {error && !loading ? (
         <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
           <p className="font-bold">
             {products.length > 0 ? "No se pudo actualizar el stock." : "No se pudieron cargar los productos."}
           </p>
-          <p className="mt-1">{result.error}</p>
+          <p className="mt-1">{error}</p>
           {products.length > 0 ? (
             <p className="mt-1">La tabla muestra los últimos datos recibidos.</p>
           ) : null}
@@ -129,7 +95,7 @@ export function ProductList() {
         </div>
       ) : null}
 
-      {result?.error && products.length === 0 && !loading ? null : (
+      {error && products.length === 0 && !loading ? null : (
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className={`w-full min-w-[880px] text-left ${loading && !firstLoad ? "opacity-60" : ""}`} aria-busy={loading}>
             <caption className="sr-only">Productos del inventario con su stock actual</caption>
@@ -200,7 +166,7 @@ export function ProductList() {
                   </td>
                 </tr>
               ) : null}
-              {!loading && !result?.error && products.length === 0 ? (
+              {!loading && !error && products.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-600">
                     Todavía no hay productos en el inventario. Cuando se registren SKUs en la API aparecerán aquí con
