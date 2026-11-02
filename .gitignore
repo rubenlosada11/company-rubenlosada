@@ -7,3 +7,8 @@ __pycache__/
 
 # exportación local del analizador de incidencias (python analyze.py … → results.csv)
 scripts/results.csv
+
+# variables de entorno (Docker Compose en la raíz y cualquier app): solo se versionan las plantillas
+.env
+.env.*
+!.env.example
