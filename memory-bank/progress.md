@@ -6,7 +6,11 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/inventory-backoffice` (desde `main` @ `9779fbf`, que ya incluye las PR #3–#18).
+- **Rama de trabajo:** `feature/infra-40-docker-monorepo` (desde `main` @ `7f6a1b6`, que ya incluye las PR #3–#20).
+- **Contenedorización del monorepo** (práctica sin número de hito, ticket infra-40): Docker Compose de desarrollo
+  (website :3000 + backoffice :3001 en el contenedor `interfaces`, API :8000 en `backend`, hot reload) y de
+  producción, **desplegado en el VPS `bc-vps-248` sin acceso público** (túnel SSH). **Implementado y validado**;
+  commits hechos, falta push y PR (fases 14–15). Guía: `docs/docker.md`.
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (práctica sin número de hito; contexto en
@@ -44,7 +48,7 @@
   `/inventory/orders/outbound` y `/inventory/orders`, con un único módulo de integración (`lib/inventory.ts`).
   **Implementado y validado** en `feature/inventory-backoffice`, por fases (prompt del curso) sin paradas intermedias
   por indicación del desarrollador. **PR #19 fusionada** (`01ddccb`). **Hito 5 entregado** (2026-11-01).
-- **Última actualización:** 2026-11-01.
+- **Última actualización:** 2026-11-02.
 
 | Componente | Estado |
 | --- | --- |
@@ -1198,6 +1202,39 @@ todas las fases sin confirmación salvo algo muy crítico y **parar antes de los
   Hito 5 a `delivered` en `lib/data/milestones.ts` (el panel muestra «Entregado»), sin la fila «Estado» en
   `docs/hitos.md` (como los demás hitos entregados) y texto de «Hitos del proyecto» en el README del backoffice.
 
+### 2026-11-02 — Contenedorización del monorepo (rama `feature/infra-40-docker-monorepo`)
+
+Prompt del curso por fases con parada y «CONTINÚA»; de la fase 7 a la 13 (commits) seguidas por indicación del
+desarrollador. Decisiones en `techContext.md` («Decisiones técnicas de la contenedorización»); guía en
+`docs/docker.md`.
+
+- **Auditoría (fase 1):** apps Next.js compatibles (mismas versiones, npm, lockfiles con binarios musl), solo el
+  backoffice llama a la API y siempre desde el navegador; la API no tenía `requirements.txt` y busca sus bases junto al
+  código. VPS `bc-vps-248`: Ubuntu 22.04, 1 vCPU, ~1 GB de RAM, **sin Docker ni proxy**, con OpenClaw y code-server
+  en `127.0.0.1`. Las demos públicas de website/backoffice no están en este VPS.
+- **Decisiones del desarrollador:** VPS de 4Geeks; imágenes compiladas en el equipo; sin publicar en Internet; sin
+  contenedor de base de datos (SQLite en volumen o Supabase existente); OpenClaw se puede parar si hace falta (no hizo
+  falta); commits `Contenedorización — …`, sin `Co-authored-by`.
+- **Ficheros:** `uis/Dockerfile`, `uis/start.sh`, `uis/.dockerignore`, `services/Dockerfile`,
+  `services/.dockerignore`, `services/requirements.txt` (de `uv.lock`), `docker-compose.yml`,
+  `docker-compose.prod.yml`, `.env.example`, `env.prod.example`, `.gitignore`, `docs/docker.md` y enlaces en
+  `README.es.md`, `docs/README*.md` y `docs/despliegue-api.md`.
+- **Pruebas locales:** build sin caché (85 s) y arranque desde cero con `docker compose up`; website, backoffice y API
+  200; DNS entre contenedores en los dos sentidos; CORS permitido/rechazado; secretos solo en `backend`; hot reload
+  (Turbopack falla en Windows → webpack con sondeo: ≈ 2–5 s; API ≈ 4 s); persistencia; reinicios; errores de
+  configuración (`.env` ausente, `SECRET_KEY` vacía). E2E en Edge (scratchpad, datos en un volumen temporal): 10/10
+  en dev (login, proveedores, inventario, sesión tras recargar, API caída → mensaje, recuperación, token inválido) y
+  8/8 con las imágenes de producción en local.
+- **VPS:** Docker CE 29.9.2 + Compose 5.6.1 (repositorio oficial); imágenes `infra40-rc1` enviadas (307 MB
+  comprimidas); `/opt/company-rubenlosada` con `.env` 600 (secretos generados allí); stack sano, ≈ 215 MB de RAM entre
+  los dos contenedores y 329 MB aún disponibles; nada escucha fuera de `127.0.0.1`; seed de proveedores cargado;
+  reinicio automático tras `kill -9` del proceso y vuelta atrás por etiqueta probados; túnel SSH + Edge: website,
+  backoffice y login con CORS (401 con su mensaje). OpenClaw y code-server siguen activos.
+- **Auditoría de seguridad:** sin secretos en logs, historial de imágenes ni git. `npm audit --omit=dev`: 3 avisos ya
+  conocidos (`next` 16.3.4 *critical*, `sharp`, `source-map-js`; no se usan `next/og`, `use cache` ni draft mode);
+  `pip-audit`: `ecdsa`, `pyasn1` y `python-jose` (dependencias de la autenticación JWT). Previos a esta rama; no se
+  cambian versiones aquí.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -1207,6 +1244,9 @@ todas las fases sin confirmación salvo algo muy crítico y **parar antes de los
 - Git ya tiene `user.name`/`user.email` en la máquina, pero con un email personal: los commits siguen usando la
   identidad `noreply` de GitHub pasada por `-c`. Si se quiere, cambiar `user.email` a la `noreply`.
 - Tras fusionar cada PR, actualizar la rama local: `git checkout main` y `git pull`.
+- Docker / VPS: crear el primer administrador de producción (`ssh -t bc-vps-248 "cd /opt/company-rubenlosada &&
+  docker compose -f docker-compose.prod.yml exec backend python -m app.create_admin <email>"`, pide contraseña) y
+  añadir a la PR las capturas que se quieran (las evidencias de texto ya van en la descripción).
 
 **Decisiones abiertas (requieren confirmación; ver `projectbrief.md`)**
 
@@ -1239,6 +1279,13 @@ todas las fases sin confirmación salvo algo muy crítico y **parar antes de los
 - **Seguridad (detectado en AUTH-088, fuera de su alcance):** `next` 16.3.4 (website y backoffice) tiene 7 avisos de
   `npm audit`, uno *critical* (RCE en `next/og`, ≥16.2.0 <16.3.6) y varios *high*; **16.3.8** (parche, no mayor) los
   corrige. Pendiente de confirmación: subirlo en una rama propia y revalidar ambas apps antes de desplegar.
+  **Actualización (2026-11-02, Docker):** `npm audit --omit=dev` ya marca `next` 16.0.0–16.4.0 como *critical* (el
+  arreglo pasa a **16.4.4**, menor, no mayor) más `sharp` y `source-map-js`; y `pip-audit` marca `ecdsa`, `pyasn1`
+  (arreglo 0.6.5) y `python-jose` (dependencias del JWT). Tras subir versiones: regenerar `services/requirements.txt`
+  y reconstruir/redesplegar las imágenes Docker.
+- Docker: `services/requirements.txt` se genera a mano desde `uv.lock` (sin comprobación automática de que coinciden).
+  La imagen `interfaces` de producción pesa ≈ 1,1 GB (`output: "standalone"` la reduciría; cambia `next.config.ts`).
+  En desarrollo, webpack con sondeo en lugar de Turbopack (limitación de Docker Desktop en Windows).
 - Directorio de proveedores: TinyDB **reutiliza el id del último proveedor borrado** (la base se reabre en cada
   petición y el siguiente id es el máximo + 1). Sin contrato sobre ids; el backoffice no borra (el flujo es suspender).
   Pendiente de decidir si hace falta ids no reutilizables.
@@ -1268,3 +1315,7 @@ todas las fases sin confirmación salvo algo muy crítico y **parar antes de los
    AUTH-088; PR #17 ya fusionada).
 7. Hito 5 entregado: revisar y fusionar la PR de cierre (`feature/hito-5-cierre`). Pendientes del hito, sin fecha:
    permisos por rol, aviso de sesión caducada intermitente y limitaciones de `docs/inventario.md`.
+8. Contenedorización: push de `feature/infra-40-docker-monorepo` y PR hacia `main` (fases 14–15, con autorización
+   del desarrollador); crear el administrador de producción; tras fusionar, redesplegar con la etiqueta del commit de
+   `main` (`docs/docker.md` §15). Publicar en Internet (dominio, proxy/túnel de Cloudflare, HTTPS) queda para más
+   adelante y requiere confirmación.

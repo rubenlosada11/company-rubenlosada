@@ -24,7 +24,12 @@ JS es autónomo, con su propio `package.json` y `package-lock.json`, y se opera 
 | `docs/` | `hitos.md` (registro de hitos), `ARCHITECTURE_PROPOSAL.md` (propuesta de backend; no es un hito) + READMEs. |
 | `memory-bank/`, `AGENTS.md`, `.agents/` | Infraestructura para agentes (Hito 4). |
 
-No existen: `docker-compose.yml`, CI/CD (`.github/`), `Dockerfile`, base de datos de servidor (el inventario usa SQLite
+**Docker (2026-11-02, rama `feature/infra-40-docker-monorepo`):** `uis/Dockerfile` + `uis/start.sh` (contenedor
+`interfaces`: website + backoffice), `services/Dockerfile` + `services/requirements.txt` (contenedor `backend`),
+`docker-compose.yml` (desarrollo) y `docker-compose.prod.yml` (producción), `.env.example`/`env.prod.example` en la
+raíz. Guía: [`docs/docker.md`](../docs/docker.md); decisiones abajo («Decisiones técnicas de la contenedorización»).
+
+No existen: CI/CD (`.github/`), base de datos de servidor (el inventario usa SQLite
 local; Supabase/PostgreSQL con `DATABASE_URL` y driver psycopg, preparado y probado contra PostgreSQL 16 local). Tests automatizados:
 Python (pytest) en `services/api/tests/`, `packages/analisis-incidencias/tests/` y `scripts/tests/`, y Jest en
 `uis/backoffice/lib/*.test.ts` (desde AUTH-088). Plan y resultados de las pruebas unitarias: `TESTING.md` (raíz).
@@ -93,7 +98,8 @@ cabecera `server: cloudflare`).
 Método de despliegue indicado al agente del servidor para website y backoffice: extraer exactamente `uis/website` y
 `uis/backoffice` del tarball de GitHub (`codeload.github.com/rubenlosada11/company-rubenlosada/tar.gz/main`) en la
 carpeta de cada sitio y ejecutar `npm ci --include=dev` y `npm run build` (necesita Node ≥ 20.9). La API
-(`services/api`) **no está desplegada**; instrucciones no ejecutadas en `docs/despliegue-api.md` (el tarball debe
+(`services/api`) **no está publicada** (desde 2026-11-02 corre con Docker en el VPS `bc-vps-248` junto a website y
+backoffice, sin acceso público: ver «Decisiones técnicas de la contenedorización»); instrucciones no ejecutadas en `docs/despliegue-api.md` (el tarball debe
 incluir también `packages/analisis-incidencias`, un solo worker, `NEXT_PUBLIC_API_BASE_URL` antes del build y
 autenticación antes de publicar). Al añadir una nueva
 uis desplegada: `LINK_PRODUCCION.md`, sección en su README y fila en `docs/hitos.md`.
@@ -137,6 +143,22 @@ navegador se hacen fuera del repo (Edge + `playwright-core` en el scratchpad).
 | Cargar los SKUs y movimientos de ejemplo del inventario (idempotente; necesita un usuario en TinyDB: por defecto el primer admin) | `uv run seed-inventory` · `uv run seed-inventory <email>` |
 | Solo los tests del inventario (Hito 5) | `uv run pytest tests/test_inventory.py tests/test_seed_inventory.py tests/test_inventory_database.py` |
 | Cargar el CSV histórico en el gestor de incidencias (idempotente; **desde la raíz del repo**, con la API parada) | `uv run --project services/api python scripts/seed_incidents.py` |
+| Regenerar `services/requirements.txt` (Docker) tras cambiar dependencias | `uv export --frozen --format requirements.txt --no-dev --no-emit-project --no-emit-package analisis-incidencias --output-file ../requirements.txt` |
+
+Docker (desde la **raíz** del repo; detalle en `docs/docker.md`). Website `:3000`, backoffice `:3001`, API `:8000`
+(solo `127.0.0.1`; no confundir con los puertos de `npm run dev`, 3001/3002):
+
+| Acción | Comando |
+| --- | --- |
+| Primera vez | `Copy-Item .env.example .env` y rellenar `SECRET_KEY` |
+| Levantar / en segundo plano / parar | `docker compose up` · `docker compose up -d` · `docker compose down` |
+| Estado / logs / reconstruir | `docker compose ps` · `docker compose logs -f` · `docker compose up --build` |
+| Tras cambiar un `package-lock.json` | `docker compose up --build --renew-anon-volumes` |
+| Scripts de la API | `docker compose exec backend python -m app.seed` (también `app.seed_inventory`, `app.create_admin <email>`) |
+| Compilar producción (en local, nunca en el VPS) | `$env:IMAGE_TAG = git rev-parse --short HEAD` · `docker compose -f docker-compose.prod.yml --env-file env.prod.example build` |
+| Enviar imágenes al VPS | `cmd /c "docker save trackflow-interfaces:%IMAGE_TAG% trackflow-backend:%IMAGE_TAG% \| ssh -C bc-vps-248 docker load"` |
+| Producción (en el VPS, `/opt/company-rubenlosada`) | `docker compose -f docker-compose.prod.yml up -d --no-build` · `… ps` · `… logs -f` |
+| Acceso a producción (túnel) | `ssh -N -L 13000:127.0.0.1:3000 -L 13001:127.0.0.1:3001 -L 18000:127.0.0.1:8000 bc-vps-248` |
 
 Analizador de incidencias (Python ≥ 3.11 del sistema, sin instalar nada):
 
@@ -390,6 +412,31 @@ Rama `feature/inventory-backoffice` (2026-11-01). Documentación: `uis/backoffic
 | `Badge` con tono `red` | Stock crítico/agotado; sin tocar los tonos existentes |
 | Pruebas en navegador fuera del repo con una API de prueba (`:8021`, bases temporales) y backoffice en `:3003` | Convención del repo; no tocar el `.env` ni Supabase del desarrollador |
 
+## Decisiones técnicas de la contenedorización (Docker)
+
+Ticket «Contenedorización del monorepo» (infra-40). Rama `feature/infra-40-docker-monorepo` (2026-11-02), por fases
+con parada y «CONTINÚA» (fases 7–13 seguidas por indicación del desarrollador). Guía: `docs/docker.md`.
+
+| Decisión | Motivo |
+| --- | --- |
+| Ficheros en `uis/`, `services/` y la raíz (no en `infra/`) | Estructura pedida por el ticket |
+| Dos contenedores: `interfaces` (website + backoffice, `next` ×2) y `backend` (API), red con nombre propio | Ticket. Website **3000** y backoffice **3001** dentro y fuera del contenedor; los scripts de `npm` (3001/3002) no se tocan: `start.sh` llama a `next` con `--port` |
+| `node:24.19.0-alpine3.24` + `tini` + `start.sh` POSIX (prefijo de logs, reenvío de SIGTERM/SIGINT, si una app cae se para la otra y sale con error) | Misma versión de Node que el equipo; lockfiles con binarios musl. Señales y caídas probadas (143/130/137) |
+| `npm ci` por app con su lockfile; prod: `next build` + `npm ci --omit=dev` + `next start` (sin `output: "standalone"`) | Sin tocar las apps; `next start` lee `next.config.ts` sin TypeScript. Imagen ≈ 1,1 GB; standalone la reduciría pero cambia `next.config.ts` |
+| `NEXT_PUBLIC_API_BASE_URL` como build-arg obligatorio en prod (`http://localhost:18000`, túnel) | Next.js la incrusta al compilar; el navegador no resuelve `backend` |
+| Dev: **webpack con sondeo** (`NEXT_DEV_BUNDLER=webpack`, `WATCHPACK_POLLING=true`) por defecto | Docker Desktop en Windows no propaga eventos de ficheros: Turbopack no veía los cambios (comprobado). `NEXT_DEV_BUNDLER=turbopack` en Linux/macOS |
+| `python:3.13.18-slim-trixie` + uv 0.12.19; `requirements.txt` **generado con `uv export` desde `uv.lock`**, con hashes (`--require-hashes`) | El ticket pide `uv pip install -r requirements.txt`; el lock sigue siendo la fuente de verdad. Hay que regenerarlo al cambiar dependencias |
+| La API **no se instala**: se ejecuta desde el código con `PYTHONPATH` (`/app/services/api` + `packages/analisis-incidencias/src`), contexto adicional `packages` | Las bases se buscan con `Path(__file__)…/db`: instalada, irían a `site-packages`. Así se aplica `services/.dockerignore` |
+| Usuarios sin privilegios (`node`, `trackflow` uid 1000); uvicorn dev con `--reload-dir app` (StatReload, por sondeo) | La recarga funciona en Windows sin configurar nada; no vigila `.venv` ni `db/` |
+| Un `.env` en la raíz; secretos solo al `backend` (`env_file`); CORS, `FRONTEND_BASE_URL` y `NEXT_PUBLIC_API_BASE_URL` calculados en Compose a partir de los puertos | Cambiar un puerto no rompe CORS. `.gitignore` raíz: `.env`, `.env.*`, `!.env.example`. Plantilla de producción `env.prod.example` (sin punto inicial: AGENTS.md solo admite versionar `.env.example`) |
+| Puertos solo en `127.0.0.1` (dev y prod) | Docker Desktop publicaba en todas las interfaces; en el VPS Docker se salta `ufw` |
+| Dev: datos de `services/api/db` del host (bind mount) | Mismos datos que sin Docker. No usar a la vez `uv run uvicorn` en :8000 |
+| Prod: `restart: unless-stopped`, healthchecks, `mem_limit` (512/256 MB), logs rotados, `cap_drop: ALL`, `no-new-privileges`, API `read_only` + `tmpfs /tmp`, volumen `trackflow-api-data`, `pull_policy: never`, `IMAGE_TAG` obligatoria | VPS de 1 GB compartido; reinicio tras caída probado (`kill -9` del proceso en el host) |
+| Imágenes compiladas en el equipo y enviadas con `cmd /c "docker save … \| ssh -C … docker load"` | El VPS tiene ~1 GB de RAM; las tuberías de PowerShell 5.1 no son binarias, las de `cmd` sí (probado) |
+| VPS `bc-vps-248` (4Geeks): Docker CE 29.9 + Compose 5.6 del repositorio oficial; despliegue en `/opt/company-rubenlosada`, `.env` 600 con secretos generados allí; **sin acceso público** (sin dominio/proxy/HTTPS), túnel SSH 13000/13001/18000 | Decisión del desarrollador: no se publica demo. OpenClaw y code-server siguen activos; no hizo falta pararlos |
+| Sin contenedor de base de datos: SQLite en el volumen; `DATABASE_URL` opcional (proyecto Supabase existente) | Memoria del VPS; decisión del desarrollador |
+| Commits `Contenedorización — …` escalonados, sin `docs/hitos.md` ni `Co-authored-by` | Práctica sin número de hito; el ticket prohíbe firmas de IA |
+
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 
 - `CONTEXT.es.md` y `CONTEXT-trackflow.es.md` (fuente de verdad del negocio).
@@ -399,4 +446,5 @@ Rama `feature/inventory-backoffice` (2026-11-01). Documentación: `uis/backoffic
 - La estructura de carpetas de primer nivel y su responsabilidad.
 - `packages/shared` (`dist/` versionado; cambios de tipos afectan a hitos previos).
 - Secretos, `.env*` (solo `.env.example` se versiona), credenciales, despliegue, DNS/dominios `rubenlosada.com`.
-- Añadir CI/CD, Docker, workspace raíz o backend: requiere confirmación.
+- Añadir CI/CD, workspace raíz o backend: requiere confirmación. Docker ya existe (ver arriba); cambiar su
+  arquitectura, publicar puertos fuera de `127.0.0.1` o tocar el VPS también requiere confirmación.

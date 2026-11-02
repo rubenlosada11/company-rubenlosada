@@ -60,6 +60,7 @@ Estás construyendo **una sola empresa** a lo largo de muchos hitos y proyectos.
 > - **Hito 3 — Talent Pipeline Tracker**: aplicación Next.js de People & Talent en [`uis/talent-pipeline-tracker/`](./uis/talent-pipeline-tracker/). Demo: [talent-pipeline-tracker.rubenlosada.com](https://talent-pipeline-tracker.rubenlosada.com/)
 > - **Hito 4 — Ingeniería impulsada por IA**: infraestructura para agentes — [`AGENTS.md`](./AGENTS.md), [`memory-bank/`](./memory-bank/), [`.agents/rules/`](./.agents/rules/) y la skill [`.agents/skills/validate-delivery/`](./.agents/skills/validate-delivery/SKILL.md) — más las aplicaciones [`uis/website/`](./uis/website/) (web corporativa, local `http://localhost:3001`) y [`uis/backoffice/`](./uis/backoffice/) (aplicación interna, local `http://localhost:3002`). Demos: [websitetrackflow.rubenlosada.com](https://websitetrackflow.rubenlosada.com/) y [backofficetrackflow.rubenlosada.com](https://backofficetrackflow.rubenlosada.com/)
 >
+> - **Docker:** `docker compose up` levanta website (`:3000`), backoffice (`:3001`) y API (`:8000`) desde la raíz, con hot reload; producción con `docker-compose.prod.yml`. Guía en [`docs/docker.md`](./docs/docker.md).
 > - **Agentes de programación:** empieza por [`AGENTS.md`](./AGENTS.md) (lectura inicial, flujo previo a cada commit y áreas que requieren confirmación).
 > - `packages/shared/package.json` (`@repo/shared-types`) ya tiene scripts propios (`build`, `typecheck`, `demo`); aún no hay un runner de workspace único en la raíz que orqueste todos los paquetes.
 

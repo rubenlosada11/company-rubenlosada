@@ -19,5 +19,8 @@ This folder holds **cross-cutting documentation** for the monorepo: architecture
   endpoints, backoffice pages, error handling, tests and limitations (in Spanish).
 - [`inventario.md`](./inventario.md) — Milestone 5, inventory backend: `/inventory` API with SQLModel, mapping to the
   briefing's file structure, per-warehouse stock rules, seed data, Supabase and limitations (in Spanish).
+- [`docker.md`](./docker.md) — Docker setup of the monorepo (in Spanish): `interfaces` (website + backoffice) and
+  `backend` (API) containers, development Compose with hot reload, production Compose, environment variables and
+  deployment to the VPS without public access.
 - [`despliegue-api.md`](./despliegue-api.md) — deployment instructions (not executed) for `services/api` and the
   production backoffice: tarball, `uv`, variables, proxy, authentication and checks (in Spanish).
