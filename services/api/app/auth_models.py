@@ -6,7 +6,9 @@
 - `PasswordResetToken`: enlaces de recuperación de contraseña (AUTH-03), de un solo uso y con caducidad.
 
 Se guardan solo en TinyDB (`app/database.py:auth_db`). Los modelos persistidos (`User`, `Profile`) nunca se
-devuelven tal cual: las respuestas usan `UserPublic`, `ProfilePublic` y `MeResponse`, que no tienen `hashed_password`.
+devuelven tal cual: las respuestas usan esquemas de salida con sus campos declarados uno a uno (`UserPublic`,
+`ProfilePublic`, `UserWithProfile`, `RegisterResponse`), que se construyen desde el modelo persistido con
+`from_attributes` y no tienen `hashed_password` ni `password_changed_at`. Ver `docs/serialization-audit.md`.
 """
 
 import re
@@ -14,7 +16,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
 from app.models import EMAIL_PATTERN
 
@@ -229,9 +231,18 @@ class ChangePasswordRequest(BaseModel):
 
 
 # --- Salida ----------------------------------------------------------------------------------------------------
+# Listas blancas: cada esquema declara los campos que expone. Nunca heredan de un modelo persistido ni de uno de
+# entrada, así que un campo nuevo de `User` (p. ej. otro dato de control de sesiones) no llega solo a las respuestas.
 
 
-class UserPublic(BaseModel):
+class _Public(BaseModel):
+    # Se construyen desde `User`/`Profile` leyendo atributos: `UserPublic.model_validate(user)`.
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserPublic(_Public):
+    """Usuario visto por administración (`/users`). Incluye el email."""
+
     id: str
     email: str
     role: Role
@@ -239,7 +250,7 @@ class UserPublic(BaseModel):
     created_at: datetime
 
 
-class ProfilePublic(BaseModel):
+class ProfilePublic(_Public):
     id: str
     user_id: str
     name: str | None
@@ -248,8 +259,18 @@ class ProfilePublic(BaseModel):
 
 
 class UserWithProfile(UserPublic):
-    """Respuesta de `POST /users` y `GET /auth/me`."""
+    """Respuesta de `GET /auth/me`: el propio usuario, con su email y su perfil."""
 
+    profile: ProfilePublic
+
+
+class RegisterResponse(_Public):
+    """Respuesta de `POST /users` (registro público). Sin email ni credenciales: solo confirma la cuenta creada."""
+
+    id: str
+    role: Role
+    is_active: bool
+    created_at: datetime
     profile: ProfilePublic
 
 

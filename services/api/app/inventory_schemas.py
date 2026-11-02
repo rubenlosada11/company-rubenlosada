@@ -20,10 +20,15 @@ class Warehouse(StrEnum):
     ZGZ = "ZGZ"  # Zaragoza
 
 
-class Category(StrEnum):
+class ProductCategory(StrEnum):
     FASHION = "fashion"
     ELECTRONICS = "electronics"
     COSMETICS = "cosmetics"
+
+
+# Nombre corto del módulo. La clase se llama `ProductCategory` para que OpenAPI no la confunda con la categoría de
+# proveedor (`app.models.SupplierCategory`).
+Category = ProductCategory
 
 
 class ExitType(StrEnum):

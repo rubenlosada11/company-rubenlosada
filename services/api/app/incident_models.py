@@ -8,7 +8,7 @@ from enum import StrEnum
 from typing import Any
 
 from analisis_incidencias import gestor
-from pydantic import AwareDatetime, BaseModel, ValidationInfo, field_validator, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, ValidationInfo, field_validator, model_validator
 
 IncidentCategory = StrEnum("IncidentCategory", {value.upper(): value for value in gestor.CATEGORIAS})
 IncidentStatus = StrEnum("IncidentStatus", {value.upper(): value for value in gestor.ESTADOS})
@@ -62,10 +62,25 @@ class IncidentRecord(IncidentData):
     source_id: str | None = None
 
 
-class Incident(IncidentData):
-    """Incidencia tal y como la devuelve la API."""
+class Incident(BaseModel):
+    """Incidencia tal y como la devuelve la API (sin `source_id`, que es interno del seed).
+
+    Esquema de salida con sus campos declarados uno a uno: no hereda de `IncidentCreate`/`IncidentData`, así que las
+    reglas de entrada no se repiten al responder y un campo nuevo de `IncidentRecord` no se expone sin decidirlo aquí.
+    Lo que se guarda ya pasó por `IncidentRecord` (alta, seed y cambio de estado).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: int
+    title: str
+    description: str
+    category: IncidentCategory
+    origin: IncidentOrigin
+    branch: Branch
+    status: IncidentStatus
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
 
 
 class IncidentStatusUpdate(BaseModel):
