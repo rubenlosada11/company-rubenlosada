@@ -1281,6 +1281,7 @@ agente gestionara las mediciones y las capturas de Lighthouse.
   - B2 (resumen del gestor reserva su alto durante la primera carga): `/gestor-incidencias` escritorio CLS 0,133 → 0 y rendimiento 95 → 99; comprobado en navegador que el listado no se mueve (908 px antes y después) y sin errores de consola.
   - B1 (`preconnect` con `crossorigin` al origen de `NEXT_PUBLIC_API_BASE_URL` en el layout raíz): `uses-rel-preconnect` aprobado (antes 150 ms estimados), `/auth/me` antes en la traza y LCP observado 398 → 358 ms; LCP simulado del dashboard móvil sin cambio (3056 → 3055 ms; lo domina la hidratación). En `/login` (dinámica) Next solo manda la pista en el payload RSC.
   - B3 (`sizes` en los 5 logos del backoffice; el del sidebar sin `priority`): logo de 1200/3840 px (9,4 KB) a 256 px (5,1 KB); puntuaciones iguales (100 / 94), LCP escritorio 768 → 750 ms.
+  - B4 (etiquetas del dashboard sobre `bg-slate-100` de `text-slate-500` a `text-slate-600`, 10 nodos): accesibilidad 96 → 100 en escritorio y móvil.
 
 ## Trabajo pendiente
 

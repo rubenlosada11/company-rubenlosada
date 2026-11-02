@@ -103,7 +103,7 @@ export function Explorer() {
           <div className="mt-5 space-y-6">
             {visibleAreas.map((area) => (
               <div key={area.id}>
-                <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">{area.name}</h3>
+                <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">{area.name}</h3>
                 <ul className="space-y-2">
                   {visible
                     .filter((item) => item.areaId === area.id)
