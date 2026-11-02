@@ -325,6 +325,7 @@ datos: `docker compose -f docker-compose.prod.yml down` (sin `-v`).
 | `env file …\.env not found` | Falta el `.env` de la raíz: `Copy-Item .env.example .env` y rellena `SECRET_KEY`. |
 | `backend` no pasa a *healthy*; log `La API no puede arrancar: SECRET_KEY …` | `SECRET_KEY` vacía, corta o `change-me` en el `.env` de la raíz. |
 | `Bind for 127.0.0.1:3001 failed: port is already allocated` | Otro proceso usa el puerto (p. ej. `npm run dev` del website o tu API local): páralo o cambia el puerto en `.env`. |
+| `docker compose ps` dice *healthy* pero `localhost:3001` devuelve otra app o un 404 (p. ej. «Página no encontrada \| TrackFlow» en `/login`) | Otro proceso (`npm run dev`/`next start` del website, que usa el 3001) escucha en `0.0.0.0`/`[::]`; Docker publica en `127.0.0.1` y Windows deja que convivan **sin avisar**. `localhost` resuelve antes a `::1` y llega al otro proceso (comprobado: `127.0.0.1:3001` → Docker, `localhost:3001` → el otro). Para ese proceso o cambia el puerto en `.env`. |
 | Los cambios del frontend no se ven | Comprueba que no has puesto `NEXT_DEV_BUNDLER=turbopack` en Windows; si sigue, `docker compose restart interfaces`. |
 | Errores de módulos tras cambiar dependencias JS | `docker compose up --build --renew-anon-volumes`. |
 | El backoffice dice «No se pudo conectar con la API de TrackFlow» | La API está parada o `NEXT_PUBLIC_API_BASE_URL` no es una URL que resuelva el navegador (`localhost`, no `backend`). En producción: abre el túnel SSH. |
