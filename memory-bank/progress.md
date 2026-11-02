@@ -11,8 +11,7 @@
   inventariados con su estado original y final en `docs/serialization-audit.md`; las 30 rutas JSON declaran
   `response_model` en el decorador (antes ninguna), el registro ya no devuelve el email, el analizador tiene contrato
   (`ResultadoAnalisis`), los esquemas de salida no heredan de los de entrada y `tests/test_serialization.py` (61 casos)
-  lo vigila. **Implementada y validada** (2026-11-02), commits locales: **pendiente de push y PR** (el desarrollador
-  revisa antes).
+  lo vigila. **Implementada y validada** (2026-11-02): 7 commits, rama subida y **PR #24 abierta** contra `main`.
 - **Auditoría de rendimiento de los frontends** (práctica sin número de hito): Lighthouse (12.8.2, 5 ejecuciones,
   builds de producción) sobre `uis/website` y `uis/backoffice`, diagnóstico en `AUDIT.md`, correcciones una a una
   con su medición, refactorizaciones del backoffice y resultados en `REPORT.md`. Evidencias en `audit/`.
@@ -1405,6 +1404,5 @@ push y antes de la PR**. Detalle completo en `docs/serialization-audit.md`.
 10. Auditoría de rendimiento (PR #23 fusionada). Recomendaciones que requieren decisión (`REPORT.md` §8): sesión
     con cookie + comprobación en servidor para que el panel del backoffice no espere a `GET /auth/me` (LCP móvil
     ~3 s); `experimental.inlineCss` cuando sea estable; medir en campo (RUM con `web-vitals`) si se publican.
-11. Auditoría de serialización: el desarrollador revisa los commits locales de `feature/serialization-audit`; después,
-    push y PR contra `main`. Limitaciones aceptadas en `docs/serialization-audit.md` §17 (ejemplo del 422 en OpenAPI,
+11. Auditoría de serialización: revisar y fusionar la PR #24. Limitaciones aceptadas en `docs/serialization-audit.md` §17 (ejemplo del 422 en OpenAPI,
     build con Turbopack y Google Fonts en este equipo).
