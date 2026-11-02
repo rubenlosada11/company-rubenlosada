@@ -1234,6 +1234,9 @@ desarrollador. Decisiones en `techContext.md` («Decisiones técnicas de la cont
 - **Entrega:** 6 commits + 1 con un conflicto de puertos silencioso detectado al preparar la PR (un `next start` de la
   validación quedó vivo en el 3001; documentado en `docs/docker.md` §17). Push y **PR #22** abierta con evidencias de
   texto; las capturas las añade el desarrollador. Práctica registrada en Notion («Prácticas — Bootcamp», en progreso).
+- **Capturas (2026-11-02):** 9, tomadas por el desarrollador, en `docs/screenshots/docker/` y explicadas en
+  `docs/docker.md` §18. Revisadas por el agente: IP del VPS tapadas (06), nombre completo pixelado (04), sin metadatos.
+  Producción ya tiene un administrador (creado por el desarrollador). Accesos y demos públicas anotados en Notion.
 - **Auditoría de seguridad:** sin secretos en logs, historial de imágenes ni git. `npm audit --omit=dev`: 3 avisos ya
   conocidos (`next` 16.3.4 *critical*, `sharp`, `source-map-js`; no se usan `next/og`, `use cache` ni draft mode);
   `pip-audit`: `ecdsa`, `pyasn1` y `python-jose` (dependencias de la autenticación JWT). Previos a esta rama; no se
@@ -1248,9 +1251,6 @@ desarrollador. Decisiones en `techContext.md` («Decisiones técnicas de la cont
 - Git ya tiene `user.name`/`user.email` en la máquina, pero con un email personal: los commits siguen usando la
   identidad `noreply` de GitHub pasada por `-c`. Si se quiere, cambiar `user.email` a la `noreply`.
 - Tras fusionar cada PR, actualizar la rama local: `git checkout main` y `git pull`.
-- Docker / VPS: crear el primer administrador de producción (`ssh -t bc-vps-248 "cd /opt/company-rubenlosada &&
-  docker compose -f docker-compose.prod.yml exec backend python -m app.create_admin <email>"`, pide contraseña) y
-  añadir a la PR las capturas que se quieran (las evidencias de texto ya van en la descripción).
 
 **Decisiones abiertas (requieren confirmación; ver `projectbrief.md`)**
 
@@ -1319,6 +1319,6 @@ desarrollador. Decisiones en `techContext.md` («Decisiones técnicas de la cont
    AUTH-088; PR #17 ya fusionada).
 7. Hito 5 entregado: revisar y fusionar la PR de cierre (`feature/hito-5-cierre`). Pendientes del hito, sin fecha:
    permisos por rol, aviso de sesión caducada intermitente y limitaciones de `docs/inventario.md`.
-8. Contenedorización: revisar y fusionar la PR #22 (añadir las capturas); crear el administrador de producción; tras fusionar, redesplegar con la etiqueta del commit de
+8. Contenedorización: revisar y fusionar la PR #22; tras fusionar, redesplegar con la etiqueta del commit de
    `main` (`docs/docker.md` §15). Publicar en Internet (dominio, proxy/túnel de Cloudflare, HTTPS) queda para más
    adelante y requiere confirmación.

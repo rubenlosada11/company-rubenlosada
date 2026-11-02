@@ -244,7 +244,8 @@ docker compose -f docker-compose.prod.yml up -d --no-build
 docker compose -f docker-compose.prod.yml exec backend python -m app.seed
 ```
 
-4. Crear el primer administrador (pendiente: lo hace el desarrollador, porque pide la contraseña; `ssh -t` da la terminal que necesita):
+4. Crear el primer administrador (hecho por el desarrollador el 2026-11-02; sirve también para promover a otro usuario).
+   Pide la contraseña, y `ssh -t` da la terminal que necesita:
 
 ```powershell
 ssh -t bc-vps-248 "cd /opt/company-rubenlosada && docker compose -f docker-compose.prod.yml exec backend python -m app.create_admin tu-email@dominio"
@@ -333,3 +334,20 @@ datos: `docker compose -f docker-compose.prod.yml down` (sin `-v`).
 | `required variable IMAGE_TAG is missing a value` | Falta `IMAGE_TAG` en el `.env` del VPS o en `$env:IMAGE_TAG` al compilar. |
 | Producción: `No such image: trackflow-backend:<etiqueta>` | La imagen de esa etiqueta no está cargada en el VPS (`pull_policy: never`): repite el `docker save … \| docker load`. |
 | `docker load` falla o la imagen llega corrupta al usar una tubería de PowerShell | Usa la variante `cmd /c "…"`: las tuberías de PowerShell 5.1 no son binarias. |
+
+## 18. Capturas
+
+Tomadas por el desarrollador el 2026-11-02 en [`screenshots/docker/`](./screenshots/docker/); anonimizadas antes de
+subirlas (IP del VPS tapadas en la 06 y nombre completo en la 04).
+
+| Captura | Qué muestra |
+| --- | --- |
+| [01](./screenshots/docker/01-compose-ps-local.png) | `docker compose ps` en local: `backend` e `interfaces` *healthy*, puertos solo en `127.0.0.1` |
+| [02](./screenshots/docker/02-docker-desktop.png) | Docker Desktop: el proyecto `trackflow` con sus dos contenedores |
+| [03](./screenshots/docker/03-website-local.jpeg) | Website servido por Docker en `localhost:3000` (página completa) |
+| [04](./screenshots/docker/04-backoffice-local.jpeg) | Backoffice en `localhost:3001` con sesión iniciada: proveedores leídos de la API del contenedor |
+| [05](./screenshots/docker/05-api-docs-local.jpeg) | Swagger de la API en `localhost:8000/docs` |
+| [06](./screenshots/docker/06-vps-ssh.png) | VPS por SSH: `docker compose -f docker-compose.prod.yml ps` y `docker stats` (memoria bajo los límites) |
+| [07](./screenshots/docker/07-produccion-login.png) | Backoffice de producción por el túnel SSH (`localhost:13001/login`) |
+| [07b](./screenshots/docker/07b-produccion-proveedores.png) | Backoffice de producción con sesión: los 15 proveedores del seed, desde la API del VPS |
+| [08](./screenshots/docker/08-produccion-website.png) | Website de producción por el túnel (`localhost:13000`) |
