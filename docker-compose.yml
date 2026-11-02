@@ -1,0 +1,82 @@
+# Docker Compose de DESARROLLO: website + backoffice (contenedor "interfaces") y API FastAPI ("backend").
+#
+#   Copy-Item .env.example .env      (la primera vez; rellena SECRET_KEY)
+#   docker compose up --build
+#
+# Website http://localhost:3000 · Backoffice http://localhost:3001 · API http://localhost:8000 (puertos en .env).
+# Producción: docker-compose.prod.yml. Guía completa: docs/docker.md.
+name: trackflow
+
+services:
+  backend:
+    build:
+      context: ./services
+      dockerfile: Dockerfile
+      target: dev
+      additional_contexts:
+        packages: ./packages/analisis-incidencias
+    image: trackflow-backend:dev
+    # Variables de la API (SECRET_KEY, REGISTRATION_CODE, RESEND_*, DATABASE_URL…). El frontend no las recibe.
+    env_file: .env
+    environment:
+      # Origen del backoffice tal como lo ve el navegador. Se deriva del puerto publicado; .env puede sobrescribirlo.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:${BACKOFFICE_PORT:-3001},http://127.0.0.1:${BACKOFFICE_PORT:-3001}}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:${BACKOFFICE_PORT:-3001}}
+    ports:
+      # Solo en 127.0.0.1: la API no queda expuesta a la red local.
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    volumes:
+      # Código y datos locales (services/api/db) del host: los mismos que sin Docker.
+      - ./services/api:/app/services/api
+      - ./packages/analisis-incidencias:/app/packages/analisis-incidencias:ro
+    networks:
+      - trackflow-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  interfaces:
+    build:
+      context: ./uis
+      dockerfile: Dockerfile
+      target: dev
+    image: trackflow-interfaces:dev
+    environment:
+      # El backoffice llama a la API DESDE EL NAVEGADOR: la URL debe resolverla tu equipo (localhost), no "backend".
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:${API_PORT:-8000}}
+      NEXT_PUBLIC_INVENTORY_API_URL: ${NEXT_PUBLIC_INVENTORY_API_URL:-}
+      # Recarga en caliente. Docker Desktop en Windows no propaga los eventos de ficheros de los bind mounts y Turbopack
+      # no ve los cambios (comprobado): por defecto webpack con sondeo. En Linux/macOS: NEXT_DEV_BUNDLER=turbopack.
+      NEXT_DEV_BUNDLER: ${NEXT_DEV_BUNDLER:-webpack}
+      WATCHPACK_POLLING: ${WATCHPACK_POLLING:-true}
+    ports:
+      - "127.0.0.1:${WEBSITE_PORT:-3000}:3000"
+      - "127.0.0.1:${BACKOFFICE_PORT:-3001}:3001"
+    volumes:
+      - ./uis/website:/app/website
+      - ./uis/backoffice:/app/backoffice
+      # Volúmenes anónimos: node_modules y .next del contenedor (Linux) no se mezclan con los del host (Windows).
+      # Tras cambiar un package-lock.json: docker compose up --build --renew-anon-volumes
+      - /app/website/node_modules
+      - /app/website/.next
+      - /app/backoffice/node_modules
+      - /app/backoffice/.next
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - trackflow-net
+    healthcheck:
+      # En desarrollo la primera petición compila la página: margen amplio.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ && wget -q -O /dev/null http://127.0.0.1:3001/login"]
+      interval: 30s
+      timeout: 60s
+      retries: 3
+      start_period: 90s
+
+networks:
+  trackflow-net:
+    name: trackflow-net

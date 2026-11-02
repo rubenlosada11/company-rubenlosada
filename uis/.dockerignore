@@ -1,0 +1,35 @@
+# Contexto de build de uis/Dockerfile: solo entran website, backoffice y start.sh.
+
+# Apps de hitos anteriores (no van en este contenedor)
+landing
+script-automatizacion
+talent-pipeline-tracker
+README*.md
+
+# Dependencias y artefactos: se instalan y compilan dentro de la imagen
+**/node_modules
+**/.next
+**/out
+**/build
+**/.swc
+**/coverage
+**/*.tsbuildinfo
+**/next-env.d.ts
+
+# Variables de entorno y secretos (las públicas llegan como argumentos de build)
+**/.env*
+**/*.pem
+
+# Logs, capturas y ficheros de editor o de agentes
+**/*.log
+**/npm-debug.log*
+**/screenshots
+**/.DS_Store
+**/.vscode
+**/AGENTS.md
+**/CLAUDE.md
+**/LINK_PRODUCCION.md
+
+# Ficheros de Docker
+Dockerfile
+.dockerignore

@@ -17,5 +17,8 @@ Esta carpeta contiene la **documentación transversal** del monorepo: guías de 
   histórico, endpoints, páginas del backoffice, manejo de errores, tests y limitaciones.
 - [`inventario.md`](./inventario.md) — Hito 5, gestión de inventario backend: API `/inventory` con SQLModel,
   equivalencia con la estructura del briefing, reglas de stock por almacén, datos semilla, Supabase y limitaciones.
+- [`docker.md`](./docker.md) — Docker del monorepo: contenedores `interfaces` (website + backoffice) y `backend`
+  (API), Compose de desarrollo con hot reload y de producción, variables, despliegue en el VPS sin acceso público,
+  actualización, vuelta atrás y problemas habituales.
 - [`despliegue-api.md`](./despliegue-api.md) — instrucciones (no ejecutadas) para desplegar `services/api` y conectar
   el backoffice de producción: tarball, `uv`, variables, proxy, autenticación y verificación.

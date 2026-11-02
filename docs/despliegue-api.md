@@ -12,6 +12,10 @@ funcionan en local.
 > dejar entrar. Si se redespliega sin la API publicada, el panel queda inaccesible. Despliega primero la API
 > (secciones 1–2) y después el backoffice.
 
+> **Docker (2026-11-02):** la API y las dos apps ya se ejecutan con Docker Compose y están desplegadas en el VPS
+> `bc-vps-248`, **sin acceso público** (túnel SSH). Ver [`docker.md`](./docker.md). Este documento sigue describiendo
+> el despliegue sin Docker y la publicación con dominio, que siguen pendientes.
+
 > **Estado: documentado, NO ejecutado.** Todo lo que toca infraestructura, DNS (`rubenlosada.com`), proxy o secretos
 > requiere confirmación previa del desarrollador ([`AGENTS.md`](../AGENTS.md) §4). Antes de empezar, el desarrollador
 > debe decidir los puntos de [Decisiones pendientes](#decisiones-pendientes).
