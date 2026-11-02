@@ -11,7 +11,7 @@
   builds de producción) sobre `uis/website` y `uis/backoffice`, diagnóstico en `AUDIT.md`, correcciones una a una
   con su medición, refactorizaciones del backoffice y resultados en `REPORT.md`. Evidencias en `audit/`.
   **Implementada y validada** (2026-11-02): website accesibilidad 96 → 100 y móvil 96 → 97; gestor de incidencias
-  95 → 99 (CLS 0,133 → 0); dashboard accesibilidad 96 → 100. 11 commits; pendiente de revisión en PR.
+  95 → 99 (CLS 0,133 → 0); dashboard accesibilidad 96 → 100. 12 commits, rama subida y **PR #23 abierta** (2026-11-02).
 - **Contenedorización del monorepo** (práctica sin número de hito, ticket infra-40): Docker Compose de desarrollo
   (website :3000 + backoffice :3001 en el contenedor `interfaces`, API :8000 en `backend`, hot reload) y de
   producción, desplegado en el VPS `bc-vps-248` **sin acceso público** (túnel SSH). **Entregada:** 9 commits y
@@ -1375,6 +1375,6 @@ agente gestionara las mediciones y las capturas de Lighthouse.
    `/opt/company-rubenlosada` (y, si cambió el código, redesplegar con la etiqueta del commit de `main`,
    `docs/docker.md` §15). Publicar en Internet (dominio, proxy/túnel de Cloudflare, HTTPS) requiere confirmación.
 9. Opcional: borrar la rama local `feature/infra-40-docker-monorepo` (ya fusionada) con `git branch -d`.
-10. Auditoría de rendimiento: revisar y fusionar su PR. Recomendaciones que requieren decisión (`REPORT.md` §8): sesión
+10. Auditoría de rendimiento: revisar y fusionar la PR #23. Recomendaciones que requieren decisión (`REPORT.md` §8): sesión
     con cookie + comprobación en servidor para que el panel del backoffice no espere a `GET /auth/me` (LCP móvil
     ~3 s); `experimental.inlineCss` cuando sea estable; medir en campo (RUM con `web-vitals`) si se publican.
