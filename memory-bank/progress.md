@@ -6,12 +6,16 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/infra-40-docker-monorepo` (desde `main` @ `7f6a1b6`, que ya incluye las PR #3–#20).
+- **Rama de trabajo:** `feature/frontend-performance-audit` (desde `main` @ `714441a`, que incluye las PR #3–#22).
+- **Auditoría de rendimiento de los frontends** (práctica sin número de hito): Lighthouse (12.8.2, 5 ejecuciones,
+  builds de producción) sobre `uis/website` y `uis/backoffice`, diagnóstico en `AUDIT.md`, correcciones una a una
+  con su medición, refactorizaciones del backoffice y resultados en `REPORT.md`. Evidencias en `audit/`. **En curso.**
 - **Contenedorización del monorepo** (práctica sin número de hito, ticket infra-40): Docker Compose de desarrollo
   (website :3000 + backoffice :3001 en el contenedor `interfaces`, API :8000 en `backend`, hot reload) y de
-  producción, **desplegado en el VPS `bc-vps-248` sin acceso público** (túnel SSH). **Implementado y validado**;
-  7 commits, rama subida y **PR #22 abierta** (2026-11-02), registrada en Notion («Prácticas — Bootcamp»). Guía:
-  `docs/docker.md`.
+  producción, desplegado en el VPS `bc-vps-248` **sin acceso público** (túnel SSH). **Entregada:** 9 commits y
+  **PR #22 fusionada** (`714441a`, 2026-11-02), con 9 capturas; registrada en Notion como completada. **Los dos
+  entornos están parados** (con `stop`, sin perder nada): se reanudan con `docker compose start` (local) y
+  `docker compose -f docker-compose.prod.yml start` en `/opt/company-rubenlosada` (VPS). Guía: `docs/docker.md`.
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (práctica sin número de hito; contexto en
@@ -65,6 +69,8 @@
 | Gestión de errores | ✅ PR #16 fusionada (`7435c5f`): API 789 tests, paquete + scripts 196, navegador 41 + 36 |
 | Pruebas unitarias (AUTH-088, API-042, FE-019) | ✅ PR #17 fusionada (`39af495`); cifras en `TESTING.md` |
 | Hito 5 — Inventario (`/inventory`) | ✅ API: PR #18 fusionada (`9779fbf`; 1160 tests, 118 del inventario); Supabase conectado (2026-11-01) |
+| Auditoría de rendimiento (frontends) | 🟡 En curso en `feature/frontend-performance-audit`: línea base en `audit/before/`, diagnóstico en `AUDIT.md` |
+| Contenedorización (Docker + VPS) | ✅ PR #22 fusionada (`714441a`): E2E 10/10 dev, 8/8 imágenes prod, 5/5 VPS por túnel; 9 capturas. Stacks local y VPS **parados** (`start` para reanudar) |
 | Hito 5 — Interfaz de inventario (backoffice) | ✅ PR #19 fusionada (`01ddccb`; Jest 148, 57 nuevos; navegador 18 + 29 + 35 + 21 + 41 + 12/13; 10 capturas). Hito 5 **entregado** |
 | Gestor de incidencias | ✅ PR #15 fusionada (`2d90092`): paquete + scripts 192 tests, API 751 tests, navegador 69 + 64 + 33 + 44 + 22 |
 | Recuperación y cambio de contraseña (AUTH-03) | ✅ PR #14 fusionada (`f586bb3`): API completa: persistencia, email, los tres endpoints y cambio de email con contraseña (473 tests) `/forgot-password` (E2E 39/39) y `/reset-password` (E2E 51/51) enlace en `/login` (E2E 26/26) y `/account/change-password` (E2E 42/42); E2E de punta a punta 33/33 con emails reales; regresión de AUTH-02 en verde |
@@ -1241,6 +1247,32 @@ desarrollador. Decisiones en `techContext.md` («Decisiones técnicas de la cont
   conocidos (`next` 16.3.4 *critical*, `sharp`, `source-map-js`; no se usan `next/og`, `use cache` ni draft mode);
   `pip-audit`: `ecdsa`, `pyasn1` y `python-jose` (dependencias de la autenticación JWT). Previos a esta rama; no se
   cambian versiones aquí.
+- **Cierre (2026-11-02):** el desarrollador fusionó la PR #22 (`714441a`) y actualizó su `main` local. Notion: fila
+  «Completado», página de documentación y página «TrackFlow · Accesos» (Docker local, VPS por túnel, demos públicas
+  comprobadas y tablas de usuarios de prueba que rellena el desarrollador; nunca al repo). Ambos stacks parados con
+  `stop` (el VPS no arranca solo al reiniciarse). Limpieza de restos de pruebas en el equipo (imágenes `*-test` e
+  `infra40-rc1`, 16 volúmenes huérfanos, caché de build de las pruebas, scratchpad); se conservan las imágenes `:dev`,
+  las bases de los Dockerfiles y todo lo del proyecto `ai-eng-financial-dashboard`. En el VPS siguen las imágenes
+  `infra40-rc1`, el volumen `trackflow-api-data` (admin + 15 proveedores) y `/opt/company-rubenlosada`. Esta
+  actualización de `progress.md` quedó **sin commitear** por indicación del desarrollador.
+
+### 2026-11-02 — Auditoría de rendimiento de los frontends (rama `feature/frontend-performance-audit`)
+
+Prompt del curso por fases; el desarrollador pidió ejecutarlo **del tirón**, sin paradas salvo bloqueo, y que el
+agente gestionara las mediciones y las capturas de Lighthouse.
+
+- **Medición:** Lighthouse 12.8.2 (API de Node) + Chrome 156 headless, instalados **fuera del repo** (scratchpad);
+  scripts versionados en `audit/scripts/` (`run-lh.mjs`, `shot-reports.mjs`, `summarize.mjs`, `diag.mjs`) y
+  procedimiento en `audit/README.md`. 5 ejecuciones por página y dispositivo; se versiona la ejecución mediana
+  (HTML + JSON + PNG de la cabecera del informe) y `runs.json` con todas.
+- **Backoffice con sesión:** API arrancada con **copias** de las bases en el scratchpad (`*_DB_PATH`, `DATABASE_URL` a un
+  SQLite copiado, `SECRET_KEY` temporal) y un usuario `auditoria@example.com` solo en esa copia; el token se guarda en
+  `localStorage` antes de cada ejecución y Lighthouse corre con `disableStorageReset`.
+- **Línea base (medianas):** website escritorio 100/96/100/100, móvil 96/96/100/100 (LCP 2,64 s); dashboard escritorio
+  100/96/100/63, móvil 93/96/100/63 (LCP 3,06 s); gestor de incidencias escritorio 95/100/100/63 (CLS 0,133). SEO 63 del
+  backoffice = `noindex` intencionado. Sin CrUX (PSI con cuota anónima agotada; `localhost` no tiene datos de campo).
+- **Skills del CTO** (`core-web-vitals`, `performance`, `web-perf`): leídas de sus repositorios como referencia, no
+  instaladas.
 
 ## Trabajo pendiente
 
@@ -1315,10 +1347,12 @@ desarrollador. Decisiones en `techContext.md` («Decisiones técnicas de la cont
    API y luego el backoffice, y más adelante sustituir los “datos de partida” estáticos de `lib/data/`.
 5. Valorar añadir CI (requiere confirmación) que ejecute `uv run pytest` y `npm test` del backoffice (runners ya
    existentes desde AUTH-088) y automatice `validate-delivery`.
-6. Decidir la subida de `next` a 16.3.8 (website y backoffice) en una rama propia (avisos de seguridad detectados en
-   AUTH-088; PR #17 ya fusionada).
-7. Hito 5 entregado: revisar y fusionar la PR de cierre (`feature/hito-5-cierre`). Pendientes del hito, sin fecha:
-   permisos por rol, aviso de sesión caducada intermitente y limitaciones de `docs/inventario.md`.
-8. Contenedorización: revisar y fusionar la PR #22; tras fusionar, redesplegar con la etiqueta del commit de
-   `main` (`docs/docker.md` §15). Publicar en Internet (dominio, proxy/túnel de Cloudflare, HTTPS) queda para más
-   adelante y requiere confirmación.
+6. Decidir la subida de `next` a **16.4.4** (website y backoffice; la auditoría del 2026-11-02 ya marca 16.3.x como
+   *critical*) y de `ecdsa`/`pyasn1`/`python-jose` en una rama propia; después, regenerar `services/requirements.txt`
+   y reconstruir/redesplegar las imágenes Docker.
+7. Hito 5 entregado (PR de cierre #20 fusionada). Pendientes del hito, sin fecha: permisos por rol, aviso de sesión
+   caducada intermitente y limitaciones de `docs/inventario.md`.
+8. Contenedorización entregada (PR #22). Si un proyecto futuro necesita el VPS: `start` en
+   `/opt/company-rubenlosada` (y, si cambió el código, redesplegar con la etiqueta del commit de `main`,
+   `docs/docker.md` §15). Publicar en Internet (dominio, proxy/túnel de Cloudflare, HTTPS) requiere confirmación.
+9. Opcional: borrar la rama local `feature/infra-40-docker-monorepo` (ya fusionada) con `git branch -d`.
