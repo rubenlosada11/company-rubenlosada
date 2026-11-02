@@ -10,7 +10,8 @@
 - **Contenedorización del monorepo** (práctica sin número de hito, ticket infra-40): Docker Compose de desarrollo
   (website :3000 + backoffice :3001 en el contenedor `interfaces`, API :8000 en `backend`, hot reload) y de
   producción, **desplegado en el VPS `bc-vps-248` sin acceso público** (túnel SSH). **Implementado y validado**;
-  commits hechos, falta push y PR (fases 14–15). Guía: `docs/docker.md`.
+  7 commits, rama subida y **PR #22 abierta** (2026-11-02), registrada en Notion («Prácticas — Bootcamp»). Guía:
+  `docs/docker.md`.
 - **Hito 4 — Ingeniería impulsada por IA:** entregado y desplegado (PR #3–#6 fusionadas).
 - **Propuesta de arquitectura de backend** (entregable del curso, no es un hito numerado): PR #7 fusionada.
 - **Directorio de proveedores** (práctica sin número de hito; contexto en
@@ -1230,6 +1231,9 @@ desarrollador. Decisiones en `techContext.md` («Decisiones técnicas de la cont
   los dos contenedores y 329 MB aún disponibles; nada escucha fuera de `127.0.0.1`; seed de proveedores cargado;
   reinicio automático tras `kill -9` del proceso y vuelta atrás por etiqueta probados; túnel SSH + Edge: website,
   backoffice y login con CORS (401 con su mensaje). OpenClaw y code-server siguen activos.
+- **Entrega:** 6 commits + 1 con un conflicto de puertos silencioso detectado al preparar la PR (un `next start` de la
+  validación quedó vivo en el 3001; documentado en `docs/docker.md` §17). Push y **PR #22** abierta con evidencias de
+  texto; las capturas las añade el desarrollador. Práctica registrada en Notion («Prácticas — Bootcamp», en progreso).
 - **Auditoría de seguridad:** sin secretos en logs, historial de imágenes ni git. `npm audit --omit=dev`: 3 avisos ya
   conocidos (`next` 16.3.4 *critical*, `sharp`, `source-map-js`; no se usan `next/og`, `use cache` ni draft mode);
   `pip-audit`: `ecdsa`, `pyasn1` y `python-jose` (dependencias de la autenticación JWT). Previos a esta rama; no se
@@ -1315,7 +1319,6 @@ desarrollador. Decisiones en `techContext.md` («Decisiones técnicas de la cont
    AUTH-088; PR #17 ya fusionada).
 7. Hito 5 entregado: revisar y fusionar la PR de cierre (`feature/hito-5-cierre`). Pendientes del hito, sin fecha:
    permisos por rol, aviso de sesión caducada intermitente y limitaciones de `docs/inventario.md`.
-8. Contenedorización: push de `feature/infra-40-docker-monorepo` y PR hacia `main` (fases 14–15, con autorización
-   del desarrollador); crear el administrador de producción; tras fusionar, redesplegar con la etiqueta del commit de
+8. Contenedorización: revisar y fusionar la PR #22 (añadir las capturas); crear el administrador de producción; tras fusionar, redesplegar con la etiqueta del commit de
    `main` (`docs/docker.md` §15). Publicar en Internet (dominio, proxy/túnel de Cloudflare, HTTPS) queda para más
    adelante y requiere confirmación.
