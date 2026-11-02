@@ -44,7 +44,7 @@ def not_found(error: inventory_service.SKUNotFound) -> HTTPException:
     return HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error))
 
 
-@router.get("/products", summary="Lista los SKUs con su stock")
+@router.get("/products", response_model=list[SKURead], summary="Lista los SKUs con su stock")
 def list_products(
     session: DbSession,
     warehouse: Annotated[Warehouse | None, Query(description="Solo los SKUs registrados en este almacén")] = None,
@@ -56,6 +56,7 @@ def list_products(
 @router.post(
     "/products",
     status_code=status.HTTP_201_CREATED,
+    response_model=SKURead,
     summary="Registra un SKU",
     responses={409: {"description": "Ya existe un SKU con ese código"}},
 )
@@ -66,7 +67,9 @@ def create_product(payload: SKUCreate, session: DbSession) -> SKURead:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from None
 
 
-@router.get("/products/{sku_id}", summary="Obtiene un SKU con su stock", responses=SKU_NOT_FOUND)
+@router.get(
+    "/products/{sku_id}", response_model=SKURead, summary="Obtiene un SKU con su stock", responses=SKU_NOT_FOUND
+)
 def get_product(sku_id: int, session: DbSession) -> SKURead:
     try:
         return inventory_service.get_sku_read(session, sku_id)
@@ -77,6 +80,7 @@ def get_product(sku_id: int, session: DbSession) -> SKURead:
 @router.post(
     "/orders/inbound",
     status_code=status.HTTP_201_CREATED,
+    response_model=StockEntryRead,
     summary="Registra una recepción de mercancía (StockEntry)",
     responses=SKU_NOT_FOUND,
 )
@@ -91,6 +95,7 @@ def create_inbound(payload: StockEntryCreate, session: DbSession, user: CurrentU
 @router.post(
     "/orders/outbound",
     status_code=status.HTTP_201_CREATED,
+    response_model=StockExitRead,
     summary="Registra un despacho o una pérdida (StockExit)",
     responses={**SKU_NOT_FOUND, 400: {"description": "Stock insuficiente en el almacén de la salida"}},
 )
@@ -104,7 +109,7 @@ def create_outbound(payload: StockExitCreate, session: DbSession, user: CurrentU
     return StockExitRead.model_validate(stock_exit)
 
 
-@router.get("/orders", summary="Lista los movimientos de stock con los datos del SKU")
+@router.get("/orders", response_model=list[Movement], summary="Lista los movimientos de stock con los datos del SKU")
 def list_orders(
     session: DbSession,
     warehouse: Annotated[Warehouse | None, Query(description="Solo los movimientos de este almacén")] = None,
