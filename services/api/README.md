@@ -30,6 +30,11 @@ las páginas `/proveedores`, `/incidencias` y `/gestor-incidencias` del [backoff
 > los riesgos pendientes de [`docs/autenticacion.md`](../../docs/autenticacion.md#auditoría-de-seguridad) y las
 > instrucciones (no ejecutadas) de [`docs/despliegue-api.md`](../../docs/despliegue-api.md).
 
+**Contratos de respuesta:** toda ruta con cuerpo JSON declara `response_model` en su decorador y responde con un
+esquema de salida que enumera sus campos (nunca un modelo persistido, un esquema de entrada ni un `dict`). Al añadir
+una ruta, haz lo mismo: `tests/test_serialization.py` falla si falta. Inventario, decisiones y excepciones (204 y la
+descarga CSV) en [`docs/serialization-audit.md`](../../docs/serialization-audit.md).
+
 ## Instalación
 
 Requiere `uv` (`uv --version`). Desde la raíz del repo, en Windows PowerShell (un comando por línea):
@@ -455,6 +460,7 @@ funcionando con un token válido.
 | [`tests/test_models.py`](./tests/test_models.py) | Proveedor válido, obligatorios, estados, países, categorías, tarifa 0/negativa/texto/booleano, moneda por país, email, campos del servidor |
 | [`tests/test_database.py`](./tests/test_database.py) | Ruta, ids, UTF-8, reapertura, lectura desde otro proceso, escrituras concurrentes |
 | [`tests/test_seed.py`](./tests/test_seed.py) | Seed idéntico al CONTEXT, 1.ª y 2.ª ejecución, inserción parcial, no sobrescribe, salida por consola |
+| [`tests/test_serialization.py`](./tests/test_serialization.py) | Auditoría de serialización: todas las rutas JSON declaran `response_model`, OpenAPI las documenta, ninguna respuesta lleva contraseñas, hashes, tokens ni campos internos, registro/login/recuperación sin email, campos exactos por recurso y campos protegidos de entrada. Detalle en [`docs/serialization-audit.md`](../../docs/serialization-audit.md) |
 | [`tests/test_api.py`](./tests/test_api.py) | Los 6 endpoints: 201/200/204, filtros y combinación, 404, 422, `updated_at`, persistencia al reiniciar (otro proceso), CORS, UTF-8 |
 | [`tests/test_incidents.py`](./tests/test_incidents.py) | Valores esperados del CONTEXT, equivalencia con el script y exportación idéntica byte a byte, 400/404/413/415/422/500, último análisis, sin correos en JSON/log/exportación, CORS y `Content-Disposition` expuesto |
 | [`tests/test_incident_models.py`](./tests/test_incident_models.py) | Gestor: modelos, campos obligatorios, valores permitidos, fechas, tabla TinyDB y datos inválidos que no llegan a la base |

@@ -22,7 +22,7 @@ inexistente, y así no puede averiguar qué ids existen.
 
 from fastapi import APIRouter, HTTPException, status
 
-from app.auth_models import ProfilePublic, Role, User, UserCreate, UserPublic, UserUpdate, UserWithProfile
+from app.auth_models import ProfilePublic, RegisterResponse, Role, User, UserCreate, UserPublic, UserUpdate
 from app.dependencies import CurrentUser
 from app.security import invitation_code_is_valid, verify_password
 from app.services import password_reset as password_reset_service
@@ -54,7 +54,8 @@ def forbidden(detail: str) -> HTTPException:
 
 
 def to_public(user: User) -> UserPublic:
-    return UserPublic.model_validate(user.model_dump(exclude={"hashed_password"}))
+    """Lista blanca de `UserPublic`: sin `hashed_password` ni `password_changed_at`."""
+    return UserPublic.model_validate(user)
 
 
 def get_or_404(user_id: str) -> User:
@@ -67,13 +68,17 @@ def get_or_404(user_id: str) -> User:
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
+    response_model=RegisterResponse,
     responses={
         403: {"description": "Falta el código de invitación o no es válido (solo con `REGISTRATION_CODE`)"},
         409: {"description": EMAIL_TAKEN},
     },
 )
-def register(payload: UserCreate) -> UserWithProfile:
+def register(payload: UserCreate) -> RegisterResponse:
     """Registro público. Crea el usuario (rol `user`, activo) y su perfil con `name`, `phone` y `address` opcionales.
+
+    La respuesta confirma la cuenta (id, rol, estado, fecha y perfil) **sin el email** ni ninguna credencial: el email
+    solo se devuelve a su dueño ya autenticado (`GET /auth/me`).
 
     Si la API tiene `REGISTRATION_CODE`, exige `invitation_code`. Se comprueba antes que el email: sin el código no se
     puede averiguar qué emails están registrados.
@@ -84,10 +89,16 @@ def register(payload: UserCreate) -> UserWithProfile:
         user, profile = users_service.create_user(payload)
     except users_service.EmailAlreadyRegistered:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=EMAIL_TAKEN) from None
-    return UserWithProfile(**to_public(user).model_dump(), profile=ProfilePublic.model_validate(profile.model_dump()))
+    return RegisterResponse(
+        id=user.id,
+        role=user.role,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        profile=ProfilePublic.model_validate(profile),
+    )
 
 
-@router.get("", responses=AUTH_RESPONSES)
+@router.get("", response_model=list[UserPublic], responses=AUTH_RESPONSES)
 def list_users(current_user: CurrentUser) -> list[UserPublic]:
     """Todos los usuarios, sin hashes de contraseña. Solo `admin` y `manager`."""
     if current_user.role not in STAFF_ROLES:
@@ -95,7 +106,7 @@ def list_users(current_user: CurrentUser) -> list[UserPublic]:
     return [to_public(user) for user in users_service.list_users()]
 
 
-@router.get("/{user_id}", responses=AUTH_RESPONSES)
+@router.get("/{user_id}", response_model=UserPublic, responses=AUTH_RESPONSES)
 def get_user(user_id: str, current_user: CurrentUser) -> UserPublic:
     if user_id != current_user.id and current_user.role not in STAFF_ROLES:
         raise forbidden("No puedes consultar otros usuarios.")
@@ -104,6 +115,7 @@ def get_user(user_id: str, current_user: CurrentUser) -> UserPublic:
 
 @router.put(
     "/{user_id}",
+    response_model=UserPublic,
     responses={
         **AUTH_RESPONSES,
         400: {"description": "Cambio de email sin `current_password` o con una incorrecta"},

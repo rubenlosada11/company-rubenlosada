@@ -64,16 +64,18 @@ def test_register_creates_user_and_profile(anon_client, auth_env):
     response = anon_client.post("/users", json=payload)
     assert response.status_code == 201
     body = response.json()
-    assert body["email"] == "laura.gomez@trackflow.test"  # normalizado
+    # El registro no devuelve el email ni credenciales (auditoría de serialización): solo `GET /auth/me` lo devuelve.
+    assert set(body) == {"id", "role", "is_active", "created_at", "profile"}
     assert body["role"] == "user" and body["is_active"] is True
     assert body["profile"]["user_id"] == body["id"]
     assert {k: body["profile"][k] for k in ("name", "phone", "address")} == {
         "name": "Laura Gómez", "phone": "+34 976 000 000", "address": "Zaragoza",
     }
-    assert "hashed_password" not in body and "password" not in body
 
     stored = json.loads(auth_env.read_text(encoding="utf-8"))
     assert len(stored["users"]) == 1 and len(stored["profiles"]) == 1
+    (user,) = stored["users"].values()
+    assert user["id"] == body["id"] and user["email"] == "laura.gomez@trackflow.test"  # normalizado
 
 
 def test_register_profile_fields_are_optional(anon_client):

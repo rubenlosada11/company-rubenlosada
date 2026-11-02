@@ -101,13 +101,13 @@ router = APIRouter(
 NOT_FOUND = {404: {"description": "Incidencia no encontrada"}}
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=Incident)
 def create_incident(payload: IncidentCreate) -> Incident:
     """Registra una incidencia. Nace en estado `open`; las fechas las pone el servidor."""
     return incidents_service.create_incident(payload)
 
 
-@router.get("")
+@router.get("", response_model=list[Incident])
 def list_incidents(
     status: IncidentStatus | None = None,
     origin: IncidentOrigin | None = None,
@@ -119,7 +119,7 @@ def list_incidents(
 
 
 # Antes de `/{incident_id}`: si no, «summary» se leería como un id.
-@router.get("/summary")
+@router.get("/summary", response_model=IncidentSummary)
 def get_summary() -> IncidentSummary:
     """Totales por estado, categoría, origen y sede. Con la base vacía, todos a 0."""
     return incidents_service.summarize()
@@ -129,7 +129,7 @@ def not_found(incident_id: int) -> HTTPException:
     return HTTPException(404, detail=f"Incidencia {incident_id} no encontrada")
 
 
-@router.get("/{incident_id}", responses=NOT_FOUND)
+@router.get("/{incident_id}", response_model=Incident, responses=NOT_FOUND)
 def get_incident(incident_id: int) -> Incident:
     incident = incidents_service.get_incident(incident_id)
     if incident is None:
@@ -137,7 +137,7 @@ def get_incident(incident_id: int) -> Incident:
     return incident
 
 
-@router.patch("/{incident_id}/status", responses=NOT_FOUND)
+@router.patch("/{incident_id}/status", response_model=Incident, responses=NOT_FOUND)
 def update_status(incident_id: int, payload: IncidentStatusUpdate) -> Incident:
     """Cambia el estado. Solo `open → in_progress | discarded` e `in_progress → resolved | discarded`.
 

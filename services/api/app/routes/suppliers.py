@@ -33,7 +33,7 @@ NOT_FOUND = {404: {"description": "Proveedor no encontrado"}}
 
 
 def to_supplier(doc: Document) -> Supplier:
-    """Documento de TinyDB → modelo de respuesta (el `id` es el `doc_id` de TinyDB)."""
+    """Documento de TinyDB → esquema de respuesta (`id` = `doc_id` de TinyDB; solo los campos de `Supplier`)."""
     return Supplier.model_validate({**doc, "id": doc.doc_id})
 
 
@@ -44,13 +44,13 @@ def get_or_404(table: Table, supplier_id: int) -> Document:
     return doc
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=Supplier)
 def create_supplier(payload: SupplierCreate, table: SuppliersTable) -> Supplier:
     doc_id = table.insert({**payload.model_dump(mode="json"), "updated_at": utc_now().isoformat()})
     return to_supplier(table.get(doc_id=doc_id))
 
 
-@router.get("")
+@router.get("", response_model=list[Supplier])
 def list_suppliers(
     table: SuppliersTable,
     country: Country | None = None,
@@ -68,12 +68,12 @@ def list_suppliers(
     return [to_supplier(doc) for doc in docs]
 
 
-@router.get("/{supplier_id}", responses=NOT_FOUND)
+@router.get("/{supplier_id}", response_model=Supplier, responses=NOT_FOUND)
 def get_supplier(supplier_id: int, table: SuppliersTable) -> Supplier:
     return to_supplier(get_or_404(table, supplier_id))
 
 
-@router.patch("/{supplier_id}/rate", responses=NOT_FOUND)
+@router.patch("/{supplier_id}/rate", response_model=Supplier, responses=NOT_FOUND)
 def update_rate(supplier_id: int, payload: SupplierRateUpdate, table: SuppliersTable) -> Supplier:
     """Actualiza la tarifa y registra `updated_at` (trazabilidad de tarifas del CONTEXT)."""
     get_or_404(table, supplier_id)
@@ -84,7 +84,7 @@ def update_rate(supplier_id: int, payload: SupplierRateUpdate, table: SuppliersT
     return to_supplier(table.get(doc_id=supplier_id))
 
 
-@router.patch("/{supplier_id}/status", responses=NOT_FOUND)
+@router.patch("/{supplier_id}/status", response_model=Supplier, responses=NOT_FOUND)
 def update_status(supplier_id: int, payload: SupplierStatusUpdate, table: SuppliersTable) -> Supplier:
     """Activa o suspende. No toca `updated_at`, que es la fecha de la última actualización de tarifa."""
     get_or_404(table, supplier_id)
@@ -94,5 +94,6 @@ def update_status(supplier_id: int, payload: SupplierStatusUpdate, table: Suppli
 
 @router.delete("/{supplier_id}", status_code=status.HTTP_204_NO_CONTENT, responses=NOT_FOUND)
 def delete_supplier(supplier_id: int, table: SuppliersTable) -> None:
+    """Borra el proveedor. 204 sin cuerpo (no hay `response_model`: no hay nada que serializar)."""
     get_or_404(table, supplier_id)
     table.remove(doc_ids=[supplier_id])

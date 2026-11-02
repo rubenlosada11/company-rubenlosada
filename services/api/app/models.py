@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Country(StrEnum):
@@ -21,7 +21,7 @@ class Currency(StrEnum):
     EUR = "EUR"
 
 
-class Category(StrEnum):
+class SupplierCategory(StrEnum):
     CARRIER_LAST_MILE = "carrier_last_mile"
     CARRIER_INTERNATIONAL = "carrier_international"
     WAREHOUSE_SUPPLIES = "warehouse_supplies"
@@ -30,6 +30,11 @@ class Category(StrEnum):
     FLEET_MAINTENANCE = "fleet_maintenance"
     IT_AND_WMS_SOFTWARE = "it_and_wms_software"
     CLEANING_AND_FACILITIES = "cleaning_and_facilities"
+
+
+# Nombre corto que usan el router, el seed y los tests. La clase se llama `SupplierCategory` para que OpenAPI no la
+# confunda con la categoría de producto del inventario (`app.inventory_schemas.ProductCategory`).
+Category = SupplierCategory
 
 
 class Status(StrEnum):
@@ -112,8 +117,25 @@ class SupplierStatusUpdate(BaseModel):
     status: Status
 
 
-class Supplier(SupplierCreate):
-    """Proveedor tal y como lo devuelve la API: datos del cliente + campos del servidor."""
+class Supplier(BaseModel):
+    """Proveedor tal y como lo devuelve la API: datos del cliente + campos del servidor (`id`, `updated_at`).
+
+    Esquema de salida con sus campos declarados uno a uno: no hereda de `SupplierCreate`, así que las reglas de
+    entrada (moneda según el país, categorías sin repetir) no se vuelven a aplicar al responder y un campo nuevo de
+    entrada no se expone sin decidirlo aquí.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: int
+    name: str
+    country: Country
+    categories: list[Category]
+    rate_per_shipment: float
+    currency: Currency
+    status: Status
+    # Opcionales del alta: un documento guardado sin la clave se lee como `null`, igual que con `SupplierCreate`.
+    service_zone: str | None = None
+    contact_email: str | None = None
+    notes: str | None = None
     updated_at: datetime

@@ -87,8 +87,9 @@ contraseña (sirve también para recuperar el acceso si no queda ningún admin).
 { "email": "laura@trackflow.test", "password": "al-menos-8-caracteres", "name": "Laura Gómez", "phone": "+34 976 000 000", "address": "Zaragoza" }
 ```
 
-`name`, `phone` y `address` son opcionales. La respuesta, `201`, trae el usuario (`id`, `email`, `role: "user"`,
-`is_active`, `created_at`) y su `profile`, **sin** `hashed_password`.
+`name`, `phone` y `address` son opcionales. La respuesta, `201` (`RegisterResponse`), trae el usuario (`id`,
+`role: "user"`, `is_active`, `created_at`) y su `profile`, **sin el email** ni credenciales: el email solo lo devuelve
+`GET /auth/me` a su dueño (auditoría de serialización, [`serialization-audit.md`](./serialization-audit.md)).
 
 **Código de invitación (mejora adicional, fuera del enunciado de AUTH-02; ver
 [Mejora adicional](#mejora-adicional-código-de-invitación-registration_code)).** Si la API tiene `REGISTRATION_CODE`, el cuerpo debe incluir
@@ -432,7 +433,7 @@ comprobación en el router fallan 8 tests.
 | --- | --- |
 | Secretos en el código o en git | Ninguno. `SECRET_KEY` solo sale del entorno; `.env.example` lleva `change-me`, con el que la API se niega a arrancar. `.env`, `.env.local` y `db/` están ignorados (`git check-ignore`). |
 | Contraseñas en claro | No se guardan (bcrypt) y no aparecen en ningún log ni respuesta; `create-admin` las pide sin eco. |
-| `hashed_password` en respuestas | Nunca: las respuestas usan `UserPublic`, `ProfilePublic` y `UserWithProfile`. Hay tests en `/users`, `/auth/me` y el alta. |
+| `hashed_password` en respuestas | Nunca: las respuestas usan esquemas de lista blanca con `response_model` explícito (`UserPublic`, `ProfilePublic`, `UserWithProfile`, `RegisterResponse`). Hay tests en `/users`, `/auth/me`, el alta y `tests/test_serialization.py`, que recorre todos los flujos. |
 | JWT | Firmado con HS256 fijo (`algorithms=["HS256"]`, así que `alg: none` y la confusión de algoritmos quedan rechazados); `exp` y `sub` obligatorios; el usuario se relee en cada petición, así que borrar o desactivar un usuario invalida sus tokens al momento. |
 | Sesiones y cookies | Ninguna en la API ni en el backoffice; CORS sin `allow_credentials`. |
 | Rutas sensibles públicas | Solo son públicas `POST /users`, `POST /auth/login`, `POST /auth/token` y `/health`. |

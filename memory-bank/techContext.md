@@ -455,6 +455,23 @@ resultados en `REPORT.md`, evidencias y scripts en `audit/`.
 | Resumen del gestor: estructura invisible con ceros durante la primera carga | Reserva el alto exacto y elimina el CLS (0,133 → 0) |
 | SEO 63 del backoffice se acepta | `noindex` intencionado de una herramienta interna |
 
+## Decisiones técnicas de la auditoría de serialización
+
+Práctica sin hito, rama `feature/serialization-audit` (2026-11-02). Detalle por endpoint en
+`docs/serialization-audit.md`.
+
+| Decisión | Motivo |
+| --- | --- |
+| `response_model` **explícito en el decorador** de toda ruta JSON (la anotación de retorno se mantiene) | El contrato no depende de que nadie cambie la anotación; `tests/test_serialization.py` falla si falta |
+| Esquemas de salida con campos propios y `ConfigDict(from_attributes=True)`; nunca heredan de uno de entrada ni de un modelo persistido | Un campo nuevo de entrada o de `User` no se expone solo; las reglas de entrada no se repiten al responder (un dato antiguo no tumba un listado) |
+| `POST /users` responde `RegisterResponse` **sin email**; solo `GET /auth/me` lo devuelve | Requisito del enunciado; el backoffice no lee esa respuesta |
+| `ResultadoAnalisis` (`app/analysis_schemas.py`) para el analizador, nombres en español | Forma exacta de `types/incidencias.ts`; claves nuevas del paquete se descartan hasta declararlas |
+| 204 sin `response_model`; descarga con `response_class=Response` + `responses` `text/csv` | Sin cuerpo JSON que serializar; OpenAPI documenta el tipo real |
+| Entradas de proveedores, incidencias e inventario siguen **ignorando** `id`/`status`/fechas/`user_uuid` | Decisiones documentadas de cada práctica; mismo efecto de seguridad; cubierto por tests |
+| `SupplierCategory` / `ProductCategory` con alias `Category` | Nombres únicos en OpenAPI sin tocar imports |
+| Sin paginación nueva ni cambios de consultas | Listados de decenas de registros; sin N+1 |
+| Commits `Auditoría de serialización — …` escalonados, sin `docs/hitos.md` | Práctica sin hito |
+
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 
 - `CONTEXT.es.md` y `CONTEXT-trackflow.es.md` (fuente de verdad del negocio).
