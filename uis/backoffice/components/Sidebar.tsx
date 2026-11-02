@@ -12,7 +12,9 @@ export function Sidebar() {
           alt="Logo de TrackFlow"
           width={1190}
           height={264}
-          priority
+          // 200 px de ancho (sidebar de 264 px menos rellenos). Sin precarga: es diferida, así que en móvil, con el
+          // sidebar oculto, ni se descarga.
+          sizes="200px"
           className="h-auto w-full"
         />
       </div>

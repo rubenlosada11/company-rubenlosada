@@ -13,6 +13,7 @@ export function Topbar() {
             alt="Logo de TrackFlow"
             width={1190}
             height={264}
+            sizes="126px"
             className="h-7 w-auto lg:hidden"
           />
           <span className="shrink-0 rounded-full bg-blue-700 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-white">

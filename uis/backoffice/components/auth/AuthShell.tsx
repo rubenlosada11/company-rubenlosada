@@ -42,6 +42,7 @@ export function AuthShell({ children, footnote }: AuthShellProps) {
               width={1190}
               height={264}
               priority
+              sizes="145px"
               className="h-8 w-auto"
             />
             <span className="rounded-full bg-blue-700 px-2.5 py-0.5 text-xs font-bold tracking-wide text-white uppercase">
@@ -150,6 +151,7 @@ function BrandPanel() {
             width={1190}
             height={264}
             priority
+            sizes="145px"
             className="h-8 w-auto"
           />
         </div>
