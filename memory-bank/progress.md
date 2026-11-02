@@ -1279,6 +1279,7 @@ agente gestionara las mediciones y las capturas de Lighthouse.
   - W3 (AVIF en `images.formats` del website): peso 277 → 257 KiB, hero 39,8 → 22,2 KB, logo 6,6 → 4,4 KB; puntuación y LCP sin cambio fuera del ruido (97; 2584 → 2596 ms). Se mantiene por el ahorro de datos.
   - W4 (números del proceso del website de `blue-200` a `blue-500`, contraste 1,41 → 3,73:1): accesibilidad 96 → 100 en escritorio y móvil.
   - B2 (resumen del gestor reserva su alto durante la primera carga): `/gestor-incidencias` escritorio CLS 0,133 → 0 y rendimiento 95 → 99; comprobado en navegador que el listado no se mueve (908 px antes y después) y sin errores de consola.
+  - B1 (`preconnect` con `crossorigin` al origen de `NEXT_PUBLIC_API_BASE_URL` en el layout raíz): `uses-rel-preconnect` aprobado (antes 150 ms estimados), `/auth/me` antes en la traza y LCP observado 398 → 358 ms; LCP simulado del dashboard móvil sin cambio (3056 → 3055 ms; lo domina la hidratación). En `/login` (dinámica) Next solo manda la pista en el payload RSC.
 
 ## Trabajo pendiente
 
