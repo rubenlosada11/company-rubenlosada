@@ -14,7 +14,7 @@ export function Process() {
               className="relative rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-lg shadow-slate-900/5"
             >
               <span
-                className="font-heading text-4xl text-blue-200"
+                className="font-heading text-4xl text-blue-500"
                 aria-hidden="true"
               >
                 {String(index + 1).padStart(2, "0")}
