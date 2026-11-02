@@ -1274,6 +1274,9 @@ agente gestionara las mediciones y las capturas de Lighthouse.
 - **Skills del CTO** (`core-web-vitals`, `performance`, `web-perf`): leídas de sus repositorios como referencia, no
   instaladas.
 
+- **Correcciones (una por commit, medidas con 5 ejecuciones):**
+  - W1 (`fetchPriority="high"` en el hero) **descartada**: Lantern +100 ms de LCP móvil y A/B con throttling de DevTools sin diferencia (2149 vs 2152 ms). W2 (logo del website con `sizes="180px"`, `eager`, sin preload): móvil 96 → 97, LCP 2639 → 2584 ms, TBT 106 → 56 ms; logo de 3840 px/9,4 KB a 384 px/6,6 KB.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
