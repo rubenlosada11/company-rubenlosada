@@ -19,6 +19,9 @@ export interface CurrentUser {
   profile: Profile;
 }
 
+/** Respuesta `201` de `POST /users`: confirma la cuenta creada, **sin el email** (solo lo devuelve `GET /auth/me`). */
+export type RegisteredUser = Omit<CurrentUser, "email">;
+
 /** Cuerpo de `POST /users` (registro público). La API siempre crea el usuario con rol `user`. */
 export interface RegisterPayload {
   email: string;

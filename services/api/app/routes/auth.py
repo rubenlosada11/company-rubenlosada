@@ -18,6 +18,7 @@ from app.auth_models import (
     ResetPasswordRequest,
     Token,
     User,
+    UserPublic,
     UserWithProfile,
     normalize_email,
 )
@@ -75,29 +76,33 @@ def issue_token(user: User) -> Token:
     return Token(access_token=access_token, expires_in=expires_in)
 
 
-@router.post("/login", responses=LOGIN_RESPONSES)
+@router.post("/login", response_model=Token, responses=LOGIN_RESPONSES)
 def login(payload: LoginRequest) -> Token:
     """Login con JSON `{"email", "password"}`. Devuelve el Bearer token para la cabecera `Authorization`."""
     return issue_token(authenticate(payload.email, payload.password))
 
 
-@router.post("/token", responses=LOGIN_RESPONSES)
+@router.post("/token", response_model=Token, responses=LOGIN_RESPONSES)
 def login_form(form: Annotated[OAuth2PasswordRequestForm, Depends()]) -> Token:
     """Mismo login en formato de formulario OAuth2 (`username` = email). Lo usa el botón «Authorize» de `/docs`."""
     return issue_token(authenticate(normalize_email(form.username), form.password))
 
 
-@router.get("/me")
+@router.get("/me", response_model=UserWithProfile)
 def me(current_user: CurrentUser) -> UserWithProfile:
-    """Email, rol y perfil del usuario autenticado."""
+    """Email, rol y perfil del usuario autenticado. Es la única respuesta de `/auth` que incluye el email."""
     profile = get_or_create_profile(current_user.id)
+    # Lista blanca: solo los campos de `UserPublic` (sin `hashed_password` ni `password_changed_at`) + el perfil.
     return UserWithProfile(
-        **current_user.model_dump(exclude={"hashed_password"}),
-        profile=ProfilePublic.model_validate(profile.model_dump()),
+        **UserPublic.model_validate(current_user).model_dump(),
+        profile=ProfilePublic.model_validate(profile),
     )
 
 
-@router.post("/forgot-password", responses={422: {"description": "El email no tiene un formato válido"}})
+@router.post(
+    "/forgot-password",
+    response_model=MessageResponse,
+    responses={422: {"description": "El email no tiene un formato válido"}})
 def forgot_password(
     payload: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
@@ -125,6 +130,7 @@ def forgot_password(
 
 @router.post(
     "/reset-password",
+    response_model=MessageResponse,
     responses={
         400: {"description": "El enlace no es válido, ha caducado o ya se usó"},
         422: {"description": "La contraseña nueva no cumple las reglas"},
@@ -150,6 +156,7 @@ def reset_password(payload: ResetPasswordRequest) -> MessageResponse:
 
 @router.post(
     "/change-password",
+    response_model=Token,
     responses={
         400: {"description": "La contraseña actual no es correcta"},
         401: {"description": "Sin token o con un token no válido o caducado"},

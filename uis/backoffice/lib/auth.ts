@@ -4,6 +4,7 @@ import type {
   MessageResponse,
   Profile,
   ProfileUpdate,
+  RegisteredUser,
   RegisterPayload,
   TokenResponse,
   UserRole,
@@ -30,9 +31,9 @@ export const authApi = {
     return http.post<TokenResponse>("/auth/login", { email, password }, { auth: false });
   },
 
-  /** Público (`POST /users`): crea el usuario y su perfil. No inicia sesión. */
-  register(payload: RegisterPayload): Promise<CurrentUser> {
-    return http.post<CurrentUser>("/users", payload, { auth: false });
+  /** Público (`POST /users`): crea el usuario y su perfil. No inicia sesión. La respuesta no incluye el email. */
+  register(payload: RegisterPayload): Promise<RegisteredUser> {
+    return http.post<RegisteredUser>("/users", payload, { auth: false });
   },
 
   me(signal?: AbortSignal): Promise<CurrentUser> {

@@ -89,8 +89,9 @@ def test_passwords_just_past_the_limits_are_rejected(password, message):
 
 def test_email_is_stored_normalized():
     result = register(new_user(email="  Laura.Gomez@TrackFlow.TEST "))
-    assert result.email == "laura.gomez@trackflow.test"
-    assert get_user_by_email("laura.gomez@trackflow.test") is not None
+    # La respuesta del registro ya no lleva el email (auditoría de serialización): se comprueba en la base.
+    stored = get_user_by_email("laura.gomez@trackflow.test")
+    assert stored is not None and stored.id == result.id
 
 
 def test_blank_profile_fields_are_stored_as_null():
