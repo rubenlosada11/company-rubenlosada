@@ -6,12 +6,18 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/frontend-performance-audit` (desde `main` @ `714441a`, que incluye las PR #3–#22).
+- **Rama de trabajo:** `feature/serialization-audit` (desde `main` @ `e12574c`, que incluye las PR #3–#23).
+- **Auditoría de serialización de la API** (práctica sin número de hito): los 33 endpoints de `services/api`
+  inventariados con su estado original y final en `docs/serialization-audit.md`; las 30 rutas JSON declaran
+  `response_model` en el decorador (antes ninguna), el registro ya no devuelve el email, el analizador tiene contrato
+  (`ResultadoAnalisis`), los esquemas de salida no heredan de los de entrada y `tests/test_serialization.py` (61 casos)
+  lo vigila. **Implementada y validada** (2026-11-02), commits locales: **pendiente de push y PR** (el desarrollador
+  revisa antes).
 - **Auditoría de rendimiento de los frontends** (práctica sin número de hito): Lighthouse (12.8.2, 5 ejecuciones,
   builds de producción) sobre `uis/website` y `uis/backoffice`, diagnóstico en `AUDIT.md`, correcciones una a una
   con su medición, refactorizaciones del backoffice y resultados en `REPORT.md`. Evidencias en `audit/`.
   **Implementada y validada** (2026-11-02): website accesibilidad 96 → 100 y móvil 96 → 97; gestor de incidencias
-  95 → 99 (CLS 0,133 → 0); dashboard accesibilidad 96 → 100. 12 commits, rama subida y **PR #23 abierta** (2026-11-02).
+  95 → 99 (CLS 0,133 → 0); dashboard accesibilidad 96 → 100. 12 commits, **PR #23 fusionada** (`e12574c`, 2026-11-02).
 - **Contenedorización del monorepo** (práctica sin número de hito, ticket infra-40): Docker Compose de desarrollo
   (website :3000 + backoffice :3001 en el contenedor `interfaces`, API :8000 en `backend`, hot reload) y de
   producción, desplegado en el VPS `bc-vps-248` **sin acceso público** (túnel SSH). **Entregada:** 9 commits y
@@ -1293,6 +1299,27 @@ agente gestionara las mediciones y las capturas de Lighthouse.
   website 12/12 (escritorio y móvil) y backoffice 17/17 en escritorio y en móvil. API, paquetes y apps de hitos
   anteriores sin tocar. Las pruebas dejaron 8 incidencias «en curso» en la copia de la base (no en la real).
 
+### 2026-11-02 — Auditoría de serialización de la API (rama `feature/serialization-audit`)
+
+Prompt del curso por fases (1–12); el desarrollador pidió avanzar sin paradas salvo algo crítico y **detenerse antes del
+push y antes de la PR**. Detalle completo en `docs/serialization-audit.md`.
+
+- **Inventario desde la app registrada:** 33 endpoints + 4 rutas internas. En FastAPI 0.141 los routers incluidos son
+  `_IncludedRouter` (rutas con `effective_candidates()`), así que buscar `app.routes` ya no basta. Estado original:
+  ✅ 0 · ⚠️ 28 (contrato implícito por anotación de retorno) · ❌ 2 (`/api/incidents/analyze` y `/health`, `dict`) ·
+  3 especiales (dos `DELETE` 204 y la descarga CSV).
+- **Cambios:** `RegisterResponse` sin email en `POST /users` (el backoffice ignora ese cuerpo; tipo `RegisteredUser`);
+  `ResultadoAnalisis` en `app/analysis_schemas.py` (mismo JSON con el CSV real, validado dentro del `try`); `Supplier` e
+  `Incident` con campos propios (ya no heredan de `SupplierCreate`/`IncidentCreate`); `from_attributes` en las salidas de
+  autenticación (sin `model_dump(exclude=…)`); `HealthResponse`; descarga documentada como `text/csv`; enums
+  `SupplierCategory`/`ProductCategory` con alias `Category`. Sin cambios de dependencias, consultas ni datos.
+- **Validación:** `tests/test_serialization.py` (61 casos) + 5 mutaciones detectadas; dos tests del registro adaptados al
+  contrato sin email; regresión completa de la API; backoffice lint, typecheck, Jest 148/148 y build con
+  `--webpack`. **`npm run build` (Turbopack) falla en este equipo con Google Fonts también en `main`** (no relacionado).
+  Verificación manual en Swagger UI (Edge, «Try it out») de registro, login, Authorize, `/auth/me`, `/suppliers`,
+  `POST /api/incidents` y forgot-password; `curl` del analizador, CSV, inventario y `DELETE`; registro desde el
+  backoffice contra la API de prueba. Siempre con bases temporales en el scratchpad (API :8031, backoffice :3013).
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -1375,6 +1402,9 @@ agente gestionara las mediciones y las capturas de Lighthouse.
    `/opt/company-rubenlosada` (y, si cambió el código, redesplegar con la etiqueta del commit de `main`,
    `docs/docker.md` §15). Publicar en Internet (dominio, proxy/túnel de Cloudflare, HTTPS) requiere confirmación.
 9. Opcional: borrar la rama local `feature/infra-40-docker-monorepo` (ya fusionada) con `git branch -d`.
-10. Auditoría de rendimiento: revisar y fusionar la PR #23. Recomendaciones que requieren decisión (`REPORT.md` §8): sesión
+10. Auditoría de rendimiento (PR #23 fusionada). Recomendaciones que requieren decisión (`REPORT.md` §8): sesión
     con cookie + comprobación en servidor para que el panel del backoffice no espere a `GET /auth/me` (LCP móvil
     ~3 s); `experimental.inlineCss` cuando sea estable; medir en campo (RUM con `web-vitals`) si se publican.
+11. Auditoría de serialización: el desarrollador revisa los commits locales de `feature/serialization-audit`; después,
+    push y PR contra `main`. Limitaciones aceptadas en `docs/serialization-audit.md` §17 (ejemplo del 422 en OpenAPI,
+    build con Turbopack y Google Fonts en este equipo).

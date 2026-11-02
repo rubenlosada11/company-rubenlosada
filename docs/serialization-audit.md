@@ -266,3 +266,126 @@ puede fijarlos). Se mantiene y se cubre con tests.
 
 `uis/backoffice`: `authApi.register` pasa a tipar la respuesta como `RegisteredUser` (`CurrentUser` sin `email`). El
 componente que lo usa (`AuthProvider.register`) no lee el cuerpo, así que no cambia el comportamiento.
+
+## 13. Estado final por endpoint
+
+Se mantiene el inventario original de la sección 5; esta tabla añade el estado final. **✅ verificada** = contrato
+explícito en el decorador, campos exactos comprobados por `tests/test_serialization.py` y sin campos sensibles. Las
+filas marcadas con **(M)** se probaron además a mano contra la API arrancada (sección 15).
+
+| # | Método | Ruta | Original | Final | Esquema de respuesta | Campos expuestos | Cambio |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | POST | `/auth/login` | ⚠️ | ✅ verificada (M) | `Token` | `access_token`, `token_type`, `expires_in` | `response_model` explícito |
+| 2 | POST | `/auth/token` | ⚠️ | ✅ verificada (M, vía «Authorize») | `Token` | ídem | ídem |
+| 3 | GET | `/auth/me` | ⚠️ | ✅ verificada (M) | `UserWithProfile` | `id`, `email`, `role`, `is_active`, `created_at`, `profile{…}` | Explícito; construido desde atributos (lista blanca) |
+| 4 | POST | `/auth/forgot-password` | ⚠️ | ✅ verificada (M) | `MessageResponse` | `message` | Explícito |
+| 5 | POST | `/auth/reset-password` | ⚠️ | ✅ verificada | `MessageResponse` | `message` | Explícito |
+| 6 | POST | `/auth/change-password` | ⚠️ | ✅ verificada | `Token` | ídem #1 | Explícito |
+| 7 | POST | `/users` | ⚠️ | ✅ verificada (M, Swagger y backoffice) | `RegisterResponse` | `id`, `role`, `is_active`, `created_at`, `profile{…}` | **Sin email** (P1) |
+| 8 | GET | `/users` | ⚠️ | ✅ verificada | `list[UserPublic]` | `id`, `email`, `role`, `is_active`, `created_at` | Explícito; `from_attributes` |
+| 9 | GET | `/users/{user_id}` | ⚠️ | ✅ verificada | `UserPublic` | ídem | ídem |
+| 10 | PUT | `/users/{user_id}` | ⚠️ | ✅ verificada | `UserPublic` | ídem | ídem |
+| 11 | DELETE | `/users/{user_id}` | Especial | Especial: 204 sin cuerpo | — | — | Sin cambio (no hay cuerpo que serializar) |
+| 12 | GET | `/profiles/me` | ⚠️ | ✅ verificada | `ProfilePublic` | `id`, `user_id`, `name`, `phone`, `address` | Explícito; `from_attributes` |
+| 13 | PUT | `/profiles/me` | ⚠️ | ✅ verificada | `ProfilePublic` | ídem | ídem |
+| 14 | POST | `/suppliers` | ⚠️ | ✅ verificada | `Supplier` | 11 campos (sección 8) | Esquema propio, sin heredar de `SupplierCreate` (P4) |
+| 15 | GET | `/suppliers` | ⚠️ | ✅ verificada (M) | `list[Supplier]` | ídem | ídem; un dato antiguo ya no tumba el listado |
+| 16 | GET | `/suppliers/{supplier_id}` | ⚠️ | ✅ verificada | `Supplier` | ídem | ídem |
+| 17 | PATCH | `/suppliers/{supplier_id}/rate` | ⚠️ | ✅ verificada | `Supplier` | ídem | ídem |
+| 18 | PATCH | `/suppliers/{supplier_id}/status` | ⚠️ | ✅ verificada | `Supplier` | ídem | ídem |
+| 19 | DELETE | `/suppliers/{supplier_id}` | Especial | Especial: 204 sin cuerpo (M) | — | — | Docstring |
+| 20 | POST | `/api/incidents/analyze` | ❌ | ✅ verificada (M) | `ResultadoAnalisis` | 13 claves de métricas (sin datos personales) | Esquema nuevo (P2), validado dentro del `try` |
+| 21 | GET | `/api/incidents/results/export` | Especial | Especial: descarga `text/csv` (M) | — (`response_class=Response`) | Fichero `results.csv` | OpenAPI documenta `text/csv` (P7) |
+| 22 | POST | `/api/incidents` | ⚠️ | ✅ verificada (M) | `Incident` | 9 campos, sin `source_id` | Esquema propio (P4) |
+| 23 | GET | `/api/incidents` | ⚠️ | ✅ verificada | `list[Incident]` | ídem | ídem |
+| 24 | GET | `/api/incidents/summary` | ⚠️ | ✅ verificada | `IncidentSummary` | `total`, `by_status`, `by_category`, `by_origin`, `by_branch` | Explícito |
+| 25 | GET | `/api/incidents/{incident_id}` | ⚠️ | ✅ verificada | `Incident` | ídem #22 | ídem |
+| 26 | PATCH | `/api/incidents/{incident_id}/status` | ⚠️ | ✅ verificada | `Incident` | ídem | ídem |
+| 27 | GET | `/inventory/products` | ⚠️ | ✅ verificada | `list[SKURead]` | 8 campos con stock calculado | Explícito |
+| 28 | POST | `/inventory/products` | ⚠️ | ✅ verificada (M) | `SKURead` | ídem | Explícito |
+| 29 | GET | `/inventory/products/{sku_id}` | ⚠️ | ✅ verificada | `SKURead` | ídem | Explícito |
+| 30 | POST | `/inventory/orders/inbound` | ⚠️ | ✅ verificada (M) | `StockEntryRead` | 7 campos | Explícito |
+| 31 | POST | `/inventory/orders/outbound` | ⚠️ | ✅ verificada | `StockExitRead` | 8 campos | Explícito |
+| 32 | GET | `/inventory/orders` | ⚠️ | ✅ verificada (M) | lista de `InboundMovement` / `OutboundMovement` | movimiento + `movement_type` + `sku` (`SKUSummary`, 6 campos) | Explícito |
+| 33 | GET | `/health` | ❌ | ✅ verificada (M) | `HealthResponse` | `status` | Esquema nuevo (P5) |
+
+**Recuento final:** ✅ 30 · ⚠️ 0 · ❌ 0 · especiales 3 (justificadas en 12.5). Problemas P1–P8 resueltos.
+
+Relaciones: sin cambios respecto al diseño (12.3). Consultas: sin cambios (sin N+1; no se añadió ninguna consulta).
+
+## 14. Tests
+
+`services/api/tests/test_serialization.py` (61 casos, nuevo):
+
+| Bloque | Qué comprueba |
+| --- | --- |
+| Contratos de todas las rutas | El inventario de routers coincide con lo que publica la app (33 operaciones); cada ruta JSON declara `response_model=` **en el decorador** y es un modelo Pydantic (o lista/unión de modelos); OpenAPI publica un esquema con nombre para cada 2xx; la descarga figura como `text/csv`; sin nombres `app__…` |
+| Autenticación | Registro sin email ni credenciales; login (`/auth/login` y `/auth/token`) solo con el token; `forgot-password` con el mismo cuerpo byte a byte para un email registrado, uno inexistente y uno inactivo; `reset-password` sin el token ni el email, y el reuso no da pistas; `change-password` solo con el token; `/auth/me` con email y sin `password_changed_at`; `/users` y `/profiles/me` con campos exactos; recorrido completo sin la contraseña ni el hash en ninguna respuesta |
+| Entrada | Registro rechaza `hashed_password`/`created_at`; `PUT /users` rechaza `password`, `hashed_password`, `id`, `created_at` (y el 422 no repite la contraseña); `PUT /profiles/me` distingue campo omitido (no cambia) de `null` (vacía); `PUT /users` rechaza `null` |
+| Recursos | Campos exactos de proveedor, incidencia, SKU, entrada, salida y movimiento (con `SKUSummary`); `id`, `updated_at`, `status`, `created_at` y `user_uuid` del cuerpo se ignoran; `source_id` nunca sale; un proveedor guardado que incumple una regla de entrada no rompe el listado |
+| Analizador | Respuesta = campos de `ResultadoAnalisis`, sin ningún correo del CSV real; una clave nueva del paquete no llega al cliente; un resultado que incumple el contrato da el 500 genérico y conserva el último análisis (la exportación sigue funcionando) |
+
+**Pruebas de mutación** (convención del repo): se rompió el código a propósito en cinco puntos y en cada caso falló el
+test esperado; después se restauró desde git: registro con email, ruta sin `response_model` en el decorador,
+`Supplier` heredando otra vez de `SupplierCreate`, analizador devolviendo el `dict`, `password_changed_at` en
+`UserPublic`.
+
+**Cambios en tests existentes** (cambio de contrato legítimo, no para hacerlos pasar):
+`test_auth.py::test_register_creates_user_and_profile` y `tests/auth/test_register.py::test_email_is_stored_normalized`
+leían el email de la respuesta del registro; ahora comprueban que no está y que se guardó normalizado en la base.
+
+**Regresión:** `uv run pytest -q` → **1221 passed** (1160 anteriores + 61 nuevos) en 5 min 37 s. Sin cambios de dependencias (`uv lock --check` correcto).
+
+## 15. Verificación manual
+
+API arrancada con `uv run uvicorn app.main:app --port 8031` sobre bases **temporales** (proveedores del seed; nunca las
+bases ni el `.env` del desarrollador). `/health` → 200 y `/docs` → 200.
+
+**En Swagger UI** (Edge, «Try it out» → «Execute», leyendo la respuesta pintada en `/docs`):
+
+| Endpoint | Resultado |
+| --- | --- |
+| `POST /users` (autenticación) | 201 con `id`, `role`, `is_active`, `created_at`, `profile`: sin email |
+| `POST /auth/login` | 200 con `access_token`, `token_type`, `expires_in` |
+| «Authorize» (formulario OAuth2 → `POST /auth/token`) | Sesión iniciada en Swagger |
+| `GET /auth/me` (detalle) | 200 con email y perfil; sin `hashed_password` ni `password_changed_at` |
+| `GET /suppliers` (listado) | 200, 15 proveedores con los 11 campos de `Supplier` |
+| `POST /api/incidents` (escritura) | 201 con los 9 campos de `Incident`; `status: "resolved"` e `id: 99` del cuerpo ignorados (`open`, id 1) |
+| `POST /auth/forgot-password` | 200 con `{"message"}` |
+
+**Con peticiones HTTP reales** (`curl`) al mismo servidor: análisis del CSV real (13 claves, ningún `@` en la
+respuesta), descarga (`text/csv; charset=utf-8` + `Content-Disposition`), alta de SKU, entrada con `user_uuid` falso en
+el cuerpo (ignorado), historial con `SKUSummary` y `DELETE /suppliers/15` (204, 0 bytes). Log del servidor sin errores.
+
+**Frontend conectado:** backoffice compilado contra esa API y servido en `:3013`; el flujo de registro (`/register`)
+hace `POST /users` 201 → `POST /auth/login` 200 → `GET /auth/me` 200 y entra al panel con el nombre del usuario, sin
+errores en la página.
+
+## 16. Auditoría final (Fase 8)
+
+| Comprobación | Resultado |
+| --- | --- |
+| Endpoints inventariados | 33/33 (test que compara routers con la app) |
+| `response_model` en las rutas aplicables | 30/30 (`grep` + test); 3 especiales justificadas |
+| Retornos ORM o `dict` sin controlar | Ninguno (`grep` de `-> dict`, `exclude=` y `response_model=None` en `app/routes` y `main.py`) |
+| Campos sensibles | Ninguno en ninguna respuesta (tests de autenticación, recursos y recorrido completo) |
+| Entrada y salida separadas | Sí: ningún esquema de salida hereda de uno de entrada ni de un modelo persistido |
+| Listados ligeros | Devuelven solo lo que usa el backoffice (sección 8); `SKUSummary` como proyección plana |
+| Relaciones | Justificadas en 12.3; sin ciclos ni anidamiento profundo |
+| N+1 | No hay; no se añadió ninguna consulta |
+| Frontend | Compatible (tipo `RegisteredUser`; flujo de registro probado) |
+| Esquemas duplicados o configuraciones contradictorias | Ninguno; `Category` queda como alias de `SupplierCategory`/`ProductCategory` |
+
+## 17. Limitaciones y riesgos residuales
+
+- **OpenAPI del 422:** el ejemplo por defecto de FastAPI (`HTTPValidationError`) anuncia `input` y `ctx`, que la API
+  no envía (el manejador común los quita a propósito). Es solo documentación; cambiar el esquema de errores queda fuera
+  de esta auditoría.
+- **`npm run build` del backoffice con Turbopack** falla en este equipo al procesar Google Fonts («next/font/google
+  queries have exactly one entry»), **también en `main` sin estos cambios**. Con `next build --webpack` compila sin
+  errores; lint, typecheck y Jest pasan. No se ha tocado la configuración.
+- `profile.user_id` repite el `id` del usuario en `/auth/me` y el registro: se mantiene por ser el contrato de AUTH-01.
+- La comprobación «declarado en el decorador» del test lee el código fuente de la ruta (`inspect.getsource`): FastAPI
+  no guarda si `response_model` vino del decorador o de la anotación.
+- Los esquemas de entrada de proveedores, incidencias e inventario **ignoran** (no rechazan) `id`, `status`,
+  `created_at`, `updated_at` y `user_uuid`; es la decisión documentada de cada práctica y está cubierta por tests.
