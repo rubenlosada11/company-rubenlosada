@@ -20,6 +20,7 @@ from analisis_incidencias import (
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
+from app.analysis_schemas import ResultadoAnalisis
 from app.dependencies import get_current_user
 from app.errors import log_unexpected
 
@@ -51,12 +52,16 @@ def nombre_seguro(nombre: str) -> str:
     return "".join(caracter for caracter in base if caracter.isprintable())[:LONGITUD_MAXIMA_NOMBRE]
 
 
-@router.post("/analyze")
+@router.post("/analyze", response_model=ResultadoAnalisis)
 async def analizar_incidencias(
     request: Request,
     file: UploadFile | None = File(None, description="CSV de incidencias (UTF-8, separado por comas)"),
-) -> dict:
-    """Valida el CSV y devuelve el resumen de métricas. No incluye datos personales."""
+) -> ResultadoAnalisis:
+    """Valida el CSV y devuelve el resumen de métricas. No incluye datos personales.
+
+    La respuesta es `ResultadoAnalisis`: solo las claves declaradas allí llegan al cliente, aunque el paquete
+    `analisis-incidencias` devolviera más.
+    """
     if file is None or not file.filename:
         raise HTTPException(400, "No se ha enviado ningún fichero. Adjunta un CSV en el campo 'file'.")
 
@@ -70,6 +75,8 @@ async def analizar_incidencias(
 
     try:
         resultado = analizar(decodificar_csv(contenido), nombre)
+        # Dentro del `try`: si el resultado no cumpliera el contrato, 500 genérico y el análisis anterior se conserva.
+        respuesta = ResultadoAnalisis.model_validate({**resultado, "reglas": ETIQUETAS_REGLAS})
     except ErrorAnalisis as error:
         raise HTTPException(422, str(error)) from None
     except Exception as error:
@@ -84,10 +91,22 @@ async def analizar_incidencias(
         "Análisis de '%s': %d registros (%d válidos, %d inválidos)",
         nombre, totales["procesados"], totales["validos"], totales["invalidos"],
     )
-    return {**resultado, "reglas": ETIQUETAS_REGLAS}
+    return respuesta
 
 
-@router.get("/results/export")
+@router.get(
+    "/results/export",
+    # Descarga de fichero: no hay JSON que serializar, así que no lleva `response_model`. El contrato se documenta
+    # con el tipo de contenido real para que OpenAPI no anuncie `application/json`.
+    response_class=Response,
+    responses={
+        200: {
+            "description": "`results.csv` (UTF-8 con BOM, una fila por métrica), como adjunto",
+            "content": {"text/csv": {"schema": {"type": "string", "format": "binary"}}},
+        },
+        404: {"description": "Todavía no se ha analizado ningún fichero"},
+    },
+)
 def exportar_resultados(request: Request) -> Response:
     """Descarga el último análisis como CSV (una fila por métrica)."""
     resultado = request.app.state.ultimo_analisis

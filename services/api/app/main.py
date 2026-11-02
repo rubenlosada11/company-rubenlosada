@@ -2,11 +2,13 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Literal
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from app.errors import UnexpectedErrorMiddleware, unexpected_error, validation_error
 from app.routes import auth, incident_manager, incidents, inventory, profiles, suppliers, users
@@ -92,6 +94,11 @@ app.add_exception_handler(RequestValidationError, validation_error)
 app.add_exception_handler(Exception, unexpected_error)
 
 
-@app.get("/health", tags=["health"])
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+class HealthResponse(BaseModel):
+    status: Literal["ok"]
+
+
+@app.get("/health", tags=["health"], response_model=HealthResponse)
+def health() -> HealthResponse:
+    """Comprobación de vida (healthcheck de Docker). Pública y sin datos."""
+    return HealthResponse(status="ok")
