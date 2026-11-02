@@ -16,7 +16,7 @@ export function Overview() {
     >
       <div className="space-y-6">
         <div>
-          <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.17em] text-slate-500">
+          <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.17em] text-slate-600">
             Datos de partida del briefing
           </h3>
           <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -24,14 +24,14 @@ export function Overview() {
               <StatCard key={fact.label} label={fact.label} value={fact.value} detail={fact.detail} />
             ))}
           </dl>
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-slate-600">
             Cifras aproximadas recogidas en CONTEXT.es.md. No son métricas en vivo: todavía no hay conexión con
             sistemas reales.
           </p>
         </div>
 
         <div>
-          <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.17em] text-slate-500">
+          <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.17em] text-slate-600">
             Backlog de TrackFlow Tech
           </h3>
           <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

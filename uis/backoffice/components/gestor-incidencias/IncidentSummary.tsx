@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { ListaBarras } from "@/components/incidencias/ListaBarras";
+import { LoadErrorAlert } from "@/components/LoadErrorAlert";
 import { StatCard } from "@/components/StatCard";
 import {
   branchLabel,
+  INCIDENT_BRANCHES,
+  INCIDENT_CATEGORIES,
+  INCIDENT_ORIGINS,
   INCIDENT_STATUSES,
   incidentCategoryLabel,
   originLabel,
 } from "@/lib/data/incidents";
 import { entero, porcentaje } from "@/lib/formato";
 import { incidentErrorMessage, incidentsApi } from "@/lib/incidents";
+import { useApiRequest } from "@/lib/useApiRequest";
 import type {
   IncidentBranch,
   IncidentCategory,
@@ -27,13 +31,6 @@ const STATUS_CARD_LABELS: Record<IncidentStatus, string> = {
   discarded: "Descartadas",
 };
 
-interface SummaryResult {
-  /** Petición (versión + reintento) a la que corresponde el resultado: si no coincide con la actual, está cargando. */
-  key: string;
-  summary: IncidentSummaryData | null;
-  error: string | null;
-}
-
 interface IncidentSummaryProps {
   /** Cambia cuando el listado modifica datos (p. ej. un cambio de estado): el resumen se vuelve a pedir. */
   version: number;
@@ -44,52 +41,39 @@ interface IncidentSummaryProps {
  * falla, el resto de la página (el listado) sigue funcionando.
  */
 export function IncidentSummary({ version }: IncidentSummaryProps) {
-  const [retryToken, setRetryToken] = useState(0);
-  const [result, setResult] = useState<SummaryResult | null>(null);
-
-  const requestKey = `${version}|${retryToken}`;
-  const loading = result?.key !== requestKey;
+  const request = useApiRequest(String(version), (signal) => incidentsApi.summary(signal), (reason) =>
+    incidentErrorMessage(reason, "cargar el resumen")
+  );
+  const { loading, reload } = request;
   // Mientras se actualiza se mantienen los últimos totales, atenuados, en lugar de vaciar el panel.
-  const summary = result?.summary ?? null;
-  const error = !loading ? (result?.error ?? null) : null;
-
-  useEffect(() => {
-    const controller = new AbortController();
-    incidentsApi
-      .summary(controller.signal)
-      .then((data) => setResult({ key: requestKey, summary: data, error: null }))
-      .catch((reason: unknown) => {
-        if (controller.signal.aborted) return;
-        setResult({ key: requestKey, summary: null, error: incidentErrorMessage(reason, "cargar el resumen") });
-      });
-    return () => controller.abort();
-  }, [requestKey]);
+  const summary = request.data;
+  const error = !loading ? request.error : null;
 
   if (error) {
     return (
-      <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
-        <p className="font-bold">No se pudo cargar el resumen.</p>
-        <p className="mt-1">{error} El listado sigue disponible.</p>
-        <button
-          type="button"
-          onClick={() => setRetryToken((token) => token + 1)}
-          className="mt-3 min-h-11 rounded-full border border-red-300 bg-white px-5 text-sm font-bold text-red-800 transition hover:bg-red-100"
-        >
-          Reintentar
-        </button>
-      </div>
+      <LoadErrorAlert
+        title="No se pudo cargar el resumen."
+        message={`${error} El listado sigue disponible.`}
+        onRetry={reload}
+      />
     );
   }
 
   if (!summary) {
+    // Primera carga: se reserva el alto exacto del resumen (la misma estructura, invisible) para que el listado de
+    // debajo no salte al llegar los datos (CLS). Encima, el aviso de carga.
     return (
-      <p
-        role="status"
-        aria-busy="true"
-        className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-600 shadow-sm"
-      >
-        Cargando resumen…
-      </p>
+      <div className="relative" aria-busy="true">
+        <p
+          role="status"
+          className="absolute inset-x-0 top-0 z-10 rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-600 shadow-sm"
+        >
+          Cargando resumen…
+        </p>
+        <div className="invisible" aria-hidden="true">
+          <SummaryContent summary={PLACEHOLDER_SUMMARY} />
+        </div>
+      </div>
     );
   }
 
@@ -99,7 +83,28 @@ export function IncidentSummary({ version }: IncidentSummaryProps) {
       <p role="status" className="sr-only">
         {loading ? "Actualizando resumen…" : `Resumen actualizado: ${total} incidencias.`}
       </p>
+      <SummaryContent summary={summary} />
+    </div>
+  );
+}
 
+/** Ceros con todas las claves que devuelve la API: misma estructura (y alto) que el resumen real. */
+const zeros = <K extends string>(options: readonly { value: K }[]) =>
+  Object.fromEntries(options.map((option) => [option.value, 0])) as Record<K, number>;
+
+const PLACEHOLDER_SUMMARY: IncidentSummaryData = {
+  // Con `total` > 0 se pinta la variante con barras, que es la que tendrá la página con incidencias.
+  total: 1,
+  by_status: zeros(INCIDENT_STATUSES),
+  by_category: zeros(INCIDENT_CATEGORIES),
+  by_origin: zeros(INCIDENT_ORIGINS),
+  by_branch: zeros(INCIDENT_BRANCHES),
+};
+
+function SummaryContent({ summary }: { summary: IncidentSummaryData }) {
+  const { total } = summary;
+  return (
+    <div className="space-y-5">
       <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Incidencias" value={entero(total)} detail="Total registradas" />
         {INCIDENT_STATUSES.map((status) => (

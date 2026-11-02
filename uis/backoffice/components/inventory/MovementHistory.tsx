@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Badge } from "@/components/Badge";
+import { LoadErrorAlert } from "@/components/LoadErrorAlert";
 import { exitTypeLabel, WAREHOUSES, warehouseLabel } from "@/lib/data/inventory";
 import {
   formatMovementDate,
@@ -12,6 +13,7 @@ import {
   NO_MOVEMENT_FILTERS,
   productOptionLabel,
 } from "@/lib/inventory";
+import { useApiRequest } from "@/lib/useApiRequest";
 import type { Movement, MovementFilters, Warehouse } from "@/types/inventory";
 import { useProducts } from "./formParts";
 
@@ -21,13 +23,6 @@ const filterLabelClasses = "text-xs font-bold tracking-wide text-slate-500 upper
 const buttonClasses =
   "min-h-11 rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-60";
 
-interface ListResult {
-  /** Petición (filtros + recarga) a la que corresponde el resultado: si no coincide con la actual, está cargando. */
-  key: string;
-  movements: Movement[];
-  error: string | null;
-}
-
 /** Entradas y salidas tienen numeración propia: la clave única es el tipo más el id. */
 const movementKey = (movement: Movement) => `${movement.movement_type}-${movement.id}`;
 
@@ -36,29 +31,17 @@ export function MovementHistory() {
   const { user } = useAuth();
   const products = useProducts();
   const [filters, setFilters] = useState<MovementFilters>(NO_MOVEMENT_FILTERS);
-  const [reloadToken, setReloadToken] = useState(0);
-  const [result, setResult] = useState<ListResult | null>(null);
-
-  const requestKey = `${filters.warehouse}|${filters.sku_id}|${reloadToken}`;
-  const loading = result?.key !== requestKey;
-  const movements = result?.movements ?? [];
-  const hasFilters = Boolean(filters.warehouse || filters.sku_id);
 
   // Cada cambio de filtro pide los datos a la API (`?warehouse=` y `?sku_id=` son filtros de la propia API).
-  useEffect(() => {
-    const controller = new AbortController();
-    inventoryApi
-      .listOrders(filters, controller.signal)
-      .then((list) => setResult({ key: requestKey, movements: list, error: null }))
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        setResult({ key: requestKey, movements: [], error: inventoryErrorMessage(error, "cargar el historial") });
-      });
-    return () => controller.abort();
-  }, [filters, requestKey]);
-
+  const history = useApiRequest(
+    `${filters.warehouse}|${filters.sku_id}`,
+    (signal) => inventoryApi.listOrders(filters, signal),
+    (error) => inventoryErrorMessage(error, "cargar el historial")
+  );
+  const { loading, reload } = history;
+  const movements = history.data ?? [];
+  const hasFilters = Boolean(filters.warehouse || filters.sku_id);
   const inbound = movements.filter((movement) => movement.movement_type === "inbound").length;
-  const reload = () => setReloadToken((token) => token + 1);
 
   return (
     <div className="space-y-5">
@@ -117,23 +100,13 @@ export function MovementHistory() {
       <p role="status" className="text-sm font-semibold text-slate-600">
         {loading
           ? "Cargando movimientos…"
-          : result?.error
+          : history.error
             ? "Sin datos"
             : `${movements.length} ${movements.length === 1 ? "movimiento" : "movimientos"} (${inbound} ${inbound === 1 ? "entrada" : "entradas"} y ${movements.length - inbound} ${movements.length - inbound === 1 ? "salida" : "salidas"})${hasFilters ? " con los filtros aplicados" : ""}, del más reciente al más antiguo`}
       </p>
 
-      {result?.error && !loading ? (
-        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
-          <p className="font-bold">No se pudo cargar el historial.</p>
-          <p className="mt-1">{result.error}</p>
-          <button
-            type="button"
-            onClick={reload}
-            className="mt-3 min-h-11 rounded-full border border-red-300 bg-white px-5 text-sm font-bold text-red-800 transition hover:bg-red-100"
-          >
-            Reintentar
-          </button>
-        </div>
+      {history.error && !loading ? (
+        <LoadErrorAlert title="No se pudo cargar el historial." message={history.error} onRetry={reload} />
       ) : (
         // `relative`: los textos `sr-only` (posición absoluta) de las celdas quedan dentro del desplazamiento de la tabla
         // y no ensanchan la página en móvil. `tabIndex`: la tabla no tiene nada enfocable, así que la propia región debe

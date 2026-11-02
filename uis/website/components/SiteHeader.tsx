@@ -14,7 +14,10 @@ export function SiteHeader() {
             alt="Logo de TrackFlow"
             width={1190}
             height={264}
-            priority
+            // Se pinta a 180 px como mucho (h-10): sin `sizes`, Next lo pedía a 1200/3840 px. Carga inmediata, pero
+            // sin precarga: no compite con la imagen principal.
+            sizes="180px"
+            loading="eager"
             className="h-8 w-auto max-w-[180px] object-contain sm:h-9 sm:max-w-[210px] md:h-10 md:max-w-[250px]"
           />
         </a>

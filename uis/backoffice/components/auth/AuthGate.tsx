@@ -52,6 +52,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           width={1190}
           height={264}
           priority
+          sizes="145px"
           className="h-8 w-auto"
         />
 

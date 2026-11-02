@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { LoadErrorAlert } from "@/components/LoadErrorAlert";
 import { INCIDENT_BRANCHES, INCIDENT_CATEGORIES, INCIDENT_ORIGINS, INCIDENT_STATUSES } from "@/lib/data/incidents";
 import { ApiError } from "@/lib/http";
 import { incidentErrorMessage, incidentsApi, NO_INCIDENT_FILTERS } from "@/lib/incidents";
+import { useApiRequest } from "@/lib/useApiRequest";
 import type { Incident, IncidentFilters, IncidentTargetStatus } from "@/types/incidents";
 import { IncidentRow } from "./IncidentRow";
 
@@ -19,13 +21,6 @@ const FILTERS = [
   { field: "category", label: "Categoría", all: "Todas las categorías", options: INCIDENT_CATEGORIES },
 ] as const;
 
-interface ListResult {
-  /** Petición (filtros + recarga) a la que corresponde el resultado: si no coincide con la actual, está cargando. */
-  key: string;
-  incidents: Incident[];
-  error: string | null;
-}
-
 interface IncidentListProps {
   /** Los datos han cambiado en la API (cambio de estado) o se ha pedido actualizar: quien dependa de ellos se refresca. */
   onChanged?: () => void;
@@ -33,40 +28,24 @@ interface IncidentListProps {
 
 export function IncidentList({ onChanged }: IncidentListProps) {
   const [filters, setFilters] = useState<IncidentFilters>(NO_INCIDENT_FILTERS);
-  const [reloadToken, setReloadToken] = useState(0);
-  const [result, setResult] = useState<ListResult | null>(null);
   const [saving, setSaving] = useState<Record<number, boolean>>({});
   const [rowErrors, setRowErrors] = useState<Record<number, string>>({});
   // El estado tarda un render en deshabilitar los botones: la referencia evita dos cambios seguidos de una fila.
   const savingRef = useRef(new Set<number>());
 
-  const requestKey = `${Object.values(filters).join("|")}|${reloadToken}`;
-  const loading = result?.key !== requestKey;
-  const incidents = result?.incidents ?? [];
+  // Cada cambio de filtro pide los datos a la API (GET /api/incidents?status=…), sin recargar la página.
+  const list = useApiRequest(
+    Object.values(filters).join("|"),
+    (signal) => incidentsApi.list(filters, signal),
+    (error) => incidentErrorMessage(error, "cargar el listado"),
+    { onSuccess: () => setRowErrors({}) }
+  );
+  const { loading, reload } = list;
+  const incidents = list.data ?? [];
   const hasFilters = Object.values(filters).some(Boolean);
 
-  // Cada cambio de filtro pide los datos a la API (GET /api/incidents?status=…), sin recargar la página.
-  useEffect(() => {
-    const controller = new AbortController();
-    incidentsApi
-      .list(filters, controller.signal)
-      .then((list) => {
-        setRowErrors({});
-        setResult({ key: requestKey, incidents: list, error: null });
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        setResult({ key: requestKey, incidents: [], error: incidentErrorMessage(error, "cargar el listado") });
-      });
-    return () => controller.abort();
-  }, [filters, requestKey]);
-
   function replaceIncident(incident: Incident) {
-    setResult((current) =>
-      current
-        ? { ...current, incidents: current.incidents.map((item) => (item.id === incident.id ? incident : item)) }
-        : current
-    );
+    list.update((current) => current.map((item) => (item.id === incident.id ? incident : item)));
   }
 
   function setRowError(id: number, message: string | null) {
@@ -145,7 +124,7 @@ export function IncidentList({ onChanged }: IncidentListProps) {
         <button
           type="button"
           onClick={() => {
-            setReloadToken((token) => token + 1);
+            reload();
             onChanged?.();
           }}
           disabled={loading}
@@ -165,23 +144,13 @@ export function IncidentList({ onChanged }: IncidentListProps) {
       <p role="status" className="text-sm font-semibold text-slate-600">
         {loading
           ? "Cargando incidencias…"
-          : result?.error
+          : list.error
             ? "Sin datos"
             : `${incidents.length} ${incidents.length === 1 ? "incidencia" : "incidencias"}${hasFilters ? " con los filtros aplicados" : ""}`}
       </p>
 
-      {result?.error && !loading ? (
-        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
-          <p className="font-bold">No se pudieron cargar las incidencias.</p>
-          <p className="mt-1">{result.error}</p>
-          <button
-            type="button"
-            onClick={() => setReloadToken((token) => token + 1)}
-            className="mt-3 min-h-11 rounded-full border border-red-300 bg-white px-5 text-sm font-bold text-red-800 transition hover:bg-red-100"
-          >
-            Reintentar
-          </button>
-        </div>
+      {list.error && !loading ? (
+        <LoadErrorAlert title="No se pudieron cargar las incidencias." message={list.error} onRetry={reload} />
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className={`w-full min-w-[920px] text-left ${loading ? "opacity-60" : ""}`} aria-busy={loading}>

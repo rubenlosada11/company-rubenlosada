@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { SUPPLIER_CATEGORIES, SUPPLIER_COUNTRIES } from "@/lib/data/suppliers";
 import { apiErrorMessage } from "@/lib/http";
 import { suppliersApi } from "@/lib/suppliers";
+import { useApiRequest } from "@/lib/useApiRequest";
 import type { Supplier, SupplierFilters } from "@/types";
+import { LoadErrorAlert } from "./LoadErrorAlert";
 import { SupplierForm } from "./SupplierForm";
 import { SupplierRow } from "./SupplierRow";
 
@@ -12,13 +14,6 @@ const selectClasses =
   "w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 sm:w-auto";
 
 const NO_FILTERS: SupplierFilters = { country: "", category: "" };
-
-interface ListResult {
-  /** Petición (filtros + recarga) a la que corresponde el resultado: si no coincide con la actual, está cargando. */
-  key: string;
-  suppliers: Supplier[];
-  error: string | null;
-}
 
 function matchesFilters(supplier: Supplier, filters: SupplierFilters): boolean {
   return (
@@ -29,36 +24,22 @@ function matchesFilters(supplier: Supplier, filters: SupplierFilters): boolean {
 
 export function SupplierDirectory() {
   const [filters, setFilters] = useState<SupplierFilters>(NO_FILTERS);
-  const [reloadToken, setReloadToken] = useState(0);
-  const [result, setResult] = useState<ListResult | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const requestKey = `${filters.country}|${filters.category}|${reloadToken}`;
-  const loading = result?.key !== requestKey;
-  const suppliers = result?.suppliers ?? [];
+  // Cada cambio de filtro pide los datos a la API (GET /suppliers?country=…&category=…), sin recargar la página.
+  const list = useApiRequest(
+    `${filters.country}|${filters.category}`,
+    (signal) => suppliersApi.list(filters, signal),
+    (error) => apiErrorMessage(error, "cargar los proveedores")
+  );
+  const { loading, reload } = list;
+  const suppliers = list.data ?? [];
   const activeCount = suppliers.filter((supplier) => supplier.status === "active").length;
   const hasFilters = Boolean(filters.country || filters.category);
 
-  // Cada cambio de filtro pide los datos a la API (GET /suppliers?country=…&category=…), sin recargar la página.
-  useEffect(() => {
-    const controller = new AbortController();
-    suppliersApi
-      .list(filters, controller.signal)
-      .then((list) => setResult({ key: requestKey, suppliers: list, error: null }))
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        setResult({ key: requestKey, suppliers: [], error: apiErrorMessage(error, "cargar los proveedores") });
-      });
-    return () => controller.abort();
-  }, [filters, requestKey]);
-
   function handleUpdated(updated: Supplier) {
-    setResult((current) =>
-      current
-        ? { ...current, suppliers: current.suppliers.map((item) => (item.id === updated.id ? updated : item)) }
-        : current
-    );
+    list.update((current) => current.map((item) => (item.id === updated.id ? updated : item)));
   }
 
   function handleCreated(created: Supplier) {
@@ -67,7 +48,7 @@ export function SupplierDirectory() {
       `«${created.name}» registrado con el id ${created.id}.` +
         (matchesFilters(created, filters) ? "" : " No aparece en la lista porque no coincide con los filtros aplicados.")
     );
-    setReloadToken((token) => token + 1);
+    reload();
   }
 
   return (
@@ -128,7 +109,7 @@ export function SupplierDirectory() {
         <p role="status" className="text-sm font-semibold text-slate-600 sm:ml-auto">
           {loading
             ? "Cargando proveedores…"
-            : result?.error
+            : list.error
               ? "Sin datos"
               : `${suppliers.length} ${suppliers.length === 1 ? "proveedor" : "proveedores"} · ${activeCount} activos · ${suppliers.length - activeCount} suspendidos`}
         </p>
@@ -159,18 +140,8 @@ export function SupplierDirectory() {
         </div>
       ) : null}
 
-      {result?.error && !loading ? (
-        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
-          <p className="font-bold">No se pudieron cargar los proveedores.</p>
-          <p className="mt-1">{result.error}</p>
-          <button
-            type="button"
-            onClick={() => setReloadToken((token) => token + 1)}
-            className="mt-3 rounded-full border border-red-300 bg-white px-4 py-2 text-sm font-bold text-red-800 transition hover:bg-red-100"
-          >
-            Reintentar
-          </button>
-        </div>
+      {list.error && !loading ? (
+        <LoadErrorAlert title="No se pudieron cargar los proveedores." message={list.error} onRetry={reload} />
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className={`w-full min-w-[920px] text-left ${loading ? "opacity-60" : ""}`} aria-busy={loading}>

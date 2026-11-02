@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { warehouseLabel } from "@/lib/data/inventory";
 import { formatQuantity, inventoryApi, inventoryErrorMessage, productOptionLabel } from "@/lib/inventory";
+import { useApiRequest } from "@/lib/useApiRequest";
 import type { Product } from "@/types/inventory";
 import { StockBadge } from "./StockBadge";
 
@@ -26,37 +27,23 @@ interface ProductsState {
   products: Product[];
   loading: boolean;
   error: string | null;
+  /** Ya ha terminado alguna carga (`false` solo la primera vez). */
+  settled: boolean;
   reload: () => void;
 }
 
-/** Productos para el selector (`GET /inventory/products`). */
+/**
+ * Productos de `GET /inventory/products`: el listado del inventario y los selectores de producto. Si una recarga
+ * falla, se conservan los últimos productos recibidos.
+ */
 export function useProducts(): ProductsState {
-  const [reloadKey, setReloadKey] = useState(0);
-  const [result, setResult] = useState<{ key: number; products: Product[]; error: string | null } | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    inventoryApi
-      .listProducts(controller.signal)
-      .then((products) => setResult({ key: reloadKey, products, error: null }))
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        setResult((current) => ({
-          key: reloadKey,
-          products: current?.products ?? [],
-          error: inventoryErrorMessage(error, "cargar los productos"),
-        }));
-      });
-    return () => controller.abort();
-  }, [reloadKey]);
-
-  const reload = useCallback(() => setReloadKey((key) => key + 1), []);
-  return {
-    products: result?.products ?? [],
-    loading: result?.key !== reloadKey,
-    error: result?.error ?? null,
-    reload,
-  };
+  const { data, loading, error, settled, reload } = useApiRequest(
+    "products",
+    (signal) => inventoryApi.listProducts(signal),
+    (reason) => inventoryErrorMessage(reason, "cargar los productos"),
+    { keepDataOnError: true }
+  );
+  return { products: data ?? [], loading, error, settled, reload };
 }
 
 export type StockState =
