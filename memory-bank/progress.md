@@ -9,7 +9,9 @@
 - **Rama de trabajo:** `feature/frontend-performance-audit` (desde `main` @ `714441a`, que incluye las PR #3–#22).
 - **Auditoría de rendimiento de los frontends** (práctica sin número de hito): Lighthouse (12.8.2, 5 ejecuciones,
   builds de producción) sobre `uis/website` y `uis/backoffice`, diagnóstico en `AUDIT.md`, correcciones una a una
-  con su medición, refactorizaciones del backoffice y resultados en `REPORT.md`. Evidencias en `audit/`. **En curso.**
+  con su medición, refactorizaciones del backoffice y resultados en `REPORT.md`. Evidencias en `audit/`.
+  **Implementada y validada** (2026-11-02): website accesibilidad 96 → 100 y móvil 96 → 97; gestor de incidencias
+  95 → 99 (CLS 0,133 → 0); dashboard accesibilidad 96 → 100. 11 commits; pendiente de revisión en PR.
 - **Contenedorización del monorepo** (práctica sin número de hito, ticket infra-40): Docker Compose de desarrollo
   (website :3000 + backoffice :3001 en el contenedor `interfaces`, API :8000 en `backend`, hot reload) y de
   producción, desplegado en el VPS `bc-vps-248` **sin acceso público** (túnel SSH). **Entregada:** 9 commits y
@@ -69,7 +71,7 @@
 | Gestión de errores | ✅ PR #16 fusionada (`7435c5f`): API 789 tests, paquete + scripts 196, navegador 41 + 36 |
 | Pruebas unitarias (AUTH-088, API-042, FE-019) | ✅ PR #17 fusionada (`39af495`); cifras en `TESTING.md` |
 | Hito 5 — Inventario (`/inventory`) | ✅ API: PR #18 fusionada (`9779fbf`; 1160 tests, 118 del inventario); Supabase conectado (2026-11-01) |
-| Auditoría de rendimiento (frontends) | 🟡 En curso en `feature/frontend-performance-audit`: línea base en `audit/before/`, diagnóstico en `AUDIT.md` |
+| Auditoría de rendimiento (frontends) | ✅ Implementada y validada en `feature/frontend-performance-audit`: 7 correcciones + 2 refactorizaciones, W1 descartada; `AUDIT.md`, `REPORT.md`, `audit/before` y `audit/after`; navegador 12/12 (website) y 17/17 + 17/17 (backoffice), Jest 148/148 |
 | Contenedorización (Docker + VPS) | ✅ PR #22 fusionada (`714441a`): E2E 10/10 dev, 8/8 imágenes prod, 5/5 VPS por túnel; 9 capturas. Stacks local y VPS **parados** (`start` para reanudar) |
 | Hito 5 — Interfaz de inventario (backoffice) | ✅ PR #19 fusionada (`01ddccb`; Jest 148, 57 nuevos; navegador 18 + 29 + 35 + 21 + 41 + 12/13; 10 capturas). Hito 5 **entregado** |
 | Gestor de incidencias | ✅ PR #15 fusionada (`2d90092`): paquete + scripts 192 tests, API 751 tests, navegador 69 + 64 + 33 + 44 + 22 |
@@ -1284,6 +1286,12 @@ agente gestionara las mediciones y las capturas de Lighthouse.
   - B4 (etiquetas del dashboard sobre `bg-slate-100` de `text-slate-500` a `text-slate-600`, 10 nodos): accesibilidad 96 → 100 en escritorio y móvil.
   - R1 (refactor D1): hook `lib/useApiRequest.ts` (clave + recarga, `AbortController`, `useEffectEvent`, `keepDataOnError`, `onSuccess`, `update`) integrado en `IncidentList`, `IncidentSummary`, `SupplierDirectory`, `MovementHistory` y `useProducts`; `ProductList` usa `useProducts` en vez de reimplementarlo. `useProductStock` se queda como estaba (estado «sin producto»). Lint, typecheck, Jest 148/148, build; navegador 17/17 en escritorio y en móvil (carga, filtros, cambio optimista, errores simulados y «Reintentar»); gestor P99 / CLS 0 sin cambios.
   - R2 (refactor D2): componente `components/LoadErrorAlert.tsx` (título, motivo, aclaraciones opcionales y «Reintentar») en los 5 listados; el botón de proveedores pasa a `min-h-11` como los demás. Lint, typecheck, Jest 148/148, build; navegador 17/17 en escritorio y móvil.
+- **Medición final (AFTER, mismas condiciones):** website escritorio 100/100/100/100, móvil 97/100/100/100 (LCP
+  2639 → 2591 ms, TBT 106 → 59 ms, −22 KiB); dashboard escritorio 100/100/100/63, móvil 93/100/100/63 (LCP 3054 ms, sin
+  cambio: lo domina la hidratación tras validar la sesión); gestor 99/100/100/63 (CLS 0). Speed Index del gestor
+  336 → 371 ms, dentro del ruido. Validación final: lint y typecheck de ambas apps, Jest 148/148, builds; navegador
+  website 12/12 (escritorio y móvil) y backoffice 17/17 en escritorio y en móvil. API, paquetes y apps de hitos
+  anteriores sin tocar. Las pruebas dejaron 8 incidencias «en curso» en la copia de la base (no en la real).
 
 ## Trabajo pendiente
 
@@ -1367,3 +1375,6 @@ agente gestionara las mediciones y las capturas de Lighthouse.
    `/opt/company-rubenlosada` (y, si cambió el código, redesplegar con la etiqueta del commit de `main`,
    `docs/docker.md` §15). Publicar en Internet (dominio, proxy/túnel de Cloudflare, HTTPS) requiere confirmación.
 9. Opcional: borrar la rama local `feature/infra-40-docker-monorepo` (ya fusionada) con `git branch -d`.
+10. Auditoría de rendimiento: revisar y fusionar su PR. Recomendaciones que requieren decisión (`REPORT.md` §8): sesión
+    con cookie + comprobación en servidor para que el panel del backoffice no espere a `GET /auth/me` (LCP móvil
+    ~3 s); `experimental.inlineCss` cuando sea estable; medir en campo (RUM con `web-vitals`) si se publican.

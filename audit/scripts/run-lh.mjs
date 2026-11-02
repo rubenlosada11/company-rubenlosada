@@ -57,6 +57,8 @@ function metrics(lhr) {
     finalUrl: lhr.finalDisplayedUrl,
     lighthouse: lhr.lighthouseVersion,
     userAgent: lhr.environment?.hostUserAgent,
+    throttlingMethod: lhr.configSettings.throttlingMethod,
+    observedLcp: a.metrics?.details?.items?.[0]?.observedLargestContentfulPaint ?? null,
   };
 }
 
@@ -69,6 +71,8 @@ for (const t of targets) {
     try {
       await prepare(chrome.port, t);
       const flags = { port: chrome.port, output: ["json", "html"], logLevel: "error", disableStorageReset: !!t.auth };
+      // Comprobación complementaria: LH_THROTTLING=devtools aplica el throttling de verdad en lugar de simularlo.
+      if (process.env.LH_THROTTLING) flags.throttlingMethod = process.env.LH_THROTTLING;
       const config = t.device === "desktop" ? desktopConfig : undefined;
       const result = await lighthouse(t.url, flags, config);
       const lhr = result.lhr;

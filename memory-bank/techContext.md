@@ -437,6 +437,24 @@ con parada y «CONTINÚA» (fases 7–13 seguidas por indicación del desarrolla
 | Sin contenedor de base de datos: SQLite en el volumen; `DATABASE_URL` opcional (proyecto Supabase existente) | Memoria del VPS; decisión del desarrollador |
 | Commits `Contenedorización — …` escalonados, sin `docs/hitos.md` ni `Co-authored-by` | Práctica sin número de hito; el ticket prohíbe firmas de IA |
 
+## Decisiones técnicas de la auditoría de rendimiento de los frontends
+
+Contexto: práctica sin hito, rama `feature/frontend-performance-audit` (2026-11-02). Diagnóstico en `AUDIT.md`,
+resultados en `REPORT.md`, evidencias y scripts en `audit/`.
+
+| Decisión | Motivo |
+| --- | --- |
+| Medir siempre con `npm run build` + `next start`, Lighthouse 12.8.2 por API de Node, 5 ejecuciones y mediana | Reproducible y comparable; la variabilidad móvil es grande (una ejecución suelta llegó a dar 68 frente a la mediana de 93). Herramientas fuera del repo; scripts en `audit/scripts/` |
+| Backoffice medido con la API arrancada sobre **copias** de las bases y un usuario de auditoría; token en `localStorage` + `disableStorageReset` | Medir el panel con sesión sin tocar los datos reales ni Supabase |
+| `next/image`: en Next 16 `priority` es un alias obsoleto de `preload` y **no** añade `fetchpriority` | `fetchPriority="high"` en el hero del website se probó y se descartó: Lantern +100 ms de LCP móvil y sin diferencia con throttling real de DevTools |
+| Logos con `sizes` según su tamaño pintado y sin precarga salvo la pantalla «Comprobando tu sesión» | Sin `sizes`, Next pide 1200/3840 px para imágenes de 126–200 px; los preloads de imágenes que no son LCP compiten con la carga |
+| Website: `images.formats: ["image/avif", "image/webp"]` | −45 % de bytes en la foto del hero; la primera codificación AVIF es más lenta y queda en la caché de `.next/cache/images` |
+| Backoffice: `preconnect` (con `crossorigin`) al origen de `NEXT_PUBLIC_API_BASE_URL` en `app/layout.tsx` (`preconnect` de `react-dom`) | La sesión se valida con `GET /auth/me` en otro origen. En rutas dinámicas (`/login`) Next solo manda la pista en el payload RSC |
+| Hook `lib/useApiRequest.ts` para las peticiones de listados (clave + recarga, `AbortController`, `useEffectEvent`, `keepDataOnError`, `onSuccess`, `update`) | Sustituye seis copias del mismo patrón. Las vistas nuevas que pidan datos por filtros deben usarlo. `useProductStock` sigue aparte (estado «sin producto») |
+| Componente `components/LoadErrorAlert.tsx` para «No se pudo cargar… / Reintentar» | Sustituye cinco copias; botón de 44 px |
+| Resumen del gestor: estructura invisible con ceros durante la primera carga | Reserva el alto exacto y elimina el CLS (0,133 → 0) |
+| SEO 63 del backoffice se acepta | `noindex` intencionado de una herramienta interna |
+
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 
 - `CONTEXT.es.md` y `CONTEXT-trackflow.es.md` (fuente de verdad del negocio).

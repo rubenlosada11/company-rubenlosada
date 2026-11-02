@@ -166,7 +166,8 @@ la configuración global: se usan como referencia): `core-web-vitals` y `perform
 
 ## 8. Matriz de correcciones (priorizada)
 
-Orden por impacto esperado y riesgo. Cada fila es un commit independiente con su medición.
+Orden por impacto esperado y riesgo. Cada fila es un commit independiente con su medición. El resultado de cada
+una está en [`REPORT.md`](./REPORT.md) §4 y §7 (la fila 1, W1, se probó y se **descartó** por las mediciones).
 
 | # | Problema | Aplicación | Prioridad | Corrección | Verificación |
 | --- | --- | --- | --- | --- | --- |
