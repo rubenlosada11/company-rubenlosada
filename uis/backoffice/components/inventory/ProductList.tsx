@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LoadErrorAlert } from "@/components/LoadErrorAlert";
 import { StatCard } from "@/components/StatCard";
 import { categoryLabel, warehouseLabel } from "@/lib/data/inventory";
 import { formatQuantity, STOCK_THRESHOLDS, stockLevel } from "@/lib/inventory";
@@ -77,22 +78,13 @@ export function ProductList() {
       </div>
 
       {error && !loading ? (
-        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
-          <p className="font-bold">
-            {products.length > 0 ? "No se pudo actualizar el stock." : "No se pudieron cargar los productos."}
-          </p>
-          <p className="mt-1">{error}</p>
-          {products.length > 0 ? (
-            <p className="mt-1">La tabla muestra los últimos datos recibidos.</p>
-          ) : null}
-          <button
-            type="button"
-            onClick={reload}
-            className="mt-3 min-h-11 rounded-full border border-red-300 bg-white px-5 text-sm font-bold text-red-800 transition hover:bg-red-100"
-          >
-            Reintentar
-          </button>
-        </div>
+        <LoadErrorAlert
+          title={products.length > 0 ? "No se pudo actualizar el stock." : "No se pudieron cargar los productos."}
+          message={error}
+          onRetry={reload}
+        >
+          {products.length > 0 ? <p className="mt-1">La tabla muestra los últimos datos recibidos.</p> : null}
+        </LoadErrorAlert>
       ) : null}
 
       {error && products.length === 0 && !loading ? null : (

@@ -1283,6 +1283,7 @@ agente gestionara las mediciones y las capturas de Lighthouse.
   - B3 (`sizes` en los 5 logos del backoffice; el del sidebar sin `priority`): logo de 1200/3840 px (9,4 KB) a 256 px (5,1 KB); puntuaciones iguales (100 / 94), LCP escritorio 768 → 750 ms.
   - B4 (etiquetas del dashboard sobre `bg-slate-100` de `text-slate-500` a `text-slate-600`, 10 nodos): accesibilidad 96 → 100 en escritorio y móvil.
   - R1 (refactor D1): hook `lib/useApiRequest.ts` (clave + recarga, `AbortController`, `useEffectEvent`, `keepDataOnError`, `onSuccess`, `update`) integrado en `IncidentList`, `IncidentSummary`, `SupplierDirectory`, `MovementHistory` y `useProducts`; `ProductList` usa `useProducts` en vez de reimplementarlo. `useProductStock` se queda como estaba (estado «sin producto»). Lint, typecheck, Jest 148/148, build; navegador 17/17 en escritorio y en móvil (carga, filtros, cambio optimista, errores simulados y «Reintentar»); gestor P99 / CLS 0 sin cambios.
+  - R2 (refactor D2): componente `components/LoadErrorAlert.tsx` (título, motivo, aclaraciones opcionales y «Reintentar») en los 5 listados; el botón de proveedores pasa a `min-h-11` como los demás. Lint, typecheck, Jest 148/148, build; navegador 17/17 en escritorio y móvil.
 
 ## Trabajo pendiente
 

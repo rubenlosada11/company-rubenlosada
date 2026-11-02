@@ -1,6 +1,7 @@
 "use client";
 
 import { ListaBarras } from "@/components/incidencias/ListaBarras";
+import { LoadErrorAlert } from "@/components/LoadErrorAlert";
 import { StatCard } from "@/components/StatCard";
 import {
   branchLabel,
@@ -50,17 +51,11 @@ export function IncidentSummary({ version }: IncidentSummaryProps) {
 
   if (error) {
     return (
-      <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
-        <p className="font-bold">No se pudo cargar el resumen.</p>
-        <p className="mt-1">{error} El listado sigue disponible.</p>
-        <button
-          type="button"
-          onClick={reload}
-          className="mt-3 min-h-11 rounded-full border border-red-300 bg-white px-5 text-sm font-bold text-red-800 transition hover:bg-red-100"
-        >
-          Reintentar
-        </button>
-      </div>
+      <LoadErrorAlert
+        title="No se pudo cargar el resumen."
+        message={`${error} El listado sigue disponible.`}
+        onRetry={reload}
+      />
     );
   }
 

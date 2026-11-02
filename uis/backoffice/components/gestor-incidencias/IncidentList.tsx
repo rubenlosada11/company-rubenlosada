@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+import { LoadErrorAlert } from "@/components/LoadErrorAlert";
 import { INCIDENT_BRANCHES, INCIDENT_CATEGORIES, INCIDENT_ORIGINS, INCIDENT_STATUSES } from "@/lib/data/incidents";
 import { ApiError } from "@/lib/http";
 import { incidentErrorMessage, incidentsApi, NO_INCIDENT_FILTERS } from "@/lib/incidents";
@@ -149,17 +150,7 @@ export function IncidentList({ onChanged }: IncidentListProps) {
       </p>
 
       {list.error && !loading ? (
-        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
-          <p className="font-bold">No se pudieron cargar las incidencias.</p>
-          <p className="mt-1">{list.error}</p>
-          <button
-            type="button"
-            onClick={reload}
-            className="mt-3 min-h-11 rounded-full border border-red-300 bg-white px-5 text-sm font-bold text-red-800 transition hover:bg-red-100"
-          >
-            Reintentar
-          </button>
-        </div>
+        <LoadErrorAlert title="No se pudieron cargar las incidencias." message={list.error} onRetry={reload} />
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className={`w-full min-w-[920px] text-left ${loading ? "opacity-60" : ""}`} aria-busy={loading}>

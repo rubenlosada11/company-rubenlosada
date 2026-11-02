@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Badge } from "@/components/Badge";
+import { LoadErrorAlert } from "@/components/LoadErrorAlert";
 import { exitTypeLabel, WAREHOUSES, warehouseLabel } from "@/lib/data/inventory";
 import {
   formatMovementDate,
@@ -105,17 +106,7 @@ export function MovementHistory() {
       </p>
 
       {history.error && !loading ? (
-        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
-          <p className="font-bold">No se pudo cargar el historial.</p>
-          <p className="mt-1">{history.error}</p>
-          <button
-            type="button"
-            onClick={reload}
-            className="mt-3 min-h-11 rounded-full border border-red-300 bg-white px-5 text-sm font-bold text-red-800 transition hover:bg-red-100"
-          >
-            Reintentar
-          </button>
-        </div>
+        <LoadErrorAlert title="No se pudo cargar el historial." message={history.error} onRetry={reload} />
       ) : (
         // `relative`: los textos `sr-only` (posición absoluta) de las celdas quedan dentro del desplazamiento de la tabla
         // y no ensanchan la página en móvil. `tabIndex`: la tabla no tiene nada enfocable, así que la propia región debe
