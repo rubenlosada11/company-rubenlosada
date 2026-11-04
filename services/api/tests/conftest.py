@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.auth_models import Role, UserCreate
+from app.cache import reset_all as reset_api_caches
 from app.database import dispose_engine, suppliers_table
 from app.main import app
 from app.security import create_access_token
@@ -28,6 +29,14 @@ def auth_env(tmp_path, monkeypatch):
     path = tmp_path / "db" / "auth.json"
     monkeypatch.setenv("AUTH_DB_PATH", str(path))
     return path
+
+
+@pytest.fixture(autouse=True)
+def clear_api_caches():
+    """Cachés de la API (`app/cache.py`) vacías al empezar y al terminar cada test: ningún test ve datos de otro."""
+    reset_api_caches()
+    yield
+    reset_api_caches()
 
 
 @pytest.fixture(autouse=True)

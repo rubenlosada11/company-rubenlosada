@@ -2,6 +2,9 @@
 
 Las funciones con `table` como primer parámetro trabajan dentro de una tabla ya abierta (y bajo su candado); las
 demás abren y cierran la base en cada operación.
+
+`summary_cache` guarda el resumen (`GET /api/incidents/summary`), que para devolver unos pocos totales tiene que leer el
+fichero entero. Lo invalidan el alta y el cambio de estado, solo cuando se han escrito.
 """
 
 from collections import Counter
@@ -9,7 +12,8 @@ from collections import Counter
 from analisis_incidencias import gestor
 from tinydb.table import Document, Table
 
-from app.database import incidents_table
+from app.cache import TTLCache, register
+from app.database import get_incidents_db_path, incidents_table
 from app.incident_models import (
     Branch,
     Incident,
@@ -21,6 +25,13 @@ from app.incident_models import (
     IncidentSummary,
 )
 from app.models import utc_now
+
+
+# 60 segundos: son totales para el panel del gestor; un minuto de retraso es aceptable y todas las altas y cambios de
+# estado de la API la invalidan al momento. El TTL acota lo que tarda en verse una escritura de otro proceso (el seed
+# de incidencias, que se ejecuta con la API parada) o de otro worker.
+SUMMARY_TTL_SECONDS = 60
+summary_cache = register(TTLCache("incidents.summary", SUMMARY_TTL_SECONDS, IncidentSummary))
 
 
 class InvalidTransition(Exception):
@@ -41,7 +52,9 @@ def create_incident(payload: IncidentCreate) -> Incident:
     now = utc_now()
     record = IncidentRecord(**payload.model_dump(), status=IncidentStatus.OPEN, created_at=now, updated_at=now)
     with incidents_table() as table:
-        return to_incident(table.get(doc_id=insert_incident(table, record)))
+        doc_id = insert_incident(table, record)
+        summary_cache.invalidate()
+        return to_incident(table.get(doc_id=doc_id))
 
 
 def list_incidents(**filters: str | None) -> list[Incident]:
@@ -75,7 +88,12 @@ def update_status(incident_id: int, new_status: IncidentStatus) -> Incident | No
         # El documento modificado pasa por el mismo modelo que el alta y el seed antes de escribirse.
         record = IncidentRecord.model_validate({**doc, "status": new_status, "updated_at": utc_now()})
         table.update(record.model_dump(mode="json", include={"status", "updated_at"}), doc_ids=[incident_id])
+        summary_cache.invalidate()
         return to_incident(table.get(doc_id=incident_id))
+
+
+def summary_cache_key() -> tuple[str]:
+    return (str(get_incidents_db_path()),)
 
 
 def summarize() -> IncidentSummary:

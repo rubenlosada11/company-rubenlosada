@@ -121,8 +121,12 @@ def list_incidents(
 # Antes de `/{incident_id}`: si no, «summary» se leería como un id.
 @router.get("/summary", response_model=IncidentSummary)
 def get_summary() -> IncidentSummary:
-    """Totales por estado, categoría, origen y sede. Con la base vacía, todos a 0."""
-    return incidents_service.summarize()
+    """Totales por estado, categoría, origen y sede. Con la base vacía, todos a 0.
+
+    Se sirve desde una caché de 60 s que invalidan el alta y el cambio de estado (`summary_cache`).
+    """
+    cache = incidents_service.summary_cache
+    return cache.get_or_load(incidents_service.summary_cache_key(), incidents_service.summarize)
 
 
 def not_found(incident_id: int) -> HTTPException:

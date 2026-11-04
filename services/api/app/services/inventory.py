@@ -9,6 +9,10 @@ Reglas de negocio de `CONTEXT-gestor-inventario.es.md`:
 
 Las funciones no saben nada de HTTP: lanzan excepciones propias que el router traduce (404, 400, 409). Las usan la API
 y el seed (`app/seed_inventory.py`).
+
+`products_cache` guarda el listado de SKUs con su stock (`GET /inventory/products`). Cada escritura que cambia un SKU o
+su stock la invalida **después** del commit; una operación rechazada (SKU duplicado, stock insuficiente, SKU que no
+existe) no la toca.
 """
 
 import threading
@@ -18,6 +22,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, select
 
+from app.cache import TTLCache, register
 from app.inventory_models import SKU, StockEntry, StockExit
 from app.inventory_schemas import (
     InboundMovement,
@@ -35,6 +40,13 @@ from app.inventory_schemas import (
 # pasar la comprobación con el mismo stock y dejarlo en negativo. Cubre los hilos de un proceso (un solo worker, como
 # el resto de la API); en PostgreSQL, además, `with_for_update` bloquea la fila del SKU entre procesos.
 _exit_lock = threading.Lock()
+
+# 30 segundos: el stock cambia con cada recepción o salida, pero todas pasan por la API e invalidan la caché al
+# momento. El TTL acota el retraso con el que se ven las escrituras de otros procesos (seed, otro worker, cambios
+# directos en Supabase). La comprobación de stock de una salida nunca usa la caché (regla 2: `available_stock`), y la
+# ficha de un SKU (`GET /inventory/products/{id}`), que consultan los formularios antes de enviar, tampoco.
+PRODUCTS_TTL_SECONDS = 30
+products_cache = register(TTLCache("inventory.products", PRODUCTS_TTL_SECONDS, list[SKURead]))
 
 
 class SKUNotFound(Exception):
@@ -146,6 +158,7 @@ def create_sku(session: Session, data: SKUCreate) -> SKURead:
         # Otra petición ha creado el mismo código entre la comprobación y la escritura (índice único).
         session.rollback()
         raise DuplicateSKU(data.sku) from None
+    products_cache.invalidate()
     session.refresh(sku)
     return to_sku_read(sku, {})
 
@@ -165,6 +178,7 @@ def register_entry(session: Session, data: StockEntryCreate, user_uuid: str) -> 
     )
     session.add(entry)
     session.commit()
+    products_cache.invalidate()
     session.refresh(entry)
     return entry
 
@@ -192,6 +206,7 @@ def register_exit(session: Session, data: StockExitCreate, user_uuid: str) -> St
         )
         session.add(stock_exit)
         session.commit()
+        products_cache.invalidate()
     session.refresh(stock_exit)
     return stock_exit
 
