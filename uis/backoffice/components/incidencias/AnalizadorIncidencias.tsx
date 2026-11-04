@@ -1,11 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { ResultadosAnalisis } from "@/components/incidencias/ResultadosAnalisis";
+import { Suspense, use, useState } from "react";
 import { SelectorCsv } from "@/components/incidencias/SelectorCsv";
+import { deferredModule } from "@/lib/deferredModule";
 import { ApiError, apiErrorMessage } from "@/lib/http";
 import { analizarCsv, descargarResultados } from "@/lib/incidencias";
 import type { ResultadoAnalisis } from "@/types/incidencias";
+
+// Los resultados (resumen, barras, tablas de satisfacción, cruces y registros inválidos) solo existen tras analizar un
+// CSV: van en un chunk aparte. Se empieza a descargar al enviar el fichero, en paralelo con la petición a la API, así que
+// cuando llega la respuesta normalmente ya está y se muestra sin pasar por el «Preparando…». Por qué `deferredModule` +
+// `use()` y no `next/dynamic` ni `React.lazy`: ver `lib/deferredModule.ts`.
+const loadResultados = deferredModule(() =>
+  import("@/components/incidencias/ResultadosAnalisis").then((module) => module.ResultadosAnalisis)
+);
+
+function DeferredResultados({ resultado }: { resultado: ResultadoAnalisis }) {
+  const ResultadosAnalisis = use(loadResultados());
+  // Siempre la misma exportación del módulo (la promesa se guarda): no se crea un componente en cada render.
+  // eslint-disable-next-line react-hooks/static-components
+  return <ResultadosAnalisis resultado={resultado} />;
+}
 
 const SIN_ANALISIS = "Todavía no hay ningún análisis que descargar. Analiza primero un fichero CSV.";
 
@@ -55,6 +70,8 @@ export function AnalizadorIncidencias() {
     setCargando(true);
     setError(null);
     setErrorDescarga(null);
+    // Solo adelanta la descarga: si falla, se repite al mostrar los resultados (y si no, el límite de error del panel).
+    loadResultados().catch(() => undefined);
     try {
       setResultado(await analizarCsv(archivo));
     } catch (e) {
@@ -114,7 +131,15 @@ export function AnalizadorIncidencias() {
             </button>
           </div>
           {errorDescarga ? <Aviso>{errorDescarga}</Aviso> : null}
-          <ResultadosAnalisis resultado={resultado} />
+          <Suspense
+            fallback={
+              <p role="status" className="text-sm text-slate-600">
+                Preparando los resultados…
+              </p>
+            }
+          >
+            <DeferredResultados resultado={resultado} />
+          </Suspense>
         </div>
       ) : null}
     </div>

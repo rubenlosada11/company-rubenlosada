@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { warehouseLabel } from "@/lib/data/inventory";
 import { formatQuantity, inventoryApi, inventoryErrorMessage, productOptionLabel } from "@/lib/inventory";
 import { useApiRequest } from "@/lib/useApiRequest";
@@ -23,6 +23,9 @@ export function FieldError({ id, message }: { id: string; message?: string }) {
   );
 }
 
+// Lista vacía estable: con `data ?? []` sería un array nuevo en cada render y el `useMemo` del selector se rehace siempre.
+const NO_PRODUCTS: Product[] = [];
+
 interface ProductsState {
   products: Product[];
   loading: boolean;
@@ -43,7 +46,7 @@ export function useProducts(): ProductsState {
     (reason) => inventoryErrorMessage(reason, "cargar los productos"),
     { keepDataOnError: true }
   );
-  return { products: data ?? [], loading, error, settled, reload };
+  return { products: data ?? NO_PRODUCTS, loading, error, settled, reload };
 }
 
 export type StockState =
@@ -103,6 +106,18 @@ interface ProductSelectProps {
 /** Selector de producto por nombre (con código y almacén: el mismo nombre existe en LA y en ZGZ). */
 export function ProductSelect({ id, value, onChange, products, error, errorId, disabled }: ProductSelectProps) {
   const unavailable = products.error !== null && products.products.length === 0;
+  // Los formularios de entrada y salida se vuelven a renderizar con cada pulsación (cantidad, referencia, número de
+  // seguimiento). Las opciones solo dependen de la lista de productos: se construyen una vez por lista recibida y, al
+  // ser los mismos elementos, React no vuelve a comparar las `<option>` (cientos en un almacén real).
+  const options = useMemo(
+    () =>
+      products.products.map((product) => (
+        <option key={product.id} value={String(product.id)}>
+          {productOptionLabel(product)}
+        </option>
+      )),
+    [products.products]
+  );
   return (
     <div className="flex flex-col gap-2">
       <label htmlFor={id} className={labelClasses}>
@@ -121,11 +136,7 @@ export function ProductSelect({ id, value, onChange, products, error, errorId, d
         <option value="">
           {products.loading && products.products.length === 0 ? "Cargando productos…" : "Elige un producto"}
         </option>
-        {products.products.map((product) => (
-          <option key={product.id} value={String(product.id)}>
-            {productOptionLabel(product)}
-          </option>
-        ))}
+        {options}
       </select>
       <FieldError id={errorId} message={error} />
       {products.error ? (
