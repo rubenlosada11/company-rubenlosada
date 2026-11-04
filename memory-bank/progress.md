@@ -12,7 +12,7 @@
   `GET /api/incidents/summary` (60 s), carga diferida de dos componentes del backoffice (`lib/deferredModule.ts`) y
   `useMemo` en el selector de producto. Medido con un dataset sintético (`audit/caching/`): −82 % y −92 % de latencia
   mediana, ×14 y ×12 de rendimiento con 8 hilos, pulsación 4,9 → 1,0 ms. Informe: `CACHING_REPORT.md`.
-  **Implementada y validada** (2026-11-03), pendiente de commit (revisión del desarrollador) y de PR.
+  **Implementada y validada** (2026-11-03): 5 commits, rama subida y **PR #25 abierta** contra `main` (2026-11-04).
 - **Auditoría de serialización de la API** (práctica sin número de hito): los 33 endpoints de `services/api`
   inventariados con su estado original y final en `docs/serialization-audit.md`; las 30 rutas JSON declaran
   `response_model` en el decorador (antes ninguna), el registro ya no devuelve el email, el analizador tiene contrato
@@ -1351,6 +1351,8 @@ los commits (revisar qué se commitea y los mensajes) y antes de la PR**. Detall
 - **Validación:** API 1.268 tests (47 nuevos: `test_cache.py`, `test_api_cache.py`, `test_timing.py`), paquete y scripts
   196, backoffice lint + typecheck + Jest 151 (3 nuevos) + `next build --webpack`; respuestas cacheadas idénticas byte a
   byte a las de la API sin caché; 0 errores de consola en Edge.
+- **Entrega:** el desarrollador revisó y aprobó los 5 commits (`Optimización con caché — …`, sin `Co-authored-by`);
+  rama subida y PR #25 abierta (título en español, sin capturas, sin merge: la fusiona el desarrollador).
 
 ## Trabajo pendiente
 
@@ -1439,7 +1441,7 @@ los commits (revisar qué se commitea y los mensajes) y antes de la PR**. Detall
     ~3 s); `experimental.inlineCss` cuando sea estable; medir en campo (RUM con `web-vitals`) si se publican.
 11. Auditoría de serialización: PR #24 fusionada. Limitaciones aceptadas en `docs/serialization-audit.md` §17 (ejemplo del 422 en OpenAPI,
     build con Turbopack y Google Fonts en este equipo).
-12. Caching (`feature/caching-optimisation`): revisar los commits y la PR. Mejoras que requieren decisión
+12. Caching (`feature/caching-optimisation`): revisar y fusionar la PR #25. Mejoras que requieren decisión
     (`CACHING_REPORT.md` §10): paginación de `/inventory/orders` y `/api/incidents` (cambia el contrato), invalidación
     compartida si la API pasa a varios workers, medir con Supabase real, precarga en reposo del formulario de
     proveedores para pantallas táctiles.
