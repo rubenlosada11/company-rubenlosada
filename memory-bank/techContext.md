@@ -472,6 +472,25 @@ Práctica sin hito, rama `feature/serialization-audit` (2026-11-02). Detalle por
 | Sin paginación nueva ni cambios de consultas | Listados de decenas de registros; sin N+1 |
 | Commits `Auditoría de serialización — …` escalonados, sin `docs/hitos.md` | Práctica sin hito |
 
+## Decisiones técnicas de la optimización con caché
+
+Práctica sin hito, rama `feature/caching-optimisation` (2026-11-03). Informe y mediciones en `CACHING_REPORT.md` y
+`audit/caching/`.
+
+| Decisión | Motivo |
+| --- | --- |
+| `RequestTimingMiddleware` (`app/timing.py`): ASGI puro, dentro de CORS y fuera del 500 genérico; log `trackflow.api.timing` con la **plantilla** de ruta, estado, ms y `sql=N` | Medir sin registrar ids, query strings ni tokens; `try/finally` registra también las excepciones |
+| Caché en memoria `TTLCache` (`app/cache.py`), sin Redis ni dependencias | Un worker, VPS de 1 GB y datos pequeños; Redis solo si la API pasa a varios workers o instancias |
+| Instantáneas JSON (`bytes`) + `validate_json` en cada acierto; las funciones del router siguen devolviendo modelos | Nada mutable compartido y contrato idéntico (comprobado byte a byte); las pruebas API-042 llaman a las funciones del router directamente |
+| Solo `GET /inventory/products` (TTL 30 s) y `GET /api/incidents/summary` (60 s); invalidación en los servicios **después** de escribir | Únicos candidatos con mejora medida (−82 % / −92 %); la comprobación de stock y `GET /inventory/products/{id}` nunca usan la caché |
+| Clave = origen de los datos (`DATABASE_URL` o ruta del JSON) + parámetros validados; contador de generación | Bases distintas no comparten entrada; una lectura cruzada con una escritura no se guarda |
+| `GET /suppliers` sin caché (probado: −6 %, dentro del ruido) | El coste está en serializar 500 modelos, no en leer TinyDB |
+| Tests: fixture autouse `clear_api_caches` en `tests/conftest.py`; relojes falsos (`cache.clock`) para el TTL | Ningún test ve la caché de otro; el TTL se prueba sin esperar |
+| Carga diferida con `lib/deferredModule.ts` (`import()` + `use()` + `Suspense`), no `next/dynamic` ni `React.lazy` | `next/dynamic` añadía 3 KB de runtime; ambos suspenden aunque el chunk esté descargado y React 19 retrasa ~300 ms la sustitución del fallback |
+| `useMemo` de las `<option>` en `ProductSelect` y lista vacía estable `NO_PRODUCTS` en `useProducts` | Cada pulsación de los formularios de stock rehacía todas las opciones (4,9 → 1,0 ms con 1.001 SKUs y CPU ×4) |
+| Benchmarks con `next build --webpack`, Edge + `playwright-core` fuera del repo y prefetch del router bloqueado | Turbopack no compila aquí (Google Fonts); el prefetch del sidebar mezcla el JS de otras rutas |
+| Commits `Optimización con caché — …` escalonados, sin `docs/hitos.md` ni `Co-authored-by` | Práctica sin hito; el prompt prohíbe firmas de IA |
+
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 
 - `CONTEXT.es.md` y `CONTEXT-trackflow.es.md` (fuente de verdad del negocio).

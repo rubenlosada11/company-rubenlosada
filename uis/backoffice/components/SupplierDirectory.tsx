@@ -1,14 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { type ComponentProps, Suspense, use, useState } from "react";
 import { SUPPLIER_CATEGORIES, SUPPLIER_COUNTRIES } from "@/lib/data/suppliers";
+import { deferredModule } from "@/lib/deferredModule";
 import { apiErrorMessage } from "@/lib/http";
 import { suppliersApi } from "@/lib/suppliers";
 import { useApiRequest } from "@/lib/useApiRequest";
 import type { Supplier, SupplierFilters } from "@/types";
 import { LoadErrorAlert } from "./LoadErrorAlert";
-import { SupplierForm } from "./SupplierForm";
+import type { SupplierForm as SupplierFormComponent } from "./SupplierForm";
 import { SupplierRow } from "./SupplierRow";
+
+// El formulario de alta solo aparece al pulsar «Nuevo proveedor»: su código (validación, campos, envío) va en un
+// chunk aparte que se descarga entonces, no con la página. Se empieza a descargar en cuanto el puntero o el foco
+// llegan al botón: al hacer clic normalmente ya está y se muestra sin pasar por el «Cargando…». Por qué
+// `deferredModule` + `use()` y no `next/dynamic` ni `React.lazy`: ver `lib/deferredModule.ts`.
+const loadSupplierForm = deferredModule(() => import("./SupplierForm").then((module) => module.SupplierForm));
+
+function DeferredSupplierForm(props: ComponentProps<typeof SupplierFormComponent>) {
+  const SupplierForm = use(loadSupplierForm());
+  // `SupplierForm` es siempre la misma exportación del módulo (la promesa se guarda): no se crea en cada render.
+  // eslint-disable-next-line react-hooks/static-components
+  return <SupplierForm {...props} />;
+}
+
+function preloadSupplierForm() {
+  // Solo adelanta la descarga. Si falla, se repite al mostrar el formulario y, si vuelve a fallar, lo recoge el límite
+  // de error del panel (`app/(panel)/error.tsx`).
+  loadSupplierForm().catch(() => undefined);
+}
 
 const selectClasses =
   "w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 sm:w-auto";
@@ -120,6 +140,8 @@ export function SupplierDirectory() {
             setNotice(null);
             setShowForm((open) => !open);
           }}
+          onPointerEnter={preloadSupplierForm}
+          onFocus={preloadSupplierForm}
           aria-expanded={showForm}
           aria-controls="new-supplier-panel"
           className="rounded-full bg-blue-700 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
@@ -136,7 +158,15 @@ export function SupplierDirectory() {
 
       {showForm ? (
         <div id="new-supplier-panel">
-          <SupplierForm onCreated={handleCreated} onCancel={() => setShowForm(false)} />
+          <Suspense
+            fallback={
+              <p role="status" className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
+                Cargando el formulario…
+              </p>
+            }
+          >
+            <DeferredSupplierForm onCreated={handleCreated} onCancel={() => setShowForm(false)} />
+          </Suspense>
         </div>
       ) : null}
 

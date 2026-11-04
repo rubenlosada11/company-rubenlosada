@@ -513,6 +513,31 @@ Los datos se guardan con **TinyDB** en un fichero JSON en disco, así que sobrev
 El acceso está en [`app/database.py`](./app/database.py): cada uso abre el fichero, trabaja con la tabla y lo cierra
 (lee siempre el estado del disco), con un candado para que las peticiones concurrentes no corrompan el JSON.
 
+## Rendimiento: caché y tiempos
+
+Dos lecturas se sirven desde una caché en memoria con caducidad ([`app/cache.py`](./app/cache.py)); decisiones y
+mediciones en [`CACHING_REPORT.md`](../../CACHING_REPORT.md):
+
+| Endpoint | TTL | Se invalida al |
+| --- | --- | --- |
+| `GET /inventory/products` | 30 s | dar de alta un SKU o registrar una entrada o una salida |
+| `GET /api/incidents/summary` | 60 s | registrar una incidencia o cambiar su estado |
+
+La autenticación se comprueba antes de leer la caché y las dos respuestas son iguales para cualquier usuario. La caché
+es **de cada proceso**: con varios workers de uvicorn, una escritura solo la invalida en el worker que la atendió y los
+demás pueden servir datos viejos hasta el TTL (la API se despliega con un worker). Los cambios hechos fuera de la API
+(seeds, SQL directo) también tardan hasta el TTL en verse.
+
+Cada petición deja una línea en el log `trackflow.api.timing` ([`app/timing.py`](./app/timing.py)), con la plantilla de
+la ruta (sin ids, query strings ni tokens) y, en el inventario, las consultas SQL:
+
+```text
+INFO:     trackflow.api.timing: GET /inventory/products 200 42.16 ms sql=3
+INFO:     trackflow.api.timing: GET /inventory/products 200 7.34 ms
+```
+
+La primera línea es un fallo de caché (3 consultas); la segunda, un acierto (ninguna).
+
 ## Estructura
 
 ```text
@@ -531,6 +556,8 @@ services/api/
 │   ├── email_templates.py  # email de recuperación de contraseña (HTML + texto)
 │   ├── dependencies.py   # OAuth2PasswordBearer + get_current_user
 │   ├── database.py       # TinyDB (proveedores, usuarios e incidencias) + motor SQLModel y get_db (inventario)
+│   ├── cache.py          # caché en memoria con TTL e invalidación (inventario y resumen de incidencias)
+│   ├── timing.py         # middleware de tiempos por petición y recuento de consultas SQL
 │   ├── seed.py           # `uv run seed`
 │   ├── create_admin.py   # `uv run create-admin <email>`
 │   ├── seed_inventory.py # `uv run seed-inventory [email]`

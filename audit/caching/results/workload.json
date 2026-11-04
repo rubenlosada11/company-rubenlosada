@@ -1,0 +1,53 @@
+{
+  "operations": 2000,
+  "seed": 7,
+  "mix": {
+    "GET /inventory/products": 35,
+    "GET /inventory/products?warehouse=LA": 10,
+    "GET /inventory/products?warehouse=ZGZ": 10,
+    "GET /api/incidents/summary": 35,
+    "POST /inventory/orders/inbound": 5,
+    "POST /api/incidents": 2,
+    "PATCH /api/incidents/{id}/status": 3
+  },
+  "caches": {
+    "incidents.summary": {
+      "ttl_seconds": 60,
+      "hits": 584,
+      "misses": 89,
+      "invalidations": 104,
+      "hit_ratio": 0.868,
+      "hit_ms": {
+        "n": 584,
+        "mean": 5.758,
+        "median": 5.106,
+        "p95": 9.568
+      },
+      "miss_ms": {
+        "n": 89,
+        "mean": 42.141,
+        "median": 37.445,
+        "p95": 78.003
+      }
+    },
+    "inventory.products": {
+      "ttl_seconds": 30,
+      "hits": 892,
+      "misses": 227,
+      "invalidations": 104,
+      "hit_ratio": 0.797,
+      "hit_ms": {
+        "n": 892,
+        "mean": 12.173,
+        "median": 10.673,
+        "p95": 23.432
+      },
+      "miss_ms": {
+        "n": 227,
+        "mean": 51.409,
+        "median": 46.617,
+        "p95": 91.334
+      }
+    }
+  }
+}

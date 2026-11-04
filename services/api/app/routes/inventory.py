@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session
 
 from app.auth_models import User
-from app.database import get_db
+from app.database import get_database_url, get_db
 from app.dependencies import CurrentUser, get_current_user
 from app.inventory_schemas import (
     Movement,
@@ -49,8 +49,12 @@ def list_products(
     session: DbSession,
     warehouse: Annotated[Warehouse | None, Query(description="Solo los SKUs registrados en este almacén")] = None,
 ) -> list[SKURead]:
-    """`current_stock` es el stock en el almacén del SKU; `stock_by_warehouse`, el de cada almacén por separado."""
-    return inventory_service.list_skus(session, warehouse)
+    """`current_stock` es el stock en el almacén del SKU; `stock_by_warehouse`, el de cada almacén por separado.
+
+    Se sirve desde una caché de 30 s que se invalida con cada alta de SKU, entrada o salida (`products_cache`).
+    """
+    key = (get_database_url(), warehouse)
+    return inventory_service.products_cache.get_or_load(key, lambda: inventory_service.list_skus(session, warehouse))
 
 
 @router.post(

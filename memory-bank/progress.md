@@ -6,12 +6,18 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/serialization-audit` (desde `main` @ `e12574c`, que incluye las PR #3–#23).
+- **Rama de trabajo:** `feature/caching-optimisation` (desde `main` @ `79cf971`, que incluye las PR #3–#24).
+- **Optimización de rendimiento: caching** (práctica sin número de hito): middleware de tiempos en la API
+  (`app/timing.py`), caché en memoria con TTL e invalidación (`app/cache.py`) en `GET /inventory/products` (30 s) y
+  `GET /api/incidents/summary` (60 s), carga diferida de dos componentes del backoffice (`lib/deferredModule.ts`) y
+  `useMemo` en el selector de producto. Medido con un dataset sintético (`audit/caching/`): −82 % y −92 % de latencia
+  mediana, ×14 y ×12 de rendimiento con 8 hilos, pulsación 4,9 → 1,0 ms. Informe: `CACHING_REPORT.md`.
+  **Implementada y validada** (2026-11-03): 5 commits, rama subida y **PR #25 abierta** contra `main` (2026-11-04).
 - **Auditoría de serialización de la API** (práctica sin número de hito): los 33 endpoints de `services/api`
   inventariados con su estado original y final en `docs/serialization-audit.md`; las 30 rutas JSON declaran
   `response_model` en el decorador (antes ninguna), el registro ya no devuelve el email, el analizador tiene contrato
   (`ResultadoAnalisis`), los esquemas de salida no heredan de los de entrada y `tests/test_serialization.py` (61 casos)
-  lo vigila. **Implementada y validada** (2026-11-02): 7 commits, rama subida y **PR #24 abierta** contra `main`.
+  lo vigila. **Implementada y validada** (2026-11-02): 9 commits, **PR #24 fusionada** (`79cf971`, 2026-11-02).
 - **Auditoría de rendimiento de los frontends** (práctica sin número de hito): Lighthouse (12.8.2, 5 ejecuciones,
   builds de producción) sobre `uis/website` y `uis/backoffice`, diagnóstico en `AUDIT.md`, correcciones una a una
   con su medición, refactorizaciones del backoffice y resultados en `REPORT.md`. Evidencias en `audit/`.
@@ -1322,6 +1328,32 @@ push y antes de la PR**. Detalle completo en `docs/serialization-audit.md`.
   hechas con Playwright + Edge contra la API de prueba; en Swagger solo la respuesta, sin `curl`, cuerpo de la petición
   ni JWT (sustituido por un texto). Título de la PR cambiado a «Auditoría de Serialización del Backend».
 
+### 2026-11-03 — Optimización de rendimiento: caching (rama `feature/caching-optimisation`)
+
+Prompt del curso por fases (1–12); el desarrollador pidió avanzar sin paradas salvo algo crítico y **detenerse antes de
+los commits (revisar qué se commitea y los mensajes) y antes de la PR**. Detalle en `CACHING_REPORT.md`.
+
+- **Medición:** dataset sintético reproducible (`audit/caching/seed_benchmark.py`: 500 proveedores, 5.000 incidencias,
+  1.000 SKUs, 33.403 movimientos) siempre en un directorio nuevo; APIs de medición en :8031/:8032 sobre copias, nunca
+  `services/api/db` ni Supabase. «Antes» = copia del paquete `app/` sin caché. Los controles variaban hasta ×2 entre
+  ejecuciones completas: la comparación de referencia son **rondas alternas** (`interleave.py`).
+- **Backend:** `RequestTimingMiddleware` (ruta plantilla, sin query ni ids; `sql=N` con listener del motor y
+  `ContextVar`); `TTLCache` con instantáneas JSON inmutables (`validate_json` en cada acierto), clave con el origen de
+  los datos, generación contra lecturas cruzadas con escrituras y fallos de la caché que no tumban el endpoint.
+  Las funciones del router mantienen firma y tipo de retorno (las pruebas API-042 las llaman directamente: un primer
+  intento que devolvía `Response` con los bytes las rompía y se bloqueaba con el candado de TinyDB).
+- **Descartado tras medir:** caché de `GET /suppliers` (−6 %, dentro del ruido; el coste es serializar) — implementada
+  y retirada; `/inventory/orders` y `/api/incidents` (cambian con cada escritura; el problema es la falta de paginación).
+- **Frontend:** `next/dynamic` añadía un chunk de 3 KB (runtime) y `React.lazy` sumaba ~300 ms por el *throttle* de
+  Suspense de React 19 (`globalMostRecentFallbackTime + 300`); solución `import()` + `use()` + `Suspense` con promesa
+  marcada (`status`/`value`) y precarga al pasar el puntero / enviar el CSV. Regla `react-hooks/static-components`
+  desactivada en dos líneas con el motivo.
+- **Validación:** API 1.268 tests (47 nuevos: `test_cache.py`, `test_api_cache.py`, `test_timing.py`), paquete y scripts
+  196, backoffice lint + typecheck + Jest 151 (3 nuevos) + `next build --webpack`; respuestas cacheadas idénticas byte a
+  byte a las de la API sin caché; 0 errores de consola en Edge.
+- **Entrega:** el desarrollador revisó y aprobó los 5 commits (`Optimización con caché — …`, sin `Co-authored-by`);
+  rama subida y PR #25 abierta (título en español, sin capturas, sin merge: la fusiona el desarrollador).
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -1407,5 +1439,9 @@ push y antes de la PR**. Detalle completo en `docs/serialization-audit.md`.
 10. Auditoría de rendimiento (PR #23 fusionada). Recomendaciones que requieren decisión (`REPORT.md` §8): sesión
     con cookie + comprobación en servidor para que el panel del backoffice no espere a `GET /auth/me` (LCP móvil
     ~3 s); `experimental.inlineCss` cuando sea estable; medir en campo (RUM con `web-vitals`) si se publican.
-11. Auditoría de serialización: revisar y fusionar la PR #24. Limitaciones aceptadas en `docs/serialization-audit.md` §17 (ejemplo del 422 en OpenAPI,
+11. Auditoría de serialización: PR #24 fusionada. Limitaciones aceptadas en `docs/serialization-audit.md` §17 (ejemplo del 422 en OpenAPI,
     build con Turbopack y Google Fonts en este equipo).
+12. Caching (`feature/caching-optimisation`): revisar y fusionar la PR #25. Mejoras que requieren decisión
+    (`CACHING_REPORT.md` §10): paginación de `/inventory/orders` y `/api/incidents` (cambia el contrato), invalidación
+    compartida si la API pasa a varios workers, medir con Supabase real, precarga en reposo del formulario de
+    proveedores para pantallas táctiles.

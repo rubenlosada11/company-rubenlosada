@@ -14,6 +14,7 @@ from app.errors import UnexpectedErrorMiddleware, unexpected_error, validation_e
 from app.routes import auth, incident_manager, incidents, inventory, profiles, suppliers, users
 from app.security import ConfigError, check_auth_config
 from app.services.email import check_email_config
+from app.timing import RequestTimingMiddleware
 
 # Orígenes del navegador autorizados (lista separada por comas). Por defecto, el backoffice local (puerto 3002).
 DEFAULT_CORS_ORIGINS = "http://localhost:3002,http://127.0.0.1:3002"
@@ -61,6 +62,9 @@ app = FastAPI(
 # Se registra antes que CORS para quedar dentro de él (el último middleware añadido es el más externo): así el 500
 # genérico de un error no controlado lleva las cabeceras CORS y el backoffice puede leerlo.
 app.add_middleware(UnexpectedErrorMiddleware)
+
+# Tiempo de cada petición (`app/timing.py`). Por fuera del anterior: registra el estado final, también el 500 genérico.
+app.add_middleware(RequestTimingMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

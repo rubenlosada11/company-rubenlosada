@@ -1,0 +1,167 @@
+{
+  "label": "después",
+  "date": "2026-11-02T23:00:45.032Z",
+  "browser": "Microsoft Edge 156.0.4314.58",
+  "suppliers": {
+    "route": "/proveedores",
+    "initial": {
+      "count": 13,
+      "bytes": 156041,
+      "files": [
+        {
+          "path": "/_next/static/chunks/webpack-4552f3a0fdd2785d.js",
+          "bytes": 1811
+        },
+        {
+          "path": "/_next/static/chunks/main-app-72f14cee3679c529.js",
+          "bytes": 469
+        },
+        {
+          "path": "/_next/static/chunks/app/layout-2c479572a36baaae.js",
+          "bytes": 634
+        },
+        {
+          "path": "/_next/static/chunks/4bd1b696-92152b0f5947070d.js",
+          "bytes": 63356
+        },
+        {
+          "path": "/_next/static/chunks/327-1ac92b982802e4cb.js",
+          "bytes": 3482
+        },
+        {
+          "path": "/_next/static/chunks/app/error-dfec1f7a4522fdca.js",
+          "bytes": 764
+        },
+        {
+          "path": "/_next/static/chunks/794-d1a40dcf24d651d9.js",
+          "bytes": 65666
+        },
+        {
+          "path": "/_next/static/chunks/500-b13bb91f5a6311b6.js",
+          "bytes": 3570
+        },
+        {
+          "path": "/_next/static/chunks/app/(panel)/layout-670fa4c23096e00d.js",
+          "bytes": 2335
+        },
+        {
+          "path": "/_next/static/chunks/600-d99af15e241ccedd.js",
+          "bytes": 5691
+        },
+        {
+          "path": "/_next/static/chunks/app/global-error-2c97b88513e58a80.js",
+          "bytes": 820
+        },
+        {
+          "path": "/_next/static/chunks/app/(panel)/error-dbaaf241287d87fa.js",
+          "bytes": 752
+        },
+        {
+          "path": "/_next/static/chunks/app/(panel)/proveedores/page-0848f0ce5c0efd4a.js",
+          "bytes": 6691
+        }
+      ]
+    },
+    "onDemand": {
+      "count": 1,
+      "bytes": 2078,
+      "files": [
+        {
+          "path": "/_next/static/chunks/519.ea4bd77879093ea6.js",
+          "bytes": 2078
+        }
+      ],
+      "msUntilFormVisible": 696,
+      "msUntilFormVisibleAfterHover": 147
+    }
+  },
+  "incidents": {
+    "route": "/incidencias",
+    "initial": {
+      "count": 13,
+      "bytes": 154105,
+      "files": [
+        {
+          "path": "/_next/static/chunks/webpack-4552f3a0fdd2785d.js",
+          "bytes": 1811
+        },
+        {
+          "path": "/_next/static/chunks/main-app-72f14cee3679c529.js",
+          "bytes": 469
+        },
+        {
+          "path": "/_next/static/chunks/327-1ac92b982802e4cb.js",
+          "bytes": 3482
+        },
+        {
+          "path": "/_next/static/chunks/4bd1b696-92152b0f5947070d.js",
+          "bytes": 63356
+        },
+        {
+          "path": "/_next/static/chunks/app/layout-2c479572a36baaae.js",
+          "bytes": 634
+        },
+        {
+          "path": "/_next/static/chunks/794-d1a40dcf24d651d9.js",
+          "bytes": 65666
+        },
+        {
+          "path": "/_next/static/chunks/app/error-dfec1f7a4522fdca.js",
+          "bytes": 764
+        },
+        {
+          "path": "/_next/static/chunks/500-b13bb91f5a6311b6.js",
+          "bytes": 3570
+        },
+        {
+          "path": "/_next/static/chunks/600-d99af15e241ccedd.js",
+          "bytes": 5691
+        },
+        {
+          "path": "/_next/static/chunks/app/(panel)/layout-670fa4c23096e00d.js",
+          "bytes": 2335
+        },
+        {
+          "path": "/_next/static/chunks/app/global-error-2c97b88513e58a80.js",
+          "bytes": 820
+        },
+        {
+          "path": "/_next/static/chunks/app/(panel)/error-dbaaf241287d87fa.js",
+          "bytes": 752
+        },
+        {
+          "path": "/_next/static/chunks/app/(panel)/incidencias/page-38dbd5d2476f28ad.js",
+          "bytes": 4755
+        }
+      ]
+    },
+    "onDemand": {
+      "count": 1,
+      "bytes": 3097,
+      "files": [
+        {
+          "path": "/_next/static/chunks/326.751deaab9b86610f.js",
+          "bytes": 3097
+        }
+      ],
+      "msUntilResultsVisible": 119
+    }
+  },
+  "outboundTyping": {
+    "route": "/inventory/orders/outbound",
+    "productOptions": 1001,
+    "cpuThrottling": 4,
+    "keystrokesPerRound": 60,
+    "roundMedianMs": [
+      1.4,
+      1.1,
+      1.2,
+      0.7,
+      0.8,
+      1,
+      1
+    ],
+    "medianMs": 1
+  },
+  "errors": []
+}

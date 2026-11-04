@@ -1,0 +1,583 @@
+{
+  "label": "antes",
+  "commit": "79cf971",
+  "date": "2026-11-03 00:11:42",
+  "python": "3.14.6",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "requests_per_endpoint": 200,
+  "heavy_requests": 20,
+  "warmup_per_endpoint": 10,
+  "concurrency": 8,
+  "results": [
+    {
+      "name": "health",
+      "path": "/health",
+      "status": 200,
+      "bytes": 15,
+      "requests": 200,
+      "warmup": 10,
+      "client_ms": {
+        "mean": 2.86,
+        "median": 2.846,
+        "p95": 3.518,
+        "min": 1.93,
+        "max": 4.543
+      },
+      "server": {
+        "ms": {
+          "mean": 1.89,
+          "median": 1.86,
+          "p95": 2.41,
+          "min": 1.2,
+          "max": 3.06
+        },
+        "sql_per_request": 0.0,
+        "lines": 200
+      },
+      "concurrent": {
+        "threads": 8,
+        "requests": 200,
+        "rps": 507.4,
+        "ms": {
+          "mean": 15.576,
+          "median": 13.919,
+          "p95": 26.899,
+          "min": 9.344,
+          "max": 33.11
+        }
+      }
+    },
+    {
+      "name": "auth_me",
+      "path": "/auth/me",
+      "status": 200,
+      "bytes": 299,
+      "requests": 200,
+      "warmup": 10,
+      "client_ms": {
+        "mean": 6.984,
+        "median": 6.843,
+        "p95": 8.374,
+        "min": 4.875,
+        "max": 18.274
+      },
+      "server": {
+        "ms": {
+          "mean": 5.955,
+          "median": 5.82,
+          "p95": 7.3,
+          "min": 3.85,
+          "max": 16.4
+        },
+        "sql_per_request": 0.0,
+        "lines": 200
+      },
+      "concurrent": {
+        "threads": 8,
+        "requests": 200,
+        "rps": 255.3,
+        "ms": {
+          "mean": 30.983,
+          "median": 30.197,
+          "p95": 41.696,
+          "min": 17.439,
+          "max": 46.121
+        }
+      }
+    },
+    {
+      "name": "profiles_me",
+      "path": "/profiles/me",
+      "status": 200,
+      "bytes": 134,
+      "requests": 200,
+      "warmup": 10,
+      "client_ms": {
+        "mean": 4.268,
+        "median": 4.176,
+        "p95": 6.138,
+        "min": 2.092,
+        "max": 9.83
+      },
+      "server": {
+        "ms": {
+          "mean": 3.61,
+          "median": 3.5,
+          "p95": 5.23,
+          "min": 1.72,
+          "max": 8.63
+        },
+        "sql_per_request": 0.0,
+        "lines": 200
+      },
+      "concurrent": {
+        "threads": 8,
+        "requests": 200,
+        "rps": 267.4,
+        "ms": {
+          "mean": 29.509,
+          "median": 29.583,
+          "p95": 33.936,
+          "min": 19.131,
+          "max": 35.604
+        }
+      }
+    },
+    {
+      "name": "suppliers_list",
+      "path": "/suppliers",
+      "status": 200,
+      "bytes": 146918,
+      "requests": 200,
+      "warmup": 10,
+      "client_ms": {
+        "mean": 17.441,
+        "median": 16.953,
+        "p95": 22.994,
+        "min": 8.244,
+        "max": 82.502
+      },
+      "server": {
+        "ms": {
+          "mean": 17.796,
+          "median": 17.55,
+          "p95": 23.72,
+          "min": 8.07,
+          "max": 82.58
+        },
+        "sql_per_request": 0.0,
+        "lines": 200
+      },
+      "concurrent": {
+        "threads": 8,
+        "requests": 200,
+        "rps": 57.8,
+        "ms": {
+          "mean": 136.806,
+          "median": 138.532,
+          "p95": 182.927,
+          "min": 46.549,
+          "max": 212.768
+        }
+      }
+    },
+    {
+      "name": "suppliers_filtered",
+      "path": "/suppliers?country=Spain&category=carrier_last_mile",
+      "status": 200,
+      "bytes": 19374,
+      "requests": 200,
+      "warmup": 10,
+      "client_ms": {
+        "mean": 8.37,
+        "median": 8.28,
+        "p95": 13.079,
+        "min": 3.908,
+        "max": 15.582
+      },
+      "server": {
+        "ms": {
+          "mean": 8.659,
+          "median": 8.605,
+          "p95": 13.87,
+          "min": 3.74,
+          "max": 17.01
+        },
+        "sql_per_request": 0.0,
+        "lines": 200
+      },
+      "concurrent": {
+        "threads": 8,
+        "requests": 200,
+        "rps": 99.0,
+        "ms": {
+          "mean": 78.699,
+          "median": 76.662,
+          "p95": 114.14,
+          "min": 16.065,
+          "max": 124.254
+        }
+      }
+    },
+    {
+      "name": "supplier_detail",
+      "path": "/suppliers/250",
+      "status": 200,
+      "bytes": 288,
+      "requests": 200,
+      "warmup": 10,
+      "client_ms": {
+        "mean": 8.297,
+        "median": 8.177,
+        "p95": 11.044,
+        "min": 4.501,
+        "max": 11.999
+      },
+      "server": {
+        "ms": {
+          "mean": 8.594,
+          "median": 8.4,
+          "p95": 11.97,
+          "min": 4.57,
+          "max": 13.37
+        },
+        "sql_per_request": 0.0,
+        "lines": 200
+      },
+      "concurrent": {
+        "threads": 8,
+        "requests": 200,
+        "rps": 135.8,
+        "ms": {
+          "mean": 58.121,
+          "median": 56.244,
+          "p95": 73.596,
+          "min": 16.53,
+          "max": 76.724
+        }
+      }
+    },
+    {
+      "name": "incidents_list",
+      "path": "/api/incidents",
+      "status": 200,
+      "bytes": 1867095,
+      "requests": 200,
+      "warmup": 10,
+      "client_ms": {
+        "mean": 163.306,
+        "median": 150.903,
+        "p95": 252.403,
+        "min": 84.125,
+        "max": 350.454
+      },
+      "server": {
+        "ms": {
+          "mean": 147.868,
+          "median": 135.335,
+          "p95": 225.31,
+          "min": 77.83,
+          "max": 338.05
+        },
+        "sql_per_request": 0.0,
+        "lines": 200
+      },
+      "concurrent": {
+        "threads": 8,
+        "requests": 200,
+        "rps": 5.3,
+        "ms": {
+          "mean": 1507.298,
+          "median": 1420.223,
+          "p95": 2414.685,
+          "min": 321.258,
+          "max": 3487.781
+        }
+      }
+    },
+    {
+      "name": "incidents_filtered",
+      "path": "/api/incidents?status=open&branch=central",
+      "status": 200,
+      "bytes": 73232,
+      "requests": 200,
+      "warmup": 10,
+      "client_ms": {
+        "mean": 23.223,
+        "median": 21.911,
+        "p95": 26.29,
+        "min": 19.975,
+        "max": 70.211
+      },
+      "server": {
+        "ms": {
+          "mean": 22.431,
+          "median": 21.275,
+          "p95": 24.82,
+          "min": 19.35,
+          "max": 69.65
+        },
+        "sql_per_request": 0.0,
+        "lines": 200
+      },
+      "concurrent": {
+        "threads": 8,
+        "requests": 200,
+        "rps": 43.9,
+        "ms": {
+          "mean": 178.136,
+          "median": 173.131,
+          "p95": 229.454,
+          "min": 29.434,
+          "max": 248.239
+        }
+      }
+    },
+    {
+      "name": "incidents_summary",
+      "path": "/api/incidents/summary",
+      "status": 200,
+      "bytes": 468,
+      "requests": 200,
+      "warmup": 10,
+      "client_ms": {
+        "mean": 22.928,
+        "median": 21.551,
+        "p95": 28.356,
+        "min": 18.471,
+        "max": 71.71
+      },
+      "server": {
+        "ms": {
+          "mean": 22.366,
+          "median": 21.06,
+          "p95": 27.42,
+          "min": 18.05,
+          "max": 70.92
+        },
+        "sql_per_request": 0.0,
+        "lines": 200
+      },
+      "concurrent": {
+        "threads": 8,
+        "requests": 200,
+        "rps": 47.7,
+        "ms": {
+          "mean": 164.962,
+          "median": 157.669,
+          "p95": 214.502,
+          "min": 27.196,
+          "max": 247.11
+        }
+      }
+    },
+    {
+      "name": "incident_detail",
+      "path": "/api/incidents/2500",
+      "status": 200,
+      "bytes": 283,
+      "requests": 200,
+      "warmup": 10,
+      "client_ms": {
+        "mean": 16.412,
+        "median": 15.81,
+        "p95": 17.843,
+        "min": 14.119,
+        "max": 61.393
+      },
+      "server": {
+        "ms": {
+          "mean": 15.813,
+          "median": 15.34,
+          "p95": 17.05,
+          "min": 13.65,
+          "max": 60.75
+        },
+        "sql_per_request": 0.0,
+        "lines": 200
+      },
+      "concurrent": {
+        "threads": 8,
+        "requests": 200,
+        "rps": 60.9,
+        "ms": {
+          "mean": 129.054,
+          "median": 122.458,
+          "p95": 169.451,
+          "min": 37.408,
+          "max": 188.548
+        }
+      }
+    },
+    {
+      "name": "inventory_products",
+      "path": "/inventory/products",
+      "status": 200,
+      "bytes": 192533,
+      "requests": 200,
+      "warmup": 10,
+      "client_ms": {
+        "mean": 45.547,
+        "median": 42.023,
+        "p95": 81.141,
+        "min": 38.402,
+        "max": 89.899
+      },
+      "server": {
+        "ms": {
+          "mean": 45.669,
+          "median": 42.155,
+          "p95": 81.56,
+          "min": 38.77,
+          "max": 89.12
+        },
+        "sql_per_request": 3.0,
+        "lines": 200
+      },
+      "concurrent": {
+        "threads": 8,
+        "requests": 200,
+        "rps": 8.6,
+        "ms": {
+          "mean": 921.467,
+          "median": 927.006,
+          "p95": 1000.747,
+          "min": 469.964,
+          "max": 1027.656
+        }
+      }
+    },
+    {
+      "name": "inventory_products_la",
+      "path": "/inventory/products?warehouse=LA",
+      "status": 200,
+      "bytes": 96018,
+      "requests": 200,
+      "warmup": 10,
+      "client_ms": {
+        "mean": 35.833,
+        "median": 33.762,
+        "p95": 44.809,
+        "min": 31.305,
+        "max": 79.817
+      },
+      "server": {
+        "ms": {
+          "mean": 35.805,
+          "median": 33.86,
+          "p95": 42.72,
+          "min": 31.25,
+          "max": 74.78
+        },
+        "sql_per_request": 3.0,
+        "lines": 200
+      },
+      "concurrent": {
+        "threads": 8,
+        "requests": 200,
+        "rps": 11.1,
+        "ms": {
+          "mean": 717.647,
+          "median": 719.455,
+          "p95": 786.866,
+          "min": 402.813,
+          "max": 843.2
+        }
+      }
+    },
+    {
+      "name": "inventory_product_detail",
+      "path": "/inventory/products/500",
+      "status": 200,
+      "bytes": 193,
+      "requests": 200,
+      "warmup": 10,
+      "client_ms": {
+        "mean": 3.726,
+        "median": 3.471,
+        "p95": 5.313,
+        "min": 2.719,
+        "max": 6.328
+      },
+      "server": {
+        "ms": {
+          "mean": 3.623,
+          "median": 3.35,
+          "p95": 5.01,
+          "min": 2.72,
+          "max": 5.99
+        },
+        "sql_per_request": 3.0,
+        "lines": 200
+      },
+      "concurrent": {
+        "threads": 8,
+        "requests": 200,
+        "rps": 252.8,
+        "ms": {
+          "mean": 30.98,
+          "median": 30.647,
+          "p95": 36.259,
+          "min": 8.882,
+          "max": 63.953
+        }
+      }
+    },
+    {
+      "name": "inventory_orders",
+      "path": "/inventory/orders",
+      "status": 200,
+      "bytes": 11662978,
+      "requests": 20,
+      "warmup": 2,
+      "client_ms": {
+        "mean": 1150.471,
+        "median": 1145.63,
+        "p95": 1266.999,
+        "min": 1042.819,
+        "max": 1313.527
+      },
+      "server": {
+        "ms": {
+          "mean": 1134.906,
+          "median": 1124.915,
+          "p95": 1251.36,
+          "min": 1032.57,
+          "max": 1300.01
+        },
+        "sql_per_request": 2.0,
+        "lines": 20
+      },
+      "concurrent": {
+        "threads": 8,
+        "requests": 16,
+        "rps": 0.3,
+        "ms": {
+          "mean": 26216.686,
+          "median": 26934.617,
+          "p95": 29237.148,
+          "min": 21194.079,
+          "max": 29454.627
+        }
+      }
+    },
+    {
+      "name": "inventory_orders_sku",
+      "path": "/inventory/orders?sku_id=500",
+      "status": 200,
+      "bytes": 12359,
+      "requests": 200,
+      "warmup": 10,
+      "client_ms": {
+        "mean": 4.706,
+        "median": 4.371,
+        "p95": 6.827,
+        "min": 3.386,
+        "max": 8.512
+      },
+      "server": {
+        "ms": {
+          "mean": 4.562,
+          "median": 4.295,
+          "p95": 6.62,
+          "min": 3.07,
+          "max": 8.07
+        },
+        "sql_per_request": 2.0,
+        "lines": 200
+      },
+      "concurrent": {
+        "threads": 8,
+        "requests": 200,
+        "rps": 114.0,
+        "ms": {
+          "mean": 69.32,
+          "median": 69.673,
+          "p95": 83.441,
+          "min": 16.88,
+          "max": 112.362
+        }
+      }
+    }
+  ]
+}
