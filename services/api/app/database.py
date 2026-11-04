@@ -30,6 +30,8 @@ from sqlmodel import Session, SQLModel, create_engine
 from tinydb import TinyDB
 from tinydb.table import Table
 
+from app.timing import count_sql_query
+
 DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "db" / "suppliers.json"
 SUPPLIERS_TABLE = "suppliers"
 
@@ -194,6 +196,9 @@ def get_engine() -> Engine:
             is_psycopg = make_url(url).get_driver_name() == "psycopg"
             connect_args = {"connect_timeout": POSTGRES_CONNECT_TIMEOUT_SECONDS} if is_psycopg else {}
             engine = create_engine(url, pool_pre_ping=True, connect_args=connect_args)
+
+        # Cuenta las consultas de cada petición para el log de tiempos (`app/timing.py`).
+        event.listen(engine, "before_cursor_execute", count_sql_query)
 
         # Registra las tablas (SKU, StockEntry, StockExit) en `SQLModel.metadata` antes de crearlas.
         import app.inventory_models  # noqa: F401
