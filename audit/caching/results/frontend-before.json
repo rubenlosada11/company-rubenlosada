@@ -1,0 +1,156 @@
+{
+  "label": "antes",
+  "date": "2026-11-02T22:50:49.191Z",
+  "browser": "Microsoft Edge 156.0.4314.58",
+  "suppliers": {
+    "route": "/proveedores",
+    "initial": {
+      "count": 13,
+      "bytes": 156787,
+      "files": [
+        {
+          "path": "/_next/static/chunks/webpack-aa347a72f06b9ac0.js",
+          "bytes": 1771
+        },
+        {
+          "path": "/_next/static/chunks/main-app-72f14cee3679c529.js",
+          "bytes": 469
+        },
+        {
+          "path": "/_next/static/chunks/327-1ac92b982802e4cb.js",
+          "bytes": 3482
+        },
+        {
+          "path": "/_next/static/chunks/app/layout-2c479572a36baaae.js",
+          "bytes": 634
+        },
+        {
+          "path": "/_next/static/chunks/app/error-dfec1f7a4522fdca.js",
+          "bytes": 764
+        },
+        {
+          "path": "/_next/static/chunks/4bd1b696-92152b0f5947070d.js",
+          "bytes": 63356
+        },
+        {
+          "path": "/_next/static/chunks/500-b13bb91f5a6311b6.js",
+          "bytes": 3570
+        },
+        {
+          "path": "/_next/static/chunks/app/(panel)/layout-670fa4c23096e00d.js",
+          "bytes": 2335
+        },
+        {
+          "path": "/_next/static/chunks/794-d1a40dcf24d651d9.js",
+          "bytes": 65666
+        },
+        {
+          "path": "/_next/static/chunks/600-d99af15e241ccedd.js",
+          "bytes": 5691
+        },
+        {
+          "path": "/_next/static/chunks/app/(panel)/error-dbaaf241287d87fa.js",
+          "bytes": 752
+        },
+        {
+          "path": "/_next/static/chunks/app/global-error-2c97b88513e58a80.js",
+          "bytes": 820
+        },
+        {
+          "path": "/_next/static/chunks/app/(panel)/proveedores/page-3412556b91fdfbd8.js",
+          "bytes": 7477
+        }
+      ]
+    },
+    "onDemand": {
+      "count": 0,
+      "bytes": 0,
+      "files": [],
+      "msUntilFormVisible": 137
+    }
+  },
+  "incidents": {
+    "route": "/incidencias",
+    "initial": {
+      "count": 13,
+      "bytes": 156503,
+      "files": [
+        {
+          "path": "/_next/static/chunks/webpack-aa347a72f06b9ac0.js",
+          "bytes": 1771
+        },
+        {
+          "path": "/_next/static/chunks/main-app-72f14cee3679c529.js",
+          "bytes": 469
+        },
+        {
+          "path": "/_next/static/chunks/327-1ac92b982802e4cb.js",
+          "bytes": 3482
+        },
+        {
+          "path": "/_next/static/chunks/4bd1b696-92152b0f5947070d.js",
+          "bytes": 63356
+        },
+        {
+          "path": "/_next/static/chunks/app/layout-2c479572a36baaae.js",
+          "bytes": 634
+        },
+        {
+          "path": "/_next/static/chunks/app/error-dfec1f7a4522fdca.js",
+          "bytes": 764
+        },
+        {
+          "path": "/_next/static/chunks/500-b13bb91f5a6311b6.js",
+          "bytes": 3570
+        },
+        {
+          "path": "/_next/static/chunks/600-d99af15e241ccedd.js",
+          "bytes": 5691
+        },
+        {
+          "path": "/_next/static/chunks/app/(panel)/layout-670fa4c23096e00d.js",
+          "bytes": 2335
+        },
+        {
+          "path": "/_next/static/chunks/794-d1a40dcf24d651d9.js",
+          "bytes": 65666
+        },
+        {
+          "path": "/_next/static/chunks/app/global-error-2c97b88513e58a80.js",
+          "bytes": 820
+        },
+        {
+          "path": "/_next/static/chunks/app/(panel)/error-dbaaf241287d87fa.js",
+          "bytes": 752
+        },
+        {
+          "path": "/_next/static/chunks/app/(panel)/incidencias/page-a76a18ae6838820b.js",
+          "bytes": 7193
+        }
+      ]
+    },
+    "onDemand": {
+      "count": 0,
+      "bytes": 0,
+      "files": [],
+      "msUntilResultsVisible": 125
+    }
+  },
+  "outboundTyping": {
+    "route": "/inventory/orders/outbound",
+    "productOptions": 1001,
+    "cpuThrottling": 4,
+    "keystrokesPerRound": 60,
+    "roundMedianMs": [
+      5.2,
+      5.8,
+      5.3,
+      4.7,
+      4.8,
+      4.9,
+      4.3
+    ],
+    "medianMs": 4.9
+  },
+  "errors": []
+}
