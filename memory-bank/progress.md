@@ -1422,6 +1422,7 @@ Prompt del curso por fases (0–15); el desarrollador pidió ejecutarlas seguida
   copias de las bases: 46/46. Los beacons enviados durante la descarga de la página no los muestra DevTools, pero sí
   el log del receptor.
 - **Hallazgo:** CLS de 0,31 en la pantalla de login (escritorio) durante el E2E; no corregido (fuera del alcance).
+- **Capturas** del desarrollador (6) en `docs/screenshots/telemetry-capture/`, enlazadas en `telemetry-capture.md` §9.1.
 
 ## Trabajo pendiente
 

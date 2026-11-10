@@ -315,6 +315,20 @@ npm run dev
 4. En la terminal de la API: `telemetry_batch_received {...}` por cada lote, y los eventos del backend (`channel:
    backend`) al registrar órdenes.
 
+### 9.1. Capturas
+
+Hechas por el desarrollador en local (backoffice con `npm run dev`, API con su `.env`), en
+[`docs/screenshots/telemetry-capture/`](../screenshots/telemetry-capture/):
+
+| Captura | Qué muestra |
+| --- | --- |
+| [Lote: payload](../screenshots/telemetry-capture/lote%20payload.png) | Un `POST events` con el envelope completo (`eventId`, `timestamp`, `sessionId`, `userId: null`, `event_type`, `schemaVersion`, `requestId`, `source`, `environment`) y las propiedades de `page_performance_measured` (LCP, CLS, INP, TTFB) |
+| [Lote: respuesta](../screenshots/telemetry-capture/respuesta%20200%20response.png) | La respuesta del receptor: `{"received": 1}` |
+| [Lote con varios eventos](../screenshots/telemetry-capture/beacon%20events.png) | Un lote con varios `navigation_section_viewed` de la misma sesión (sección, sección anterior, origen de la navegación) |
+| [Lote de 8 eventos](../screenshots/telemetry-capture/lote%20eventos.png) | Ocho eventos capturados en segundos que viajan en una sola petición, no uno por evento |
+| [Reintentos bloqueados](../screenshots/telemetry-capture/reintentos%20bloqueados.png) | Con el receptor bloqueado en DevTools, los envíos fallan (filas rojas, lanzados desde `telemetry.ts`); al desbloquearlo vuelven las respuestas 200 |
+| [Log de la API](../screenshots/telemetry-capture/log%20de%20la%20api.png) | El receptor registra cada lote del navegador (`"channel": "http"`, cantidad y tipos) y el evento obligatorio `inbound_order_created` que emite la API al registrar una entrada (`"channel": "backend"`) |
+
 ## 10. Limitaciones conocidas
 
 - **Sin almacenamiento**: el receptor solo registra. Los eventos de esta fase no se conservan.
