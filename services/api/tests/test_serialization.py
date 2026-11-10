@@ -30,7 +30,7 @@ from app.incident_models import Incident, IncidentRecord, IncidentStatus
 from app.inventory_schemas import SKURead, SKUSummary, StockEntryRead, StockExitRead
 from app.main import app
 from app.models import Supplier
-from app.routes import auth, incident_manager, incidents, inventory, profiles, suppliers, users
+from app.routes import auth, incident_manager, incidents, inventory, profiles, suppliers, telemetry, users
 from app.services import incidents as incidents_service
 from app.services import password_reset as password_reset_service
 from app.services import users as users_service
@@ -60,7 +60,7 @@ NO_JSON_BODY = {
     ("GET", "/api/incidents/results/export"),
 }
 
-ROUTERS = [auth, users, profiles, suppliers, incidents, incident_manager, inventory]
+ROUTERS = [auth, users, profiles, suppliers, incidents, incident_manager, inventory, telemetry]
 
 
 def all_keys(value) -> set[str]:
@@ -104,7 +104,8 @@ def test_route_inventory_matches_the_registered_app():
         (method.upper(), path) for path, item in app.openapi()["paths"].items() for method in item
     }
     assert declared == published
-    assert len(declared) == 33
+    # 33 de la auditoría + `POST /telemetry/events` (captura de telemetría).
+    assert len(declared) == 34
 
 
 @pytest.mark.parametrize("route", application_routes(), ids=lambda route: f"{sorted(route.methods)[0]} {route.path}")

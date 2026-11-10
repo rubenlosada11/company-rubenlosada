@@ -335,7 +335,8 @@ def test_forgot_password_unknown_email_gets_the_same_response_and_no_email(api, 
     assert unknown.status_code == known.status_code == 200
     assert unknown.json() == known.json() == GENERIC
     assert unknown.content == known.content
-    ignore = {"date"}
+    # `x-request-id` (telemetría) es un UUID aleatorio por petición: distinto siempre, exista o no el email.
+    ignore = {"date", "x-request-id"}
     assert {k: v for k, v in unknown.headers.items() if k not in ignore} == {
         k: v for k, v in known.headers.items() if k not in ignore
     }

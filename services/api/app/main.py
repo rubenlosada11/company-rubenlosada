@@ -11,9 +11,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.errors import UnexpectedErrorMiddleware, unexpected_error, validation_error
-from app.routes import auth, incident_manager, incidents, inventory, profiles, suppliers, users
+from app.routes import auth, incident_manager, incidents, inventory, profiles, suppliers, telemetry, users
 from app.security import ConfigError, check_auth_config
 from app.services.email import check_email_config
+from app.telemetry.config import log_telemetry_config
+from app.telemetry.context import TelemetryContextMiddleware
 from app.timing import RequestTimingMiddleware
 
 # Orígenes del navegador autorizados (lista separada por comas). Por defecto, el backoffice local (puerto 3002).
@@ -44,6 +46,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         # El servidor imprime además la traza del arranque fallido: esta línea deja el motivo a la vista.
         trackflow_logger.error("La API no puede arrancar: %s", error)
         raise
+    # La telemetría nunca impide arrancar: solo avisa de lo que falta (p. ej. la clave de los seudónimos).
+    log_telemetry_config()
     yield
 
 
@@ -66,6 +70,10 @@ app.add_middleware(UnexpectedErrorMiddleware)
 # Tiempo de cada petición (`app/timing.py`). Por fuera del anterior: registra el estado final, también el 500 genérico.
 app.add_middleware(RequestTimingMiddleware)
 
+# Correlación de la telemetría (`X-Request-Id`, `X-Session-Id`) y detección de ediciones directas de stock. Por fuera
+# de los anteriores: también el 500 genérico lleva su `X-Request-Id`.
+app.add_middleware(TelemetryContextMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -75,9 +83,11 @@ app.add_middleware(
     ],
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     # `Authorization`: el backoffice envía el Bearer token. Sin cookies: no hace falta `allow_credentials`.
-    allow_headers=["Content-Type", "Authorization"],
-    # Sin esto, el navegador no deja leer el nombre del fichero en la descarga de /api/incidents/results/export.
-    expose_headers=["Content-Disposition"],
+    # `X-Request-Id` y `X-Session-Id`: correlación de la telemetría (plan §8.2 y §8.3).
+    allow_headers=["Content-Type", "Authorization", "X-Request-Id", "X-Session-Id"],
+    # Sin `Content-Disposition`, el navegador no deja leer el nombre del fichero en la descarga de
+    # /api/incidents/results/export. `X-Request-Id`: el backoffice lo une con su `form_submitted`.
+    expose_headers=["Content-Disposition", "X-Request-Id"],
 )
 
 # Último análisis de incidencias correcto. Vive en memoria mientras la API está en marcha (un solo proceso).
@@ -90,6 +100,7 @@ app.include_router(suppliers.router)
 app.include_router(incidents.router)
 app.include_router(incident_manager.router)
 app.include_router(inventory.router)
+app.include_router(telemetry.router)
 
 
 # Errores que no gestiona ningún router (ver `app/errors.py`): 422 sin los valores recibidos y, como último recurso
