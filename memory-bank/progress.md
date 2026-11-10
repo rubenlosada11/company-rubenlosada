@@ -6,13 +6,22 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/caching-optimisation` (desde `main` @ `79cf971`, que incluye las PR #3–#24).
+- **Rama de trabajo:** `docs/telemetry-design` (desde `main` @ `1bb9b84`, que incluye las PR #3–#25).
+- **Diseño del plan de telemetría** (práctica sin número de hito; contexto en
+  [`CONTEXT-telemetria.es.md`](../CONTEXT-telemetria.es.md), el BRIEFING de telemetría): solo documentación, sin
+  código. [`docs/telemetry/telemetry-plan.md`](../docs/telemetry/telemetry-plan.md) +
+  [`docs/telemetry/event-schemas.json`](../docs/telemetry/event-schemas.json) (JSON Schema Draft-07): 43 eventos
+  (5 obligatorios del BRIEFING + 38 oportunidades) en 8 categorías, 17 en stream y 26 en batch, envelope común y
+  allowlist cerrada (220 propiedades). Validado con Ajv 6 (de `uis/backoffice/node_modules`) y validación cruzada
+  Markdown ↔ JSON (scripts fuera del repo). **Diseñado y validado** (2026-11-10); rama subida, PR pendiente.
+  Bloqueados hasta que negocio decida: `stock_threshold_triggered` (no hay mínimos por cliente) y
+  `inventory_discrepancy_detected`/`inventory_count_completed` (no hay proceso de conteo).
 - **Optimización de rendimiento: caching** (práctica sin número de hito): middleware de tiempos en la API
   (`app/timing.py`), caché en memoria con TTL e invalidación (`app/cache.py`) en `GET /inventory/products` (30 s) y
   `GET /api/incidents/summary` (60 s), carga diferida de dos componentes del backoffice (`lib/deferredModule.ts`) y
   `useMemo` en el selector de producto. Medido con un dataset sintético (`audit/caching/`): −82 % y −92 % de latencia
   mediana, ×14 y ×12 de rendimiento con 8 hilos, pulsación 4,9 → 1,0 ms. Informe: `CACHING_REPORT.md`.
-  **Implementada y validada** (2026-11-03): 5 commits, rama subida y **PR #25 abierta** contra `main` (2026-11-04).
+  **Implementada y validada** (2026-11-03): 5 commits, **PR #25 fusionada** (`1bb9b84`, 2026-11-04).
 - **Auditoría de serialización de la API** (práctica sin número de hito): los 33 endpoints de `services/api`
   inventariados con su estado original y final en `docs/serialization-audit.md`; las 30 rutas JSON declaran
   `response_model` en el decorador (antes ninguna), el registro ya no devuelve el email, el analizador tiene contrato
@@ -1352,7 +1361,31 @@ los commits (revisar qué se commitea y los mensajes) y antes de la PR**. Detall
   196, backoffice lint + typecheck + Jest 151 (3 nuevos) + `next build --webpack`; respuestas cacheadas idénticas byte a
   byte a las de la API sin caché; 0 errores de consola en Edge.
 - **Entrega:** el desarrollador revisó y aprobó los 5 commits (`Optimización con caché — …`, sin `Co-authored-by`);
-  rama subida y PR #25 abierta (título en español, sin capturas, sin merge: la fusiona el desarrollador).
+  rama subida y PR #25 abierta (título en español, sin capturas, sin merge: la fusiona el desarrollador). Fusionada
+  por el desarrollador el 2026-11-04 (`1bb9b84`).
+
+### 2026-11-10 — Diseño del plan de telemetría (rama `docs/telemetry-design`)
+
+Prompt del curso por fases (1–12); el desarrollador pidió ejecutarlas seguidas y **detenerse antes de la PR y después
+de crearla** (la fusiona él). Reto solo de diseño: sin código, tablas, dependencias ni cambios funcionales.
+
+- **Fuentes:** el enunciado pide `empresa-BRIEFING.md`, que no existe; el BRIEFING es `CONTEXT-telemetria.es.md`
+  (se titula «BRIEFING — TrackFlow» y trae las 5 métricas). Entidades de `CONTEXT-gestor-inventario.es.md`.
+- **Desajustes BRIEFING ↔ código resueltos en el diseño:** `LA`/`ZGZ` → `los_angeles`/`zaragoza`; `client_id` =
+  slug de `client_name` (no hay id de cliente); `outbound_order_created` solo con `exit_type = dispatch` (las
+  pérdidas, `stock_loss_recorded`); `direct_stock_edit_rejected` detecta tres formas de intento (405, rutas de stock
+  inexistentes y `current_stock` en el alta, que hoy se ignora en silencio).
+- **Decisiones:** `userId` seudónimo HMAC (`TELEMETRY_PSEUDONYM_KEY`), nunca el `user_uuid`; `sessionId` creado por
+  el backoffice en el login (`X-Session-Id`); `requestId` por petición (`X-Request-Id`); `eventId` v5 determinista en
+  los eventos que nacen de una fila (reconstrucción sin duplicados); nada de inventario, seguridad o auditoría se
+  muestrea ni se agrega.
+- **Generación y validación:** Markdown y JSON se generan desde una sola definición (script en el scratchpad, fuera
+  del repo). Ajv 6.15 (dependencia de ESLint en el backoffice, sin instalar nada): metaesquema Draft-07, 357 `$ref`,
+  43 ejemplos del JSON + 6 del Markdown válidos, 16 casos negativos rechazados. Validación cruzada independiente
+  (lee solo los dos entregables): mismos 43 eventos y 220 propiedades, misma clasificación, categoría, fuente,
+  entrega, tipos, nulabilidad y `userId`.
+- **Hallazgos fuera del alcance** (plan §17.3): `/inventory` sin comprobación de rol, `current_stock` ignorado sin
+  error, `_exit_lock` global, órdenes sin idempotencia, login sin límite de intentos.
 
 ## Trabajo pendiente
 
@@ -1441,7 +1474,11 @@ los commits (revisar qué se commitea y los mensajes) y antes de la PR**. Detall
     ~3 s); `experimental.inlineCss` cuando sea estable; medir en campo (RUM con `web-vitals`) si se publican.
 11. Auditoría de serialización: PR #24 fusionada. Limitaciones aceptadas en `docs/serialization-audit.md` §17 (ejemplo del 422 en OpenAPI,
     build con Turbopack y Google Fonts en este equipo).
-12. Caching (`feature/caching-optimisation`): revisar y fusionar la PR #25. Mejoras que requieren decisión
+12. Caching: PR #25 fusionada. Mejoras que requieren decisión
     (`CACHING_REPORT.md` §10): paginación de `/inventory/orders` y `/api/incidents` (cambia el contrato), invalidación
     compartida si la API pasa a varios workers, medir con Supabase real, precarga en reposo del formulario de
     proveedores para pantallas táctiles.
+13. Plan de telemetría (`docs/telemetry-design`): revisar y fusionar la PR. Antes de implementarlo (fases de Captura y
+    Almacenamiento), decisiones de `docs/telemetry/telemetry-plan.md` §18.2: mínimos de stock por cliente, proceso
+    de conteo físico, destino de los eventos, custodia de `TELEMETRY_PSEUDONYM_KEY` y si el alta de SKUs rechaza
+    `current_stock` con 422.
