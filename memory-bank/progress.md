@@ -6,14 +6,24 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `docs/telemetry-design` (desde `main` @ `1bb9b84`, que incluye las PR #3–#25).
+- **Rama de trabajo:** `feature/telemetry-capture` (desde `main` @ `1e8a842`, que incluye las PR #3–#26).
+- **Telemetría de la compañía — Captura en el frontend** (práctica sin número de hito; fase 2 de la serie de
+  telemetría): `TelemetryService` único en el backoffice (`uis/backoffice/lib/telemetry.ts`, función pública
+  `track()`; lotes de 10 s o 20 eventos, 3 reintentos con backoff 1/2/4 s, `sendBeacon` al ocultar la página),
+  receptor temporal `POST /telemetry/events` en la API (valida contra `event-schemas.json` con un validador propio,
+  pone el `userId` seudonimizado desde el token, registra en el log y **no guarda nada**) y emisor del backend para los
+  eventos de negocio. 18 de los 43 eventos instrumentados; 3 de las 5 métricas obligatorias (`inbound_order_created`,
+  `outbound_order_created`, `direct_stock_edit_rejected`); `stock_threshold_triggered` e
+  `inventory_discrepancy_detected` siguen bloqueadas (sin mínimos por cliente ni conteo físico). Documentación:
+  [`docs/telemetry/telemetry-capture.md`](../docs/telemetry/telemetry-capture.md). **Implementada y validada**
+  (2026-11-10): API 1413 tests, Jest 255, E2E en Chrome 46/46. Rama pendiente de PR.
 - **Diseño del plan de telemetría** (práctica sin número de hito; contexto en
   [`CONTEXT-telemetria.es.md`](../CONTEXT-telemetria.es.md), el BRIEFING de telemetría): solo documentación, sin
   código. [`docs/telemetry/telemetry-plan.md`](../docs/telemetry/telemetry-plan.md) +
   [`docs/telemetry/event-schemas.json`](../docs/telemetry/event-schemas.json) (JSON Schema Draft-07): 43 eventos
   (5 obligatorios del BRIEFING + 38 oportunidades) en 8 categorías, 17 en stream y 26 en batch, envelope común y
   allowlist cerrada (220 propiedades). Validado con Ajv 6 (de `uis/backoffice/node_modules`) y validación cruzada
-  Markdown ↔ JSON (scripts fuera del repo). **Diseñado y validado** (2026-11-10); rama subida, PR pendiente.
+  Markdown ↔ JSON (scripts fuera del repo). **Diseñado y validado** (2026-11-10): **PR #26 fusionada** (`1e8a842`).
   Bloqueados hasta que negocio decida: `stock_threshold_triggered` (no hay mínimos por cliente) y
   `inventory_discrepancy_detected`/`inventory_count_completed` (no hay proceso de conteo).
 - **Optimización de rendimiento: caching** (práctica sin número de hito): middleware de tiempos en la API
@@ -75,7 +85,7 @@
   `/inventory/orders/outbound` y `/inventory/orders`, con un único módulo de integración (`lib/inventory.ts`).
   **Implementado y validado** en `feature/inventory-backoffice`, por fases (prompt del curso) sin paradas intermedias
   por indicación del desarrollador. **PR #19 fusionada** (`01ddccb`). **Hito 5 entregado** (2026-11-01).
-- **Última actualización:** 2026-11-02.
+- **Última actualización:** 2026-11-10.
 
 | Componente | Estado |
 | --- | --- |
@@ -85,6 +95,7 @@
 | `.agents/skills/validate-delivery/` | ✅ Creada (`SKILL.md` + `check-route.mjs` + `check-hygiene.mjs`) |
 | `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
+| Telemetría: captura en el frontend | ✅ Implementada y validada en `feature/telemetry-capture`: API 1413 tests (144 nuevos), Jest 255 (107 nuevos), E2E 46/46; PR pendiente |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | Autenticación (AUTH-01) | ✅ API: `User`/`Profile` en TinyDB, JWT, `/auth`, `/users`, `/profiles` y 8 rutas existentes protegidas (269 tests). Backoffice: `/login` y panel protegido (E2E 34/34). Solo local |
 | Autenticación frontend (AUTH-02) | ✅ PR #13 fusionada (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE` |
@@ -1387,6 +1398,31 @@ de crearla** (la fusiona él). Reto solo de diseño: sin código, tablas, depend
 - **Hallazgos fuera del alcance** (plan §17.3): `/inventory` sin comprobación de rol, `current_stock` ignorado sin
   error, `_exit_lock` global, órdenes sin idempotencia, login sin límite de intentos.
 
+### 2026-11-10 — Telemetría de la compañía: captura en el frontend (rama `feature/telemetry-capture`)
+
+Prompt del curso por fases (0–15); el desarrollador pidió ejecutarlas seguidas, siguiendo mis recomendaciones, y
+**detenerse antes de crear la PR y después** (la fusiona él); la ficha de Notion va al final.
+
+- **Contrato sin cambios.** Ante diferencias entre el enunciado y `event-schemas.json` manda el contrato (tabla en
+  `docs/telemetry/telemetry-capture.md` §2): el navegador envía `userId = null` (lo pone el receptor desde el token);
+  las métricas obligatorias solo admiten `source` `backend`/`internal_process`, así que las emite la API tras el
+  commit hacia el mismo receptor; `login_failed` usa su enum aprobado; FCP no está en la allowlist.
+- **Frontend:** `lib/telemetry.ts` (servicio), `lib/telemetryCatalog.ts` (11 eventos del frontend, comprobado contra
+  el JSON en Jest), `lib/telemetrySession.ts` (`sessionId` en el login, `requestId` por petición),
+  `lib/telemetrySections.ts`, `lib/telemetryCapture.ts`, `lib/useFormTelemetry.ts` y
+  `components/telemetry/TelemetryProvider.tsx` (navegación, errores, Web Vitals). `lib/http.ts` envía `X-Request-Id`
+  y `X-Session-Id`; `AuthProvider` crea y cierra la sesión de telemetría; límites de error, formularios de login,
+  entrada y salida e historial instrumentados.
+- **Backend:** paquete `app/telemetry/` (contrato + validador sin dependencias, modelos Pydantic, configuración,
+  seudónimos, receptor, middleware de correlación y emisor) y `app/routes/telemetry.py`. CORS admite `X-Request-Id`
+  y `X-Session-Id`. Variables nuevas: `TELEMETRY_PSEUDONYM_KEY`, `TELEMETRY_ENDPOINT`, `TELEMETRY_ENVIRONMENT`.
+- **Pruebas:** API 1413 (144 nuevos; `test_serialization` cuenta ahora 34 rutas y un test de recuperación de
+  contraseña ignora `X-Request-Id` al comparar cabeceras), Jest 255 (107 nuevos), lint, typecheck y
+  `next build --webpack`. E2E con Chrome (playwright-core en el scratchpad) sobre el build de producción y la API con
+  copias de las bases: 46/46. Los beacons enviados durante la descarga de la página no los muestra DevTools, pero sí
+  el log del receptor.
+- **Hallazgo:** CLS de 0,31 en la pantalla de login (escritorio) durante el E2E; no corregido (fuera del alcance).
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -1478,7 +1514,9 @@ de crearla** (la fusiona él). Reto solo de diseño: sin código, tablas, depend
     (`CACHING_REPORT.md` §10): paginación de `/inventory/orders` y `/api/incidents` (cambia el contrato), invalidación
     compartida si la API pasa a varios workers, medir con Supabase real, precarga en reposo del formulario de
     proveedores para pantallas táctiles.
-13. Plan de telemetría (`docs/telemetry-design`): revisar y fusionar la PR. Antes de implementarlo (fases de Captura y
-    Almacenamiento), decisiones de `docs/telemetry/telemetry-plan.md` §18.2: mínimos de stock por cliente, proceso
+13. Plan de telemetría: PR #26 fusionada. Captura (`feature/telemetry-capture`): revisar y fusionar la PR y añadir
+    `TELEMETRY_PSEUDONYM_KEY` al `.env` de la API (sin ella se descartan los eventos que exigen `userId`). Para la
+    fase de Almacenamiento: sustituir `collector.ingest` por la escritura real y usar `TELEMETRY_ENDPOINT`.
+    Decisiones de `docs/telemetry/telemetry-plan.md` §18.2: mínimos de stock por cliente, proceso
     de conteo físico, destino de los eventos, custodia de `TELEMETRY_PSEUDONYM_KEY` y si el alta de SKUs rechaza
     `current_stock` con 422.

@@ -231,12 +231,18 @@ Windows PowerShell:
 Copy-Item .env.example .env.local
 ```
 
-Variables (`.env.example`; las dos van al navegador, así que **nunca** llevan tokens ni claves):
+Variables (`.env.example`; todas van al navegador, así que **nunca** llevan tokens ni claves):
 
 | Variable | Valor local | Para qué |
 | --- | --- | --- |
 | `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8000` | API de TrackFlow: login y todas las secciones |
 | `NEXT_PUBLIC_INVENTORY_API_URL` | `http://localhost:8000` | API del inventario. Opcional: vacía o sin definir, se usa `NEXT_PUBLIC_API_BASE_URL` (hoy es la misma API y valida el mismo token) |
+| `NEXT_PUBLIC_TELEMETRY_ENDPOINT` | `http://localhost:8000/telemetry/events` | Receptor de telemetría. Sin ella, la telemetría está desactivada. Opcionales: `NEXT_PUBLIC_TELEMETRY_ENVIRONMENT` y `NEXT_PUBLIC_APP_VERSION` |
+
+Telemetría: un único servicio (`lib/telemetry.ts`, función pública `track()`) captura navegación, errores, fallos de
+red, Web Vitals, el embudo de los formularios de login y de inventario, el filtro del historial y el fin de sesión, y
+los envía en lotes (10 s o 20 eventos) a la API. Detalle en
+[`docs/telemetry/telemetry-capture.md`](../../docs/telemetry/telemetry-capture.md).
 
 Para tener datos en el inventario, en `services\api`: `uv run seed-inventory` (necesita un usuario creado; ver
 [`docs/inventario.md`](../../docs/inventario.md)).

@@ -17,6 +17,12 @@ Esta carpeta contiene la **documentación transversal** del monorepo: guías de 
   histórico, endpoints, páginas del backoffice, manejo de errores, tests y limitaciones.
 - [`inventario.md`](./inventario.md) — Hito 5, gestión de inventario backend: API `/inventory` con SQLModel,
   equivalencia con la estructura del briefing, reglas de stock por almacén, datos semilla, Supabase y limitaciones.
+- [`telemetry/telemetry-plan.md`](./telemetry/telemetry-plan.md) y
+  [`telemetry/event-schemas.json`](./telemetry/event-schemas.json) — plan de telemetría (diseño): 43 eventos,
+  envelope, allowlists, privacidad y retención (JSON Schema validable).
+- [`telemetry/telemetry-capture.md`](./telemetry/telemetry-capture.md) — captura de telemetría: `TelemetryService`
+  del backoffice (`track()`, lotes, reintentos, `sendBeacon`), receptor temporal `POST /telemetry/events`, eventos
+  instrumentados, variables, pruebas y limitaciones.
 - [`docker.md`](./docker.md) — Docker del monorepo: contenedores `interfaces` (website + backoffice) y `backend`
   (API), Compose de desarrollo con hot reload y de producción, variables, despliegue en el VPS sin acceso público,
   actualización, vuelta atrás y problemas habituales.

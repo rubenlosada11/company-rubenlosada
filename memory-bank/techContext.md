@@ -505,6 +505,21 @@ Práctica sin hito, rama `docs/telemetry-design` (2026-11-10). Especificación e
 | Eventos de negocio emitidos en los servicios tras el `commit`, con `source = internal_process` desde los seeds | Un solo punto para API y scripts |
 | Validar en Python exige `jsonschema` (dependencia nueva, por aprobar) o modelos Pydantic equivalentes | No añadir dependencias sin aprobación |
 
+## Decisiones técnicas de la captura de telemetría
+
+Práctica sin hito, rama `feature/telemetry-capture` (2026-11-10). Detalle en `docs/telemetry/telemetry-capture.md`.
+
+| Decisión | Motivo |
+| --- | --- |
+| Única API de captura: `track(eventType, properties)` de `uis/backoffice/lib/telemetry.ts`; ningún componente hace peticiones de telemetría | Un solo punto de envío, allowlist y control de frecuencia |
+| Lotes de 10 s o 20 eventos, un lote en vuelo, 3 reintentos (1/2/4 s), descarte contado en `telemetry_events_dropped`; `sendBeacon` (`text/plain`) al ocultar la página | Requisitos del enunciado; `text/plain` evita la petición previa de CORS que un beacon no puede hacer |
+| El navegador envía `userId = null`; `POST /telemetry/events` lo calcula con el Bearer (HMAC, `TELEMETRY_PSEUDONYM_KEY`) y solo para eventos con sesión; un lote nunca mezcla sesiones | Contrato §8.3: nadie puede atribuir eventos a otro |
+| Métricas obligatorias emitidas por la API (`app/telemetry/emitter.py`) tras el commit, hacia el mismo receptor; `source = internal_process` desde el seed | El contrato no admite `frontend` para ellas; solo la API sabe si la orden existe |
+| Validación contra la copia `services/api/app/telemetry/event-schemas.json` (idéntica a `docs/`, lo comprueba un test) con un validador propio de las palabras clave del catálogo | Sin `jsonschema` (dependencia por aprobar); la imagen Docker solo incluye `services/api/app` |
+| El receptor no guarda nada: `collector.ingest` registra `telemetry_batch_received` en `trackflow.telemetry` | La persistencia es la fase siguiente: solo habrá que cambiar `ingest` |
+| `X-Request-Id` (lo genera el backoffice o la API) y `X-Session-Id` en todas las peticiones; CORS los admite y expone `X-Request-Id` | Unir `form_submitted` con el evento de negocio y con los logs |
+| Cola solo en memoria (sin `localStorage` para eventos) | El enunciado prohíbe persistencia local de eventos sin aprobación |
+
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 
 - `CONTEXT.es.md` y `CONTEXT-trackflow.es.md` (fuente de verdad del negocio).
