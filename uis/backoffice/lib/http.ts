@@ -5,6 +5,8 @@
  * interfaz (no se lanza al importar, para no romper `next build` en entornos sin la variable).
  */
 import { clearToken, readToken, UNAUTHORIZED_EVENT } from "@/lib/session";
+import { reportRequestFailure } from "@/lib/telemetryCapture";
+import { currentTelemetrySessionId, isUuidV4, newUuid } from "@/lib/telemetrySession";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "");
 
@@ -154,6 +156,11 @@ export interface ApiOptions {
    * (`NEXT_PUBLIC_INVENTORY_API_URL`). Sin valor, `NEXT_PUBLIC_API_BASE_URL`.
    */
   baseUrl?: string;
+  /**
+   * `X-Request-Id` de la petición (UUID v4). Sin valor se genera uno. Los formularios pasan el que han reservado para
+   * unir su `form_submitted` con el evento de negocio que emite la API (`lib/telemetrySession.ts`).
+   */
+  requestId?: string;
 }
 
 /**
@@ -167,10 +174,11 @@ export interface ApiOptions {
 export async function fetchApi(
   path: string,
   init?: RequestInit,
-  { auth = true, baseUrl }: ApiOptions = {}
+  { auth = true, baseUrl, requestId }: ApiOptions = {}
 ): Promise<Response> {
   const apiUrl = baseUrl?.replace(/\/+$/, "") || API_BASE_URL;
   if (!apiUrl) {
+    reportRequestFailure("api_not_configured", path, init?.method);
     throw new ApiError(
       IS_DEVELOPMENT
         ? "Falta la variable NEXT_PUBLIC_API_BASE_URL. Crea uis/backoffice/.env.local a partir de .env.example y reinicia el backoffice."
@@ -182,6 +190,10 @@ export async function fetchApi(
   const token = auth ? readToken() : null;
   const headers = new Headers(init?.headers);
   if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+  // Correlación de la telemetría (plan §8.2 y §8.3): la API los usa en sus eventos y en sus logs. Nunca son secretos.
+  headers.set("X-Request-Id", isUuidV4(requestId) ? requestId : newUuid());
+  const sessionId = currentTelemetrySessionId();
+  if (sessionId) headers.set("X-Session-Id", sessionId);
 
   // La petición se cancela si quien llama la aborta (cambio de filtros, desmontaje) o si se agota el tiempo de espera.
   const caller = init?.signal;
@@ -199,8 +211,14 @@ export async function fetchApi(
   try {
     res = await fetch(`${apiUrl}${path}`, { ...init, headers, signal: controller.signal });
   } catch (error) {
-    if (timedOut) throw new ApiError(TIMEOUT_MESSAGE, 0);
+    // Telemetría: fallos que el backend no puede ver porque la petición no llegó o no volvió. Una cancelación de quien
+    // llama (cambio de filtros, desmontaje) no es un fallo.
+    if (timedOut) {
+      reportRequestFailure("timeout", path, init?.method);
+      throw new ApiError(TIMEOUT_MESSAGE, 0);
+    }
     if (isAbortError(error)) throw error;
+    reportRequestFailure("network_error", path, init?.method);
     throw new ApiError(
       IS_DEVELOPMENT
         ? `No se pudo conectar con la API de TrackFlow (${apiUrl}). Comprueba que está arrancada.`
@@ -246,7 +264,12 @@ async function request<T>(path: string, init?: RequestInit, options?: ApiOptions
     options
   );
   if (res.status === 204) return undefined as T;
-  return readJson<T>(res);
+  try {
+    return await readJson<T>(res);
+  } catch (error) {
+    if (error instanceof ApiError) reportRequestFailure("unreadable_response", path, init?.method);
+    throw error;
+  }
 }
 
 export const http = {

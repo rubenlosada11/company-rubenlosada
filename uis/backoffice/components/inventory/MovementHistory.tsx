@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Badge } from "@/components/Badge";
 import { LoadErrorAlert } from "@/components/LoadErrorAlert";
@@ -13,8 +13,9 @@ import {
   NO_MOVEMENT_FILTERS,
   productOptionLabel,
 } from "@/lib/inventory";
+import { track } from "@/lib/telemetry";
 import { useApiRequest } from "@/lib/useApiRequest";
-import type { Movement, MovementFilters, Warehouse } from "@/types/inventory";
+import type { Movement, MovementFilters, Product, Warehouse } from "@/types/inventory";
 import { useProducts } from "./formParts";
 
 const selectClasses =
@@ -26,11 +27,49 @@ const buttonClasses =
 /** Entradas y salidas tienen numeración propia: la clave única es el tipo más el id. */
 const movementKey = (movement: Movement) => `${movement.movement_type}-${movement.id}`;
 
+/** Debounce de `order_history_filtered`: cambios rápidos de los selectores cuentan como uno (plan §13.3). */
+const FILTER_DEBOUNCE_MS = 1_000;
+const TELEMETRY_WAREHOUSE = { LA: "los_angeles", ZGZ: "zaragoza" } as const;
+
+/**
+ * `order_history_filtered`: cuando termina la petición con los filtros que ha elegido el usuario (no la carga inicial),
+ * tras 1 s sin más cambios y sin repetir la misma combinación seguida. Solo almacén, código de SKU y nº de resultados.
+ */
+function useHistoryFilterTelemetry(
+  filters: MovementFilters,
+  products: Product[],
+  result: { loading: boolean; settled: boolean; error: string | null; count: number }
+) {
+  const changedByUser = useRef(false);
+  const lastReported = useRef<string | null>(null);
+  const { loading, settled, error, count } = result;
+
+  useEffect(() => {
+    if (!changedByUser.current || loading || !settled) return;
+    const warehouse = filters.warehouse ? TELEMETRY_WAREHOUSE[filters.warehouse] : null;
+    const productId = filters.sku_id
+      ? (products.find((product) => String(product.id) === filters.sku_id)?.sku ?? null)
+      : null;
+    const resultCount = error ? null : count;
+    const key = `${warehouse}|${productId}|${resultCount}`;
+    const timer = window.setTimeout(() => {
+      if (key === lastReported.current) return;
+      lastReported.current = key;
+      track("order_history_filtered", { warehouse, product_id: productId, result_count: resultCount });
+    }, FILTER_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [filters, products, loading, settled, error, count]);
+
+  return () => {
+    changedByUser.current = true;
+  };
+}
+
 /** Historial de solo lectura de `GET /inventory/orders` (la API no permite editar ni borrar movimientos). */
 export function MovementHistory() {
   const { user } = useAuth();
   const products = useProducts();
-  const [filters, setFilters] = useState<MovementFilters>(NO_MOVEMENT_FILTERS);
+  const [filters, setFiltersState] = useState<MovementFilters>(NO_MOVEMENT_FILTERS);
 
   // Cada cambio de filtro pide los datos a la API (`?warehouse=` y `?sku_id=` son filtros de la propia API).
   const history = useApiRequest(
@@ -42,6 +81,17 @@ export function MovementHistory() {
   const movements = history.data ?? [];
   const hasFilters = Boolean(filters.warehouse || filters.sku_id);
   const inbound = movements.filter((movement) => movement.movement_type === "inbound").length;
+  const markFiltered = useHistoryFilterTelemetry(filters, products.products, {
+    loading,
+    settled: history.settled,
+    error: history.error,
+    count: movements.length,
+  });
+  // Solo los cambios del usuario cuentan como filtrado (la carga inicial, no).
+  const setFilters: typeof setFiltersState = (update) => {
+    markFiltered();
+    setFiltersState(update);
+  };
 
   return (
     <div className="space-y-5">

@@ -20,6 +20,7 @@ import {
   TRACKING_MAX_LENGTH,
   validateOutboundDraft,
 } from "@/lib/inventory";
+import { useFormTelemetry } from "@/lib/useFormTelemetry";
 import type { Product, StockExit } from "@/types/inventory";
 import {
   FieldError,
@@ -59,6 +60,7 @@ interface Created {
  */
 export function OutboundForm({ initialSkuId }: { initialSkuId: number | null }) {
   const products = useProducts();
+  const telemetry = useFormTelemetry("inventory_outbound", "inventory_outbound");
   const [draft, setDraft] = useState<OutboundDraft>({
     ...EMPTY_OUTBOUND_DRAFT,
     skuId: initialSkuId ? String(initialSkuId) : "",
@@ -108,6 +110,7 @@ export function OutboundForm({ initialSkuId }: { initialSkuId: number | null }) 
   function update<K extends keyof OutboundDraft>(key: K, value: OutboundDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
     const field = DRAFT_TO_FIELD[key];
+    telemetry.fieldChanged(field);
     // Un error de stock era del producto anterior: al cambiar de producto deja de valer.
     if (field === "sku_id") clearErrors("sku_id", "quantity");
     else if (field === "exit_type") clearErrors("exit_type", "tracking_number");
@@ -131,6 +134,7 @@ export function OutboundForm({ initialSkuId }: { initialSkuId: number | null }) 
       available
     );
     if (!payload) {
+      telemetry.validationFailed(OUTBOUND_FIELDS.filter((field) => clientErrors[field]));
       showErrors(clientErrors, "Revisa los campos marcados antes de registrar la salida.");
       return;
     }
@@ -139,13 +143,16 @@ export function OutboundForm({ initialSkuId }: { initialSkuId: number | null }) 
     setFormMessage(null);
     submittingRef.current = true;
     setSubmitting(true);
+    telemetry.submitStarted();
     try {
-      const exit = await inventoryApi.createOutbound(payload);
+      const exit = await inventoryApi.createOutbound(payload, telemetry.reserveRequestId());
+      telemetry.submitted(null, 201);
       const after = await inventoryApi.getProduct(exit.sku_id).catch(() => null);
       setCreated({ exit, product: after ?? selected, stockAfter: after?.current_stock ?? null });
       setDraft(EMPTY_OUTBOUND_DRAFT);
       setFocusRequest({ target: "success" });
     } catch (error) {
+      telemetry.submitted(error);
       const fieldErrors: Partial<Record<OutboundField, string>> = {};
       for (const [field, message] of Object.entries(inventoryFieldErrors(error))) {
         if (isFormField(field)) fieldErrors[field] = message;
