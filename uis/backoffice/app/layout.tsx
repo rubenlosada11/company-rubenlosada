@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Archivo, Manrope } from "next/font/google";
 import { preconnect } from "react-dom";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { TelemetryProvider } from "@/components/telemetry/TelemetryProvider";
 import "./globals.css";
 
 /** Origen de la API (`NEXT_PUBLIC_API_BASE_URL`, incrustada al compilar), o `null` si falta o no es una URL. */
@@ -50,6 +51,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           Saltar al contenido
         </a>
+        {/* Telemetría transversal (navegación, errores, Web Vitals): no pinta nada. */}
+        <TelemetryProvider />
         {/* El panel va en app/(panel)/layout.tsx y el login en app/login: ambos comparten la sesión. */}
         <AuthProvider>{children}</AuthProvider>
       </body>

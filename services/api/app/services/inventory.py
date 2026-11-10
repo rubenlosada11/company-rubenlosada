@@ -13,6 +13,10 @@ y el seed (`app/seed_inventory.py`).
 `products_cache` guarda el listado de SKUs con su stock (`GET /inventory/products`). Cada escritura que cambia un SKU o
 su stock la invalida **después** del commit; una operación rechazada (SKU duplicado, stock insuficiente, SKU que no
 existe) no la toca.
+
+Telemetría: cada orden registrada emite su evento **después del commit** (nunca antes: un evento no puede describir
+una orden que no existe): `inbound_order_created`, `outbound_order_created` (despacho) o `stock_loss_recorded`
+(pérdida). Desde la API salen con `source = backend`; desde el seed, con `internal_process`. Emitir nunca falla.
 """
 
 import threading
@@ -23,6 +27,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, select
 
 from app.cache import TTLCache, register
+from app.telemetry import emitter as telemetry
 from app.inventory_models import SKU, StockEntry, StockExit
 from app.inventory_schemas import (
     InboundMovement,
@@ -180,6 +185,7 @@ def register_entry(session: Session, data: StockEntryCreate, user_uuid: str) -> 
     session.commit()
     products_cache.invalidate()
     session.refresh(entry)
+    telemetry.emit_order_created(sku, entry, outbound=False)
     return entry
 
 
@@ -208,6 +214,7 @@ def register_exit(session: Session, data: StockExitCreate, user_uuid: str) -> St
         session.commit()
         products_cache.invalidate()
     session.refresh(stock_exit)
+    telemetry.emit_order_created(sku, stock_exit, outbound=True)
     return stock_exit
 
 

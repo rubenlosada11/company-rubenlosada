@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { FORGOT_PASSWORD_PATH } from "@/lib/auth";
 import { toFormErrors } from "@/lib/authErrors";
 import { ApiError } from "@/lib/http";
+import { useFormTelemetry } from "@/lib/useFormTelemetry";
 import { Spinner } from "./AuthGate";
 import { useAuth } from "./AuthProvider";
 import { AlertIcon, ArrowIcon, AuthShell, iconClasses, InfoIcon, inputClasses, MailIcon, PasswordInput } from "./AuthShell";
@@ -37,6 +38,7 @@ function loginErrorMessage(error: unknown): string {
 
 export function LoginScreen({ next, reason }: LoginScreenProps) {
   const { status, login } = useAuth();
+  const telemetry = useFormTelemetry("login", "login");
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -60,15 +62,21 @@ export function LoginScreen({ next, reason }: LoginScreenProps) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!email.trim() || !password) {
+      telemetry.validationFailed([...(email.trim() ? [] : ["email" as const]), ...(password ? [] : ["password" as const])]);
       setError("Escribe tu email y tu contraseña.");
       return;
     }
     setSubmitting(true);
     setError(null);
+    // Telemetría del formulario (sin valores). El resultado del login en sí lo emite la API (`login_succeeded` /
+    // `login_failed`); aquí solo se mide el embudo de la pantalla.
+    telemetry.submitStarted();
     try {
       await login(email.trim(), password);
+      telemetry.submitted(null, 200);
       // La redirección la hace el efecto de arriba al pasar a `authenticated`.
     } catch (caught) {
+      telemetry.submitted(caught);
       setError(loginErrorMessage(caught));
       setSubmitting(false);
       selectPassword.current = true;
@@ -119,7 +127,10 @@ export function LoginScreen({ next, reason }: LoginScreenProps) {
               required
               placeholder="nombre@trackflow.com"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                telemetry.fieldChanged("email");
+              }}
               disabled={busy}
               aria-invalid={error ? true : undefined}
               className={`${inputClasses} pr-4`}
@@ -137,7 +148,10 @@ export function LoginScreen({ next, reason }: LoginScreenProps) {
             id="login-password"
             autoComplete="current-password"
             value={password}
-            onChange={setPassword}
+            onChange={(value) => {
+              setPassword(value);
+              telemetry.fieldChanged("password");
+            }}
             disabled={busy}
             invalid={Boolean(error)}
           />

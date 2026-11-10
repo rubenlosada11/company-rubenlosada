@@ -81,7 +81,10 @@ uv run --env-file .env uvicorn app.main:app --reload --port 8000
 | `SUPPLIERS_DB_PATH` | `services/api/db/suppliers.json` | Fichero de TinyDB de proveedores |
 | `INCIDENTS_DB_PATH` | `services/api/db/incidents.json` | Fichero de TinyDB del gestor de incidencias |
 | `DATABASE_URL` | SQLite en `services/api/db/inventory.db` | Base SQL del inventario (URL de SQLAlchemy). Para Supabase/PostgreSQL (cadena *Session pooler*, `postgresql+psycopg://…?sslmode=require`, entre comillas) ver [`docs/inventario.md`](../../docs/inventario.md#conectar-supabase) |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:3002,http://127.0.0.1:3002` | Orígenes del navegador autorizados (el backoffice). Admite la cabecera `Authorization` y expone `Content-Disposition` para las descargas |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3002,http://127.0.0.1:3002` | Orígenes del navegador autorizados (el backoffice). Admite las cabeceras `Authorization`, `X-Request-Id` y `X-Session-Id` y expone `Content-Disposition` (descargas) y `X-Request-Id` |
+| `TELEMETRY_PSEUDONYM_KEY` | — | Clave secreta (≥ 32 caracteres) de los seudónimos de usuario de la telemetría. Sin ella, los eventos que exigen `userId` se descartan (aviso al arrancar) |
+| `TELEMETRY_ENDPOINT` | — | Colector definitivo de la telemetría (fase de Almacenamiento). Se valida al arrancar; hoy no se usa para enviar |
+| `TELEMETRY_ENVIRONMENT` | `development` | `environment` de los eventos (`development`, `test` o `production`) |
 
 ## Seeder
 
@@ -437,6 +440,16 @@ uv run seed-inventory operario@trackflow.test
 - **Supabase:** pon `DATABASE_URL` en el `.env` y ejecuta `uv run --env-file .env seed-inventory` (crea las tablas y
   carga los datos) y la API con `--env-file .env`. Guía paso a paso, con la activación de RLS:
   [`docs/inventario.md`](../../docs/inventario.md#conectar-supabase).
+
+## Telemetría (captura)
+
+`POST /telemetry/events` es el receptor **temporal** de los lotes del backoffice: valida cada evento contra el
+catálogo aprobado (`app/telemetry/event-schemas.json`, copia exacta de `docs/telemetry/`), pone el `userId`
+seudonimizado a partir del token y registra el lote en el log (`trackflow.telemetry`), **sin guardar nada**. La API
+emite además, tras el commit, los eventos que solo ella puede afirmar (`inbound_order_created`,
+`outbound_order_created`, `stock_loss_recorded`, `inventory_order_rejected`, `direct_stock_edit_rejected`,
+`login_succeeded`, `login_failed`). Cada respuesta lleva `X-Request-Id`. Detalle en
+[`docs/telemetry/telemetry-capture.md`](../../docs/telemetry/telemetry-capture.md).
 
 ## Tests
 

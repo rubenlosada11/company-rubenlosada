@@ -4,6 +4,16 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { AccountCreatedError, authApi } from "@/lib/auth";
 import { ApiError, apiErrorMessage } from "@/lib/http";
 import { clearToken, readToken, saveToken, TOKEN_KEY, tokenExpiry, UNAUTHORIZED_EVENT } from "@/lib/session";
+import { track } from "@/lib/telemetry";
+import type { FrontendEventProperties } from "@/lib/telemetryCatalog";
+import {
+  beginTelemetrySession,
+  clearTelemetrySession,
+  commitTelemetrySession,
+  currentTelemetrySession,
+  discardPendingTelemetrySession,
+  ensureTelemetrySession,
+} from "@/lib/telemetrySession";
 import type { CurrentUser, Profile, RegisterPayload } from "@/types/auth";
 
 /**
@@ -39,6 +49,26 @@ const STORAGE_BLOCKED_MESSAGE =
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+type SessionEndReason = FrontendEventProperties["session_ended"]["end_reason"];
+
+/** Máximo de `session_duration_seconds` en el contrato (30 días). */
+const MAX_SESSION_SECONDS = 2_592_000;
+
+/**
+ * Telemetría del fin de la sesión: `session_ended` y borrado del `sessionId`. Una sola vez por sesión: si otra pestaña
+ * ya la cerró (y borró el `sessionId` compartido), esta no repite el evento.
+ */
+function reportSessionEnd(reason: SessionEndReason): void {
+  const session = currentTelemetrySession();
+  if (!session) return;
+  const seconds = Math.round((Date.now() - session.startedAt) / 1000);
+  track("session_ended", {
+    end_reason: reason,
+    session_duration_seconds: Math.min(Math.max(seconds, 0), MAX_SESSION_SECONDS),
+  });
+  clearTelemetrySession();
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<CurrentUser | null>(null);
@@ -48,12 +78,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /** Cambia cuando se guarda un token nuevo sin pasar por el login (cambio de contraseña): reprograma la caducidad. */
   const [tokenVersion, setTokenVersion] = useState(0);
 
-  const logout = useCallback((reason: Exclude<EndReason, null> = "logout") => {
+  // `telemetryReason` distingue para la telemetría lo que la interfaz trata igual (caducidad, 401, otra pestaña).
+  const endSession = useCallback((reason: Exclude<EndReason, null>, telemetryReason: SessionEndReason) => {
+    reportSessionEnd(telemetryReason);
     clearToken();
     setUser(null);
     setEndReason(reason);
     setStatus("anonymous");
   }, []);
+
+  const logout = useCallback(
+    (reason: Exclude<EndReason, null> = "logout") =>
+      endSession(reason, reason === "logout" ? "user_logout" : "token_expired"),
+    [endSession]
+  );
 
   // Al cargar (y al reintentar): valida el token guardado en este navegador. `localStorage` solo se lee aquí, en un
   // efecto (nunca en el render del servidor), así que el primer render es igual en servidor y cliente: `loading`.
@@ -64,7 +102,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const token = readToken();
       const expiry = token ? tokenExpiry(token) : null;
       if (!token || (expiry !== null && expiry <= Date.now())) {
-        if (token) clearToken();
+        if (token) {
+          reportSessionEnd("token_expired");
+          clearToken();
+        }
         setUser(null);
         setEndReason(token ? "expired" : null);
         setStatus("anonymous");
@@ -72,11 +113,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       try {
         const me = await authApi.me(controller.signal);
+        // Sesión guardada sin `sessionId` (anterior a la telemetría): se crea ahora.
+        ensureTelemetrySession();
         setUser(me);
         setStatus("authenticated");
       } catch (error) {
         if (controller.signal.aborted) return;
         if (error instanceof ApiError && error.status === 401) {
+          reportSessionEnd("unauthorized_response");
           setUser(null);
           setEndReason("expired");
           setStatus("anonymous");
@@ -93,10 +137,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Cualquier 401 de una petición protegida (token caducado, ausente, o usuario desactivado o borrado) cierra la sesión.
   useEffect(() => {
-    const onUnauthorized = () => logout("expired");
+    const onUnauthorized = () => endSession("expired", "unauthorized_response");
     window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
-  }, [logout]);
+  }, [endSession]);
 
   // Sesión compartida entre pestañas (`localStorage`): el navegador avisa a las demás pestañas cuando cambia el token.
   // Si otra pestaña cierra sesión, esta también; si otra inicia sesión, esta revalida el token nuevo con `/auth/me`.
@@ -109,12 +153,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAttempt((n) => n + 1);
       } else {
         const previous = event.oldValue ? tokenExpiry(event.oldValue) : null;
-        logout(previous !== null && previous <= Date.now() ? "expired" : "logout");
+        // La pestaña que cerró la sesión ya emitió `session_ended`; si no lo hizo, lo emite esta.
+        endSession(previous !== null && previous <= Date.now() ? "expired" : "logout", "ended_in_other_tab");
       }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [logout]);
+  }, [endSession]);
 
   // Cierre automático cuando caduca el token, aunque no se haga ninguna petición.
   useEffect(() => {
@@ -128,10 +173,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // El login es público (`auth: false`): no hace falta borrar antes el token, y no hacerlo evita que las demás pestañas
   // vean un cierre de sesión momentáneo. El token solo se guarda si la API lo emite.
+  // Telemetría: el `sessionId` nace aquí, antes de enviar el login (viaja en su cabecera `X-Session-Id`), y solo se
+  // confirma si hay sesión de verdad.
   const login = useCallback(async (email: string, password: string) => {
-    const { access_token } = await authApi.login(email, password);
+    beginTelemetrySession();
+    let accessToken: string;
+    try {
+      accessToken = (await authApi.login(email, password)).access_token;
+    } catch (error) {
+      discardPendingTelemetrySession();
+      throw error;
+    }
     // Sin el token guardado, la siguiente petición iría sin autenticar: se avisa aquí con un mensaje que lo explica.
-    if (!saveToken(access_token)) throw new ApiError(STORAGE_BLOCKED_MESSAGE, 0);
+    if (!saveToken(accessToken)) {
+      discardPendingTelemetrySession();
+      throw new ApiError(STORAGE_BLOCKED_MESSAGE, 0);
+    }
+    commitTelemetrySession();
     try {
       const me = await authApi.me();
       setUser(me);
@@ -140,6 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setStatus("authenticated");
     } catch (error) {
       clearToken();
+      clearTelemetrySession();
       throw error;
     }
   }, []);

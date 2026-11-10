@@ -1,0 +1,5882 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/rubenlosada11/company-rubenlosada/blob/main/docs/telemetry/event-schemas.json",
+  "title": "TrackFlow — esquemas de eventos de telemetría",
+  "description": "Catálogo validable (JSON Schema Draft-07) del plan de telemetría de TrackFlow. Un evento es válido si cumple exactamente uno de los esquemas de `oneOf` (el de su `event_type`). Documento de referencia: docs/telemetry/telemetry-plan.md.",
+  "x-catalogVersion": "1.0.0",
+  "x-eventCount": 43,
+  "x-mandatoryCount": 5,
+  "x-identifiedOpportunityCount": 38,
+  "x-categories": [
+    "inventory_operations",
+    "product_catalog",
+    "authentication",
+    "user_activity",
+    "frontend_experience",
+    "backend_performance",
+    "integrity_security",
+    "internal_processes"
+  ],
+  "x-eventTypes": [
+    "inbound_order_created",
+    "outbound_order_created",
+    "stock_threshold_triggered",
+    "direct_stock_edit_rejected",
+    "inventory_discrepancy_detected",
+    "inventory_count_completed",
+    "stock_loss_recorded",
+    "inventory_order_rejected",
+    "inventory_order_validation_failed",
+    "inventory_order_duplicate_detected",
+    "stock_snapshot_recorded",
+    "product_created",
+    "product_duplicate_rejected",
+    "product_validation_failed",
+    "order_history_filtered",
+    "login_succeeded",
+    "login_failed",
+    "session_ended",
+    "access_token_rejected",
+    "password_reset_requested",
+    "password_changed",
+    "user_registered",
+    "navigation_section_viewed",
+    "form_started",
+    "form_submitted",
+    "form_abandoned",
+    "form_validation_failed",
+    "frontend_error_captured",
+    "backend_request_failed",
+    "page_performance_measured",
+    "api_latency_recorded",
+    "api_slow_request_detected",
+    "api_exception_raised",
+    "database_connection_failed",
+    "database_query_slow",
+    "stock_exit_lock_contended",
+    "cache_stats_recorded",
+    "authorization_denied",
+    "user_permissions_changed",
+    "inventory_integrity_violation_detected",
+    "internal_job_finished",
+    "email_delivery_attempted",
+    "telemetry_events_dropped"
+  ],
+  "oneOf": [
+    {
+      "$ref": "#/definitions/inbound_order_created"
+    },
+    {
+      "$ref": "#/definitions/outbound_order_created"
+    },
+    {
+      "$ref": "#/definitions/stock_threshold_triggered"
+    },
+    {
+      "$ref": "#/definitions/direct_stock_edit_rejected"
+    },
+    {
+      "$ref": "#/definitions/inventory_discrepancy_detected"
+    },
+    {
+      "$ref": "#/definitions/inventory_count_completed"
+    },
+    {
+      "$ref": "#/definitions/stock_loss_recorded"
+    },
+    {
+      "$ref": "#/definitions/inventory_order_rejected"
+    },
+    {
+      "$ref": "#/definitions/inventory_order_validation_failed"
+    },
+    {
+      "$ref": "#/definitions/inventory_order_duplicate_detected"
+    },
+    {
+      "$ref": "#/definitions/stock_snapshot_recorded"
+    },
+    {
+      "$ref": "#/definitions/product_created"
+    },
+    {
+      "$ref": "#/definitions/product_duplicate_rejected"
+    },
+    {
+      "$ref": "#/definitions/product_validation_failed"
+    },
+    {
+      "$ref": "#/definitions/order_history_filtered"
+    },
+    {
+      "$ref": "#/definitions/login_succeeded"
+    },
+    {
+      "$ref": "#/definitions/login_failed"
+    },
+    {
+      "$ref": "#/definitions/session_ended"
+    },
+    {
+      "$ref": "#/definitions/access_token_rejected"
+    },
+    {
+      "$ref": "#/definitions/password_reset_requested"
+    },
+    {
+      "$ref": "#/definitions/password_changed"
+    },
+    {
+      "$ref": "#/definitions/user_registered"
+    },
+    {
+      "$ref": "#/definitions/navigation_section_viewed"
+    },
+    {
+      "$ref": "#/definitions/form_started"
+    },
+    {
+      "$ref": "#/definitions/form_submitted"
+    },
+    {
+      "$ref": "#/definitions/form_abandoned"
+    },
+    {
+      "$ref": "#/definitions/form_validation_failed"
+    },
+    {
+      "$ref": "#/definitions/frontend_error_captured"
+    },
+    {
+      "$ref": "#/definitions/backend_request_failed"
+    },
+    {
+      "$ref": "#/definitions/page_performance_measured"
+    },
+    {
+      "$ref": "#/definitions/api_latency_recorded"
+    },
+    {
+      "$ref": "#/definitions/api_slow_request_detected"
+    },
+    {
+      "$ref": "#/definitions/api_exception_raised"
+    },
+    {
+      "$ref": "#/definitions/database_connection_failed"
+    },
+    {
+      "$ref": "#/definitions/database_query_slow"
+    },
+    {
+      "$ref": "#/definitions/stock_exit_lock_contended"
+    },
+    {
+      "$ref": "#/definitions/cache_stats_recorded"
+    },
+    {
+      "$ref": "#/definitions/authorization_denied"
+    },
+    {
+      "$ref": "#/definitions/user_permissions_changed"
+    },
+    {
+      "$ref": "#/definitions/inventory_integrity_violation_detected"
+    },
+    {
+      "$ref": "#/definitions/internal_job_finished"
+    },
+    {
+      "$ref": "#/definitions/email_delivery_attempted"
+    },
+    {
+      "$ref": "#/definitions/telemetry_events_dropped"
+    }
+  ],
+  "definitions": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "UUID en minúsculas (RFC 9562). v4 aleatorio o v5 determinista (ver §8.3)."
+    },
+    "timestamp_utc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z$",
+      "description": "Fecha y hora ISO 8601 en UTC con sufijo Z (milisegundos o microsegundos opcionales)."
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "Fecha ISO 8601 (AAAA-MM-DD) en UTC."
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+      "description": "Versión semántica MAJOR.MINOR.PATCH."
+    },
+    "event_type_name": {
+      "type": "string",
+      "pattern": "^[a-z]+(_[a-z]+)+$",
+      "maxLength": 64,
+      "description": "Nombre de evento en snake_case con el patrón entidad_acción."
+    },
+    "user_ref": {
+      "type": "string",
+      "pattern": "^usr_[0-9a-f]{32}$",
+      "description": "Seudónimo del usuario: `usr_` + 32 hex de HMAC-SHA256(TELEMETRY_PSEUDONYM_KEY, 'user:' + User.id)."
+    },
+    "account_ref": {
+      "type": "string",
+      "pattern": "^acc_[0-9a-f]{32}$",
+      "description": "Seudónimo de un email de login: `acc_` + 32 hex de HMAC-SHA256(TELEMETRY_PSEUDONYM_KEY, 'email:' + email normalizado). Nunca el email."
+    },
+    "warehouse": {
+      "type": "string",
+      "enum": [
+        "los_angeles",
+        "zaragoza"
+      ],
+      "description": "Almacén. Traducción del valor interno: `LA` → `los_angeles`, `ZGZ` → `zaragoza`."
+    },
+    "client_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Cliente (marca B2B) dueño del SKU: slug determinista de `SKU.client_name` (§8.4)."
+    },
+    "product_id": {
+      "type": "string",
+      "pattern": "^\\S([\\s\\S]*\\S)?$",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Código del SKU (`SKU.sku`) tal y como está guardado, sin espacios al principio ni al final."
+    },
+    "product_category": {
+      "type": "string",
+      "enum": [
+        "fashion",
+        "electronics",
+        "cosmetics"
+      ],
+      "description": "Categoría del SKU (`SKU.category`): moda, electrónica o cosmética."
+    },
+    "quantity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647,
+      "description": "Unidades (entero positivo; mismo límite que `MAX_QUANTITY` de la API)."
+    },
+    "stock_quantity": {
+      "type": "integer",
+      "minimum": -2147483647,
+      "maximum": 2147483647,
+      "description": "Stock calculado (entradas − salidas). Puede ser 0; negativo solo si se ha roto la regla 2."
+    },
+    "order_id": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647,
+      "description": "Id del movimiento en la base del inventario (`stock_entries.id` o `stock_exits.id`)."
+    },
+    "order_type": {
+      "type": "string",
+      "enum": [
+        "inbound",
+        "outbound"
+      ],
+      "description": "`inbound` = InboundOrder (`StockEntry`); `outbound` = OutboundOrder (`StockExit`)."
+    },
+    "exit_type": {
+      "type": "string",
+      "enum": [
+        "dispatch",
+        "loss"
+      ],
+      "description": "Tipo de salida (`StockExit.exit_type`)."
+    },
+    "count_method": {
+      "type": "string",
+      "enum": [
+        "cycle_count",
+        "full_audit"
+      ],
+      "description": "Conteo físico parcial y periódico (`cycle_count`) o auditoría completa (`full_audit`)."
+    },
+    "user_role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "manager",
+        "user"
+      ],
+      "description": "Rol del usuario (`app.auth_models.Role`)."
+    },
+    "section": {
+      "type": "string",
+      "enum": [
+        "dashboard",
+        "suppliers",
+        "incident_analysis",
+        "incident_manager",
+        "incident_create",
+        "inventory_products",
+        "inventory_orders",
+        "inventory_inbound",
+        "inventory_outbound",
+        "account_profile",
+        "account_change_password",
+        "login",
+        "register",
+        "forgot_password",
+        "reset_password",
+        "not_found"
+      ],
+      "description": "Sección del backoffice, derivada de la ruta (tabla §9.4). Nunca la URL."
+    },
+    "form_id": {
+      "type": "string",
+      "enum": [
+        "login",
+        "register",
+        "forgot_password",
+        "reset_password",
+        "change_password",
+        "profile",
+        "supplier_create",
+        "incident_create",
+        "inventory_inbound",
+        "inventory_outbound"
+      ],
+      "description": "Formulario del backoffice (tabla §9.5)."
+    },
+    "form_field": {
+      "type": "string",
+      "enum": [
+        "email",
+        "password",
+        "name",
+        "phone",
+        "address",
+        "invitation_code",
+        "new_password",
+        "confirm_password",
+        "current_password",
+        "contact_email",
+        "country",
+        "currency",
+        "categories",
+        "rate_per_shipment",
+        "status",
+        "zone",
+        "notes",
+        "title",
+        "description",
+        "category",
+        "origin",
+        "branch",
+        "sku_id",
+        "quantity",
+        "reference",
+        "exit_type",
+        "tracking_number",
+        "form_level"
+      ],
+      "description": "Nombre de campo de formulario (nunca su valor). `form_level` = error que no es de un campo."
+    },
+    "validation_error_type": {
+      "type": "string",
+      "enum": [
+        "missing",
+        "too_short",
+        "too_long",
+        "not_positive",
+        "too_large",
+        "invalid_choice",
+        "wrong_type",
+        "business_rule",
+        "malformed_body",
+        "other"
+      ],
+      "description": "Tipo de fallo de validación, traducido del `type` de Pydantic (tabla §9.6). Nunca el valor."
+    },
+    "api_route": {
+      "type": "string",
+      "pattern": "^(/[a-z0-9_{}.-]*)+$|^unmatched$",
+      "maxLength": 120,
+      "description": "Plantilla de ruta de FastAPI (`/inventory/products/{sku_id}`), nunca la URL real ni la query. `unmatched` si no corresponde a ninguna ruta."
+    },
+    "http_method": {
+      "type": "string",
+      "enum": [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "HEAD",
+        "OPTIONS"
+      ],
+      "description": "Método HTTP."
+    },
+    "http_status": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 599,
+      "description": "Código de estado HTTP."
+    },
+    "duration_ms": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 3600000,
+      "description": "Duración en milisegundos (hasta 2 decimales)."
+    },
+    "error_name": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_.]{0,79}$",
+      "description": "Nombre de la clase del error (`TypeError`, `OperationalError`). Nunca el mensaje ni la traza."
+    },
+    "fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$",
+      "description": "16 hex de SHA-256 de (nombre del error + primer marco propio normalizado, sin query ni valores)."
+    },
+    "app_version": {
+      "type": "string",
+      "pattern": "^[0-9A-Za-z._-]{1,40}$",
+      "description": "Versión desplegada: hash corto del commit (`git rev-parse --short HEAD`, como `IMAGE_TAG`)."
+    },
+    "non_negative_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000,
+      "description": "Contador (entero ≥ 0)."
+    },
+    "positive_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000000,
+      "description": "Contador (entero ≥ 1)."
+    },
+    "window_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 86400,
+      "description": "Duración de la ventana de agregación, en segundos."
+    },
+    "envelope": {
+      "title": "Event Envelope",
+      "description": "Sobre común de todos los eventos (§8 del plan). Cada evento lo restringe con su `event_type`, su `schemaVersion`, sus fuentes, la nulabilidad de sus identificadores y su allowlist de `properties`.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eventId",
+        "timestamp",
+        "sessionId",
+        "userId",
+        "event_type",
+        "schemaVersion",
+        "requestId",
+        "source",
+        "environment",
+        "properties"
+      ],
+      "properties": {
+        "eventId": {
+          "$ref": "#/definitions/uuid",
+          "description": "Identificador único del evento (clave de deduplicación)."
+        },
+        "timestamp": {
+          "$ref": "#/definitions/timestamp_utc",
+          "description": "Momento del hecho en UTC (no el del envío)."
+        },
+        "sessionId": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/uuid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Sesión autenticada del backoffice (§8.2)."
+        },
+        "userId": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/user_ref"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Seudónimo del usuario que actúa (§8.3)."
+        },
+        "event_type": {
+          "$ref": "#/definitions/event_type_name",
+          "description": "Nombre del evento (taxonomía entidad_acción)."
+        },
+        "schemaVersion": {
+          "$ref": "#/definitions/semver",
+          "description": "Versión del esquema de este event_type."
+        },
+        "requestId": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/uuid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Correlación entre frontend, API y logs (`X-Request-Id`)."
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "frontend",
+            "backend",
+            "internal_process"
+          ],
+          "description": "Componente que emite el evento."
+        },
+        "environment": {
+          "type": "string",
+          "enum": [
+            "development",
+            "test",
+            "production"
+          ],
+          "description": "Entorno de origen; solo `production` alimenta los dashboards."
+        },
+        "properties": {
+          "type": "object",
+          "description": "Datos del evento: allowlist estricta por event_type."
+        }
+      },
+      "if": {
+        "properties": {
+          "source": {
+            "const": "internal_process"
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "then": {
+        "properties": {
+          "sessionId": {
+            "type": "null"
+          },
+          "requestId": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    "inbound_order_created": {
+      "title": "inbound_order_created",
+      "description": "Se ha registrado una orden de entrada (`InboundOrder`, en el código `StockEntry`): un almacén recibe mercancía de un cliente.",
+      "x-classification": "mandatory",
+      "x-category": "inventory_operations",
+      "x-sources": [
+        "backend",
+        "internal_process"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 60 s",
+      "x-priority": "critical",
+      "x-retention": "R1",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "inbound_order_created"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend",
+                "internal_process"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "$ref": "#/definitions/user_ref"
+            },
+            "requestId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "warehouse",
+                "client_id",
+                "product_id",
+                "product_category",
+                "quantity",
+                "order_id"
+              ],
+              "properties": {
+                "warehouse": {
+                  "$ref": "#/definitions/warehouse",
+                  "description": "Almacén receptor (`StockEntry.warehouse`)."
+                },
+                "client_id": {
+                  "$ref": "#/definitions/client_id",
+                  "description": "Cliente dueño del SKU, derivado de `SKU.client_name` (§8.4)."
+                },
+                "product_id": {
+                  "$ref": "#/definitions/product_id",
+                  "description": "Código del SKU (`SKU.sku`)."
+                },
+                "product_category": {
+                  "$ref": "#/definitions/product_category",
+                  "description": "Categoría del SKU (`SKU.category`)."
+                },
+                "quantity": {
+                  "$ref": "#/definitions/quantity",
+                  "description": "Unidades recibidas (`StockEntry.quantity`)."
+                },
+                "order_id": {
+                  "$ref": "#/definitions/order_id",
+                  "description": "Id del `StockEntry` creado: enlaza el evento con el registro de auditoría."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "b366bba9-528c-51c3-9476-4fe175ccb39f",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "inbound_order_created",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "warehouse": "los_angeles",
+            "client_id": "purestep-footwear",
+            "product_id": "CLT-SNK-W-42",
+            "product_category": "fashion",
+            "quantity": 120,
+            "order_id": 101
+          }
+        }
+      ]
+    },
+    "outbound_order_created": {
+      "title": "outbound_order_created",
+      "description": "Se ha registrado una orden de salida de tipo despacho (`OutboundOrder`, en el código `StockExit` con `exit_type = dispatch`): el almacén ha preparado y entregado el pedido al transportista.",
+      "x-classification": "mandatory",
+      "x-category": "inventory_operations",
+      "x-sources": [
+        "backend",
+        "internal_process"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 60 s",
+      "x-priority": "critical",
+      "x-retention": "R1",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "outbound_order_created"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend",
+                "internal_process"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "$ref": "#/definitions/user_ref"
+            },
+            "requestId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "warehouse",
+                "client_id",
+                "product_id",
+                "product_category",
+                "quantity",
+                "order_id"
+              ],
+              "properties": {
+                "warehouse": {
+                  "$ref": "#/definitions/warehouse",
+                  "description": "Almacén desde el que sale el pedido (`StockExit.warehouse`)."
+                },
+                "client_id": {
+                  "$ref": "#/definitions/client_id",
+                  "description": "Cliente dueño del SKU, derivado de `SKU.client_name` (§8.4)."
+                },
+                "product_id": {
+                  "$ref": "#/definitions/product_id",
+                  "description": "Código del SKU (`SKU.sku`)."
+                },
+                "product_category": {
+                  "$ref": "#/definitions/product_category",
+                  "description": "Categoría del SKU (`SKU.category`)."
+                },
+                "quantity": {
+                  "$ref": "#/definitions/quantity",
+                  "description": "Unidades despachadas (`StockExit.quantity`)."
+                },
+                "order_id": {
+                  "$ref": "#/definitions/order_id",
+                  "description": "Id del `StockExit` creado."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "551a24b6-8fc3-59e7-aa32-5c6863225c04",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "outbound_order_created",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "warehouse": "los_angeles",
+            "client_id": "purestep-footwear",
+            "product_id": "CLT-SNK-W-42",
+            "product_category": "fashion",
+            "quantity": 4,
+            "order_id": 57
+          }
+        }
+      ]
+    },
+    "stock_threshold_triggered": {
+      "title": "stock_threshold_triggered",
+      "description": "El stock disponible de un SKU en un almacén ha pasado de estar en el mínimo configurado para su cliente, o por encima, a estar por debajo.",
+      "x-classification": "mandatory",
+      "x-category": "inventory_operations",
+      "x-sources": [
+        "backend",
+        "internal_process"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 10 s",
+      "x-priority": "critical",
+      "x-retention": "R1",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "stock_threshold_triggered"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend",
+                "internal_process"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "$ref": "#/definitions/user_ref"
+            },
+            "requestId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "warehouse",
+                "client_id",
+                "product_id",
+                "product_category",
+                "quantity",
+                "threshold_quantity",
+                "trigger_order_id",
+                "trigger_exit_type"
+              ],
+              "properties": {
+                "warehouse": {
+                  "$ref": "#/definitions/warehouse",
+                  "description": "Almacén en el que el stock ha caído por debajo del mínimo."
+                },
+                "client_id": {
+                  "$ref": "#/definitions/client_id",
+                  "description": "Cliente dueño del SKU, derivado de `SKU.client_name` (§8.4)."
+                },
+                "product_id": {
+                  "$ref": "#/definitions/product_id",
+                  "description": "Código del SKU (`SKU.sku`)."
+                },
+                "product_category": {
+                  "$ref": "#/definitions/product_category",
+                  "description": "Categoría del SKU (`SKU.category`)."
+                },
+                "quantity": {
+                  "$ref": "#/definitions/stock_quantity",
+                  "description": "Stock disponible en el almacén **después** de la salida que cruza el umbral (puede ser 0)."
+                },
+                "threshold_quantity": {
+                  "$ref": "#/definitions/quantity",
+                  "description": "Mínimo configurado para el cliente y SKU en ese momento."
+                },
+                "trigger_order_id": {
+                  "$ref": "#/definitions/order_id",
+                  "description": "Id del `StockExit` que ha provocado el cruce."
+                },
+                "trigger_exit_type": {
+                  "$ref": "#/definitions/exit_type",
+                  "description": "Tipo de la salida que ha provocado el cruce."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "330c3f06-8983-528e-a13e-a52db80a219c",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "stock_threshold_triggered",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "warehouse": "los_angeles",
+            "client_id": "purestep-footwear",
+            "product_id": "CLT-SNK-W-42",
+            "product_category": "fashion",
+            "quantity": 8,
+            "threshold_quantity": 10,
+            "trigger_order_id": 57,
+            "trigger_exit_type": "dispatch"
+          }
+        }
+      ]
+    },
+    "direct_stock_edit_rejected": {
+      "title": "direct_stock_edit_rejected",
+      "description": "Alguien ha intentado fijar el stock de un SKU fuera de una orden y el sistema no lo ha aplicado.",
+      "x-classification": "mandatory",
+      "x-category": "inventory_operations",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 10 s",
+      "x-priority": "critical",
+      "x-retention": "R2",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "direct_stock_edit_rejected"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "warehouse",
+                "client_id",
+                "product_id",
+                "product_category",
+                "quantity",
+                "attempt_channel",
+                "route_template",
+                "http_method",
+                "authenticated"
+              ],
+              "properties": {
+                "warehouse": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/warehouse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Almacén del SKU afectado (o el del cuerpo en el caso 3). Nulo cuando el SKU no existe o el cuerpo no trae un almacén válido."
+                },
+                "client_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/client_id"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Cliente dueño del SKU, derivado de `SKU.client_name` (§8.4). Nulo cuando el SKU no existe o no se puede leer del cuerpo."
+                },
+                "product_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/product_id"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Código del SKU (`SKU.sku`). Nulo cuando la ruta no identifica un SKU existente."
+                },
+                "product_category": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/product_category"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Categoría del SKU (`SKU.category`). Nulo cuando el SKU no existe o no se puede leer del cuerpo."
+                },
+                "quantity": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/quantity"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Valor de stock que se intentaba fijar, si el cuerpo trae un entero ≥ 1. Nulo cuando el cuerpo no trae un valor entero positivo (o no se puede leer)."
+                },
+                "attempt_channel": {
+                  "type": "string",
+                  "enum": [
+                    "method_not_allowed",
+                    "unknown_stock_route",
+                    "stock_field_in_payload"
+                  ],
+                  "description": "Cómo se ha intentado: casos (1), (2) y (3) del momento de emisión."
+                },
+                "route_template": {
+                  "$ref": "#/definitions/api_route",
+                  "description": "Plantilla de la ruta (`unmatched` en el caso 2)."
+                },
+                "http_method": {
+                  "$ref": "#/definitions/http_method",
+                  "description": "Método HTTP de la petición."
+                },
+                "authenticated": {
+                  "type": "boolean",
+                  "description": "Si la petición llevaba un token válido."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "a2557d0a-9121-54c1-99a6-17f3ac8a9154",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "direct_stock_edit_rejected",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "warehouse": "los_angeles",
+            "client_id": "purestep-footwear",
+            "product_id": "CLT-SNK-W-42",
+            "product_category": "fashion",
+            "quantity": 500,
+            "attempt_channel": "method_not_allowed",
+            "route_template": "/inventory/products/{sku_id}",
+            "http_method": "PATCH",
+            "authenticated": true
+          }
+        }
+      ]
+    },
+    "inventory_discrepancy_detected": {
+      "title": "inventory_discrepancy_detected",
+      "description": "Un conteo físico o una auditoría ha encontrado una diferencia entre el stock del sistema y el real de un SKU en un almacén.",
+      "x-classification": "mandatory",
+      "x-category": "inventory_operations",
+      "x-sources": [
+        "internal_process",
+        "backend"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 60 s",
+      "x-priority": "critical",
+      "x-retention": "R1",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "inventory_discrepancy_detected"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "internal_process",
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "warehouse",
+                "client_id",
+                "product_id",
+                "product_category",
+                "quantity",
+                "system_quantity",
+                "counted_quantity",
+                "discrepancy_direction",
+                "count_method"
+              ],
+              "properties": {
+                "warehouse": {
+                  "$ref": "#/definitions/warehouse",
+                  "description": "Almacén contado."
+                },
+                "client_id": {
+                  "$ref": "#/definitions/client_id",
+                  "description": "Cliente dueño del SKU, derivado de `SKU.client_name` (§8.4)."
+                },
+                "product_id": {
+                  "$ref": "#/definitions/product_id",
+                  "description": "Código del SKU (`SKU.sku`)."
+                },
+                "product_category": {
+                  "$ref": "#/definitions/product_category",
+                  "description": "Categoría del SKU (`SKU.category`)."
+                },
+                "quantity": {
+                  "$ref": "#/definitions/quantity",
+                  "description": "Unidades de diferencia en valor absoluto: `|counted_quantity − system_quantity|`."
+                },
+                "system_quantity": {
+                  "$ref": "#/definitions/stock_quantity",
+                  "description": "Stock calculado por el sistema en el momento del conteo."
+                },
+                "counted_quantity": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2147483647,
+                  "description": "Unidades contadas físicamente."
+                },
+                "discrepancy_direction": {
+                  "type": "string",
+                  "enum": [
+                    "shortage",
+                    "surplus"
+                  ],
+                  "description": "`shortage` si faltan unidades (contado < sistema); `surplus` si sobran."
+                },
+                "count_method": {
+                  "$ref": "#/definitions/count_method",
+                  "description": "Tipo de conteo que ha detectado la diferencia."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "15265cfe-72a8-5117-b37a-091d66e7d5d9",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": null,
+          "userId": null,
+          "event_type": "inventory_discrepancy_detected",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "internal_process",
+          "environment": "production",
+          "properties": {
+            "warehouse": "los_angeles",
+            "client_id": "purestep-footwear",
+            "product_id": "CLT-SNK-W-42",
+            "product_category": "fashion",
+            "quantity": 3,
+            "system_quantity": 40,
+            "counted_quantity": 37,
+            "discrepancy_direction": "shortage",
+            "count_method": "cycle_count"
+          }
+        }
+      ]
+    },
+    "inventory_count_completed": {
+      "title": "inventory_count_completed",
+      "description": "Se ha cerrado el conteo físico de un SKU en un almacén, con o sin diferencia.",
+      "x-classification": "identified_opportunity",
+      "x-category": "inventory_operations",
+      "x-sources": [
+        "internal_process",
+        "backend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "diario",
+      "x-priority": "high",
+      "x-retention": "R1",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "inventory_count_completed"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "internal_process",
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "warehouse",
+                "client_id",
+                "product_id",
+                "product_category",
+                "quantity",
+                "system_quantity",
+                "has_discrepancy",
+                "count_method"
+              ],
+              "properties": {
+                "warehouse": {
+                  "$ref": "#/definitions/warehouse",
+                  "description": "Almacén contado."
+                },
+                "client_id": {
+                  "$ref": "#/definitions/client_id",
+                  "description": "Cliente dueño del SKU, derivado de `SKU.client_name` (§8.4)."
+                },
+                "product_id": {
+                  "$ref": "#/definitions/product_id",
+                  "description": "Código del SKU (`SKU.sku`)."
+                },
+                "product_category": {
+                  "$ref": "#/definitions/product_category",
+                  "description": "Categoría del SKU (`SKU.category`)."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2147483647,
+                  "description": "Unidades contadas físicamente."
+                },
+                "system_quantity": {
+                  "$ref": "#/definitions/stock_quantity",
+                  "description": "Stock calculado por el sistema en el momento del conteo."
+                },
+                "has_discrepancy": {
+                  "type": "boolean",
+                  "description": "`true` si el conteo emite también `inventory_discrepancy_detected`."
+                },
+                "count_method": {
+                  "$ref": "#/definitions/count_method",
+                  "description": "Tipo de conteo."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "f05fa0bb-6d61-5eb6-a8bc-e19d93bc2e71",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": null,
+          "userId": null,
+          "event_type": "inventory_count_completed",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "internal_process",
+          "environment": "production",
+          "properties": {
+            "warehouse": "los_angeles",
+            "client_id": "purestep-footwear",
+            "product_id": "CLT-SNK-W-42",
+            "product_category": "fashion",
+            "quantity": 37,
+            "system_quantity": 40,
+            "has_discrepancy": true,
+            "count_method": "cycle_count"
+          }
+        }
+      ]
+    },
+    "stock_loss_recorded": {
+      "title": "stock_loss_recorded",
+      "description": "Se ha registrado una salida de tipo pérdida (`StockExit` con `exit_type = loss`): daño o discrepancia confirmada.",
+      "x-classification": "identified_opportunity",
+      "x-category": "inventory_operations",
+      "x-sources": [
+        "backend",
+        "internal_process"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "lote cada 5 min",
+      "x-priority": "high",
+      "x-retention": "R1",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "stock_loss_recorded"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend",
+                "internal_process"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "$ref": "#/definitions/user_ref"
+            },
+            "requestId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "warehouse",
+                "client_id",
+                "product_id",
+                "product_category",
+                "quantity",
+                "order_id"
+              ],
+              "properties": {
+                "warehouse": {
+                  "$ref": "#/definitions/warehouse",
+                  "description": "Almacén del movimiento (`StockEntry/StockExit.warehouse`), con el valor interno traducido."
+                },
+                "client_id": {
+                  "$ref": "#/definitions/client_id",
+                  "description": "Cliente dueño del SKU, derivado de `SKU.client_name` (§8.4)."
+                },
+                "product_id": {
+                  "$ref": "#/definitions/product_id",
+                  "description": "Código del SKU (`SKU.sku`)."
+                },
+                "product_category": {
+                  "$ref": "#/definitions/product_category",
+                  "description": "Categoría del SKU (`SKU.category`)."
+                },
+                "quantity": {
+                  "$ref": "#/definitions/quantity",
+                  "description": "Unidades dadas de baja."
+                },
+                "order_id": {
+                  "$ref": "#/definitions/order_id",
+                  "description": "Id del `StockExit` creado."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "db4515f2-723e-554b-b717-5ffbddaf81ac",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "stock_loss_recorded",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "warehouse": "los_angeles",
+            "client_id": "purestep-footwear",
+            "product_id": "CLT-SNK-W-42",
+            "product_category": "fashion",
+            "quantity": 2,
+            "order_id": 58
+          }
+        }
+      ]
+    },
+    "inventory_order_rejected": {
+      "title": "inventory_order_rejected",
+      "description": "La API ha rechazado una orden de entrada o salida con datos válidos por una regla de negocio: stock insuficiente (400) o SKU inexistente (404).",
+      "x-classification": "identified_opportunity",
+      "x-category": "inventory_operations",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 60 s",
+      "x-priority": "high",
+      "x-retention": "R1",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "inventory_order_rejected"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "$ref": "#/definitions/user_ref"
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "order_type",
+                "rejection_reason",
+                "warehouse",
+                "client_id",
+                "product_id",
+                "product_category",
+                "quantity",
+                "available_quantity",
+                "exit_type"
+              ],
+              "properties": {
+                "order_type": {
+                  "$ref": "#/definitions/order_type",
+                  "description": "Tipo de orden rechazada."
+                },
+                "rejection_reason": {
+                  "type": "string",
+                  "enum": [
+                    "insufficient_stock",
+                    "sku_not_found"
+                  ],
+                  "description": "Regla que la rechaza: regla 2 del inventario (400) o SKU inexistente (404)."
+                },
+                "warehouse": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/warehouse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Almacén de la orden (el del cuerpo o, si no lo trae, el del SKU). Nulo cuando el SKU no existe y el cuerpo no indica almacén."
+                },
+                "client_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/client_id"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Cliente dueño del SKU, derivado de `SKU.client_name` (§8.4). Nulo cuando `rejection_reason = sku_not_found`."
+                },
+                "product_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/product_id"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Código del SKU (`SKU.sku`). Nulo cuando `rejection_reason = sku_not_found`."
+                },
+                "product_category": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/product_category"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Categoría del SKU (`SKU.category`). Nulo cuando `rejection_reason = sku_not_found`."
+                },
+                "quantity": {
+                  "$ref": "#/definitions/quantity",
+                  "description": "Unidades solicitadas."
+                },
+                "available_quantity": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/stock_quantity"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Stock disponible en el almacén en el momento del rechazo. Nulo cuando `rejection_reason = sku_not_found`."
+                },
+                "exit_type": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/exit_type"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Tipo de salida solicitada. Nulo cuando `order_type = inbound`."
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "rejection_reason": {
+                        "const": "insufficient_stock"
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "order_type": {
+                        "const": "outbound"
+                      },
+                      "available_quantity": {
+                        "$ref": "#/definitions/stock_quantity"
+                      },
+                      "client_id": {
+                        "$ref": "#/definitions/client_id"
+                      },
+                      "product_id": {
+                        "$ref": "#/definitions/product_id"
+                      },
+                      "product_category": {
+                        "$ref": "#/definitions/product_category"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "rejection_reason": {
+                        "const": "sku_not_found"
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "client_id": {
+                        "type": "null"
+                      },
+                      "product_id": {
+                        "type": "null"
+                      },
+                      "product_category": {
+                        "type": "null"
+                      },
+                      "available_quantity": {
+                        "type": "null"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "order_type": {
+                        "const": "inbound"
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "exit_type": {
+                        "type": "null"
+                      }
+                    }
+                  },
+                  "else": {
+                    "properties": {
+                      "exit_type": {
+                        "$ref": "#/definitions/exit_type"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "0f794736-2239-539c-9adc-336b2e90371b",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "inventory_order_rejected",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "order_type": "outbound",
+            "rejection_reason": "insufficient_stock",
+            "warehouse": "los_angeles",
+            "client_id": "purestep-footwear",
+            "product_id": "CLT-SNK-W-42",
+            "product_category": "fashion",
+            "quantity": 30,
+            "available_quantity": 12,
+            "exit_type": "dispatch"
+          }
+        }
+      ]
+    },
+    "inventory_order_validation_failed": {
+      "title": "inventory_order_validation_failed",
+      "description": "La API ha respondido 422 a una orden de entrada o salida porque los datos no cumplen el esquema.",
+      "x-classification": "identified_opportunity",
+      "x-category": "inventory_operations",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "lote cada 5 min",
+      "x-priority": "medium",
+      "x-retention": "R3",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "inventory_order_validation_failed"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "order_type",
+                "failed_fields",
+                "error_types"
+              ],
+              "properties": {
+                "order_type": {
+                  "$ref": "#/definitions/order_type",
+                  "description": "Ruta que ha fallado: `inbound` u `outbound`."
+                },
+                "failed_fields": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 7,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "sku_id",
+                      "quantity",
+                      "reference",
+                      "warehouse",
+                      "exit_type",
+                      "tracking_number",
+                      "body"
+                    ]
+                  },
+                  "description": "Campos que han fallado (de `loc`); `body` si el cuerpo entero no es válido."
+                },
+                "error_types": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 10,
+                  "uniqueItems": true,
+                  "items": {
+                    "$ref": "#/definitions/validation_error_type"
+                  },
+                  "description": "Tipos de fallo, sin valores."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "42752541-4e8a-5fc3-b9c4-e0860b3a3504",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "inventory_order_validation_failed",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "order_type": "outbound",
+            "failed_fields": [
+              "tracking_number"
+            ],
+            "error_types": [
+              "business_rule"
+            ]
+          }
+        }
+      ]
+    },
+    "inventory_order_duplicate_detected": {
+      "title": "inventory_order_duplicate_detected",
+      "description": "Un proceso de revisión ha encontrado órdenes casi idénticas registradas en pocos segundos (posible doble envío).",
+      "x-classification": "identified_opportunity",
+      "x-category": "integrity_security",
+      "x-sources": [
+        "internal_process"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "diario",
+      "x-priority": "medium",
+      "x-retention": "R2",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "inventory_order_duplicate_detected"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "internal_process"
+              ]
+            },
+            "sessionId": {
+              "type": "null"
+            },
+            "userId": {
+              "type": "null"
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "order_type",
+                "warehouse",
+                "client_id",
+                "product_id",
+                "product_category",
+                "quantity",
+                "order_ids",
+                "window_seconds",
+                "match_basis"
+              ],
+              "properties": {
+                "order_type": {
+                  "$ref": "#/definitions/order_type",
+                  "description": "Tipo de las órdenes duplicadas."
+                },
+                "warehouse": {
+                  "$ref": "#/definitions/warehouse",
+                  "description": "Almacén del movimiento (`StockEntry/StockExit.warehouse`), con el valor interno traducido."
+                },
+                "client_id": {
+                  "$ref": "#/definitions/client_id",
+                  "description": "Cliente dueño del SKU, derivado de `SKU.client_name` (§8.4)."
+                },
+                "product_id": {
+                  "$ref": "#/definitions/product_id",
+                  "description": "Código del SKU (`SKU.sku`)."
+                },
+                "product_category": {
+                  "$ref": "#/definitions/product_category",
+                  "description": "Categoría del SKU (`SKU.category`)."
+                },
+                "quantity": {
+                  "$ref": "#/definitions/quantity",
+                  "description": "Cantidad de cada orden del grupo."
+                },
+                "order_ids": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 20,
+                  "uniqueItems": true,
+                  "items": {
+                    "$ref": "#/definitions/order_id"
+                  },
+                  "description": "Ids de los movimientos sospechosos."
+                },
+                "window_seconds": {
+                  "$ref": "#/definitions/window_seconds",
+                  "description": "Segundos entre la primera y la última orden del grupo."
+                },
+                "match_basis": {
+                  "type": "string",
+                  "enum": [
+                    "same_reference",
+                    "same_tracking_number"
+                  ],
+                  "description": "Dato que coincide además de SKU, almacén, cantidad y usuario."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "e8bf7ba2-cdab-50ae-a0db-45fc58e4a0e2",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": null,
+          "userId": null,
+          "event_type": "inventory_order_duplicate_detected",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "internal_process",
+          "environment": "production",
+          "properties": {
+            "order_type": "outbound",
+            "warehouse": "los_angeles",
+            "client_id": "purestep-footwear",
+            "product_id": "CLT-SNK-W-42",
+            "product_category": "fashion",
+            "quantity": 24,
+            "order_ids": [
+              101,
+              102
+            ],
+            "window_seconds": 4,
+            "match_basis": "same_reference"
+          }
+        }
+      ]
+    },
+    "stock_snapshot_recorded": {
+      "title": "stock_snapshot_recorded",
+      "description": "Foto diaria del stock de un SKU en un almacén.",
+      "x-classification": "identified_opportunity",
+      "x-category": "inventory_operations",
+      "x-sources": [
+        "internal_process"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "diario",
+      "x-priority": "medium",
+      "x-retention": "R1",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "stock_snapshot_recorded"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "internal_process"
+              ]
+            },
+            "sessionId": {
+              "type": "null"
+            },
+            "userId": {
+              "type": "null"
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "warehouse",
+                "client_id",
+                "product_id",
+                "product_category",
+                "quantity",
+                "snapshot_date",
+                "days_since_last_movement"
+              ],
+              "properties": {
+                "warehouse": {
+                  "$ref": "#/definitions/warehouse",
+                  "description": "Almacén de la foto."
+                },
+                "client_id": {
+                  "$ref": "#/definitions/client_id",
+                  "description": "Cliente dueño del SKU, derivado de `SKU.client_name` (§8.4)."
+                },
+                "product_id": {
+                  "$ref": "#/definitions/product_id",
+                  "description": "Código del SKU (`SKU.sku`)."
+                },
+                "product_category": {
+                  "$ref": "#/definitions/product_category",
+                  "description": "Categoría del SKU (`SKU.category`)."
+                },
+                "quantity": {
+                  "$ref": "#/definitions/stock_quantity",
+                  "description": "Stock calculado del SKU en ese almacén al cierre del día."
+                },
+                "snapshot_date": {
+                  "$ref": "#/definitions/date",
+                  "description": "Día (UTC) al que corresponde la foto."
+                },
+                "days_since_last_movement": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 36500
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Días desde el último movimiento del SKU en ese almacén. Nulo cuando no ha tenido nunca movimientos."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "b6b34bca-6559-5637-aa4b-46c0e302fa15",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": null,
+          "userId": null,
+          "event_type": "stock_snapshot_recorded",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "internal_process",
+          "environment": "production",
+          "properties": {
+            "warehouse": "los_angeles",
+            "client_id": "purestep-footwear",
+            "product_id": "CLT-SNK-W-42",
+            "product_category": "fashion",
+            "quantity": 35,
+            "snapshot_date": "2026-11-10",
+            "days_since_last_movement": 12
+          }
+        }
+      ]
+    },
+    "product_created": {
+      "title": "product_created",
+      "description": "Se ha dado de alta un SKU (`Product`).",
+      "x-classification": "identified_opportunity",
+      "x-category": "product_catalog",
+      "x-sources": [
+        "backend",
+        "internal_process"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "lote cada 5 min",
+      "x-priority": "medium",
+      "x-retention": "R1",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "product_created"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend",
+                "internal_process"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "$ref": "#/definitions/user_ref"
+            },
+            "requestId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "warehouse",
+                "client_id",
+                "product_id",
+                "product_category"
+              ],
+              "properties": {
+                "warehouse": {
+                  "$ref": "#/definitions/warehouse",
+                  "description": "Almacén en el que se registra el SKU (`SKU.warehouse`)."
+                },
+                "client_id": {
+                  "$ref": "#/definitions/client_id",
+                  "description": "Cliente dueño del SKU, derivado de `SKU.client_name` (§8.4)."
+                },
+                "product_id": {
+                  "$ref": "#/definitions/product_id",
+                  "description": "Código del SKU (`SKU.sku`)."
+                },
+                "product_category": {
+                  "$ref": "#/definitions/product_category",
+                  "description": "Categoría del SKU (`SKU.category`)."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "994d3732-45bd-5d5b-a2b5-e4773c4dd67a",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "product_created",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "warehouse": "los_angeles",
+            "client_id": "purestep-footwear",
+            "product_id": "CLT-SNK-W-42",
+            "product_category": "fashion"
+          }
+        }
+      ]
+    },
+    "product_duplicate_rejected": {
+      "title": "product_duplicate_rejected",
+      "description": "La API ha rechazado el alta de un SKU porque su código ya existe (409).",
+      "x-classification": "identified_opportunity",
+      "x-category": "product_catalog",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "lote cada 5 min",
+      "x-priority": "low",
+      "x-retention": "R3",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "product_duplicate_rejected"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "$ref": "#/definitions/user_ref"
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "warehouse",
+                "client_id",
+                "product_id",
+                "product_category",
+                "detected_by"
+              ],
+              "properties": {
+                "warehouse": {
+                  "$ref": "#/definitions/warehouse",
+                  "description": "Almacén del alta rechazada (del cuerpo)."
+                },
+                "client_id": {
+                  "$ref": "#/definitions/client_id",
+                  "description": "Cliente dueño del SKU, derivado de `SKU.client_name` (§8.4)."
+                },
+                "product_id": {
+                  "$ref": "#/definitions/product_id",
+                  "description": "Código que ya existía."
+                },
+                "product_category": {
+                  "$ref": "#/definitions/product_category",
+                  "description": "Categoría del SKU (`SKU.category`)."
+                },
+                "detected_by": {
+                  "type": "string",
+                  "enum": [
+                    "pre_check",
+                    "unique_constraint"
+                  ],
+                  "description": "`pre_check` = `find_sku_by_code`; `unique_constraint` = otra petición lo creó a la vez (carrera)."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "59ab1409-ec3d-5e8f-bc56-4298eee72bce",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "product_duplicate_rejected",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "warehouse": "los_angeles",
+            "client_id": "purestep-footwear",
+            "product_id": "CLT-SNK-W-42",
+            "product_category": "fashion",
+            "detected_by": "pre_check"
+          }
+        }
+      ]
+    },
+    "product_validation_failed": {
+      "title": "product_validation_failed",
+      "description": "La API ha respondido 422 al alta de un SKU.",
+      "x-classification": "identified_opportunity",
+      "x-category": "product_catalog",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "lote cada 5 min",
+      "x-priority": "low",
+      "x-retention": "R3",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "product_validation_failed"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "failed_fields",
+                "error_types"
+              ],
+              "properties": {
+                "failed_fields": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 6,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "name",
+                      "sku",
+                      "client_name",
+                      "category",
+                      "warehouse",
+                      "body"
+                    ]
+                  },
+                  "description": "Campos que han fallado (de `loc`)."
+                },
+                "error_types": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 10,
+                  "uniqueItems": true,
+                  "items": {
+                    "$ref": "#/definitions/validation_error_type"
+                  },
+                  "description": "Tipos de fallo, sin valores."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "359216bc-6bcd-5fe6-b0c9-f168e27b13b0",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "product_validation_failed",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "failed_fields": [
+              "category"
+            ],
+            "error_types": [
+              "invalid_choice"
+            ]
+          }
+        }
+      ]
+    },
+    "order_history_filtered": {
+      "title": "order_history_filtered",
+      "description": "Un usuario ha cambiado los filtros del historial de movimientos (almacén y/o producto).",
+      "x-classification": "identified_opportunity",
+      "x-category": "product_catalog",
+      "x-sources": [
+        "frontend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "al ocultar la página o cada 30 s",
+      "x-priority": "low",
+      "x-retention": "R3",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "order_history_filtered"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "frontend"
+              ]
+            },
+            "sessionId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "warehouse",
+                "product_id",
+                "result_count"
+              ],
+              "properties": {
+                "warehouse": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/warehouse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Almacén filtrado. Nulo cuando no hay filtro de almacén."
+                },
+                "product_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/product_id"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "SKU filtrado (código, traducido desde el `sku_id` del selector). Nulo cuando no hay filtro de producto."
+                },
+                "result_count": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/non_negative_count"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Movimientos devueltos. Nulo cuando la petición ha fallado."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "26d48d6a-36f3-5b2f-8ee6-7507a410a5af",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "order_history_filtered",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "frontend",
+          "environment": "production",
+          "properties": {
+            "warehouse": "los_angeles",
+            "product_id": "CLT-SNK-W-42",
+            "result_count": 14
+          }
+        }
+      ]
+    },
+    "login_succeeded": {
+      "title": "login_succeeded",
+      "description": "Un usuario ha iniciado sesión: la API ha emitido un token.",
+      "x-classification": "identified_opportunity",
+      "x-category": "authentication",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "lote cada 5 min",
+      "x-priority": "high",
+      "x-retention": "R2",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "login_succeeded"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "$ref": "#/definitions/user_ref"
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "auth_method",
+                "user_role"
+              ],
+              "properties": {
+                "auth_method": {
+                  "type": "string",
+                  "enum": [
+                    "password_json",
+                    "oauth2_form"
+                  ],
+                  "description": "`password_json` = `/auth/login` (backoffice); `oauth2_form` = `/auth/token` (Swagger)."
+                },
+                "user_role": {
+                  "$ref": "#/definitions/user_role",
+                  "description": "Rol del usuario al iniciar sesión."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "b894f62b-2ba9-519e-9b18-b9efe8a057a9",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "login_succeeded",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "auth_method": "password_json",
+            "user_role": "user"
+          }
+        }
+      ]
+    },
+    "login_failed": {
+      "title": "login_failed",
+      "description": "Un intento de inicio de sesión no ha terminado en token.",
+      "x-classification": "identified_opportunity",
+      "x-category": "authentication",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 10 s",
+      "x-priority": "high",
+      "x-retention": "R2",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "login_failed"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "type": "null"
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "failure_reason",
+                "auth_method",
+                "account_ref"
+              ],
+              "properties": {
+                "failure_reason": {
+                  "type": "string",
+                  "enum": [
+                    "invalid_credentials",
+                    "account_inactive",
+                    "invalid_payload"
+                  ],
+                  "description": "Motivo interno (la respuesta al cliente no lo distingue entre email inexistente y contraseña mala)."
+                },
+                "auth_method": {
+                  "type": "string",
+                  "enum": [
+                    "password_json",
+                    "oauth2_form"
+                  ],
+                  "description": "Endpoint usado."
+                },
+                "account_ref": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/account_ref"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Seudónimo del email intentado (agrupa intentos contra una cuenta). Nulo cuando el email no es válido (`invalid_payload`)."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "a4887a62-e5c2-5cdd-9166-c60efb43d6dc",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": null,
+          "userId": null,
+          "event_type": "login_failed",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "failure_reason": "invalid_credentials",
+            "auth_method": "password_json",
+            "account_ref": "acc_9e2d4f6a8c0b1e3d5f7a9c2e4b6d8f0a"
+          }
+        }
+      ]
+    },
+    "session_ended": {
+      "title": "session_ended",
+      "description": "La sesión del backoffice ha terminado: cierre voluntario, caducidad del token, 401 de la API o cierre en otra pestaña.",
+      "x-classification": "identified_opportunity",
+      "x-category": "authentication",
+      "x-sources": [
+        "frontend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "al ocultar la página o cada 30 s",
+      "x-priority": "medium",
+      "x-retention": "R3",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "session_ended"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "frontend"
+              ]
+            },
+            "sessionId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "end_reason",
+                "session_duration_seconds"
+              ],
+              "properties": {
+                "end_reason": {
+                  "type": "string",
+                  "enum": [
+                    "user_logout",
+                    "token_expired",
+                    "unauthorized_response",
+                    "ended_in_other_tab"
+                  ],
+                  "description": "Motivo del fin de sesión."
+                },
+                "session_duration_seconds": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2592000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Segundos desde el login de esta sesión. Nulo cuando no se conoce el inicio (sesión anterior al despliegue de la telemetría)."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "5d0da10b-9ee7-5c27-959e-af75e5e3721b",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "session_ended",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "frontend",
+          "environment": "production",
+          "properties": {
+            "end_reason": "token_expired",
+            "session_duration_seconds": 1800
+          }
+        }
+      ]
+    },
+    "access_token_rejected": {
+      "title": "access_token_rejected",
+      "description": "La API ha respondido 401 a una ruta protegida.",
+      "x-classification": "identified_opportunity",
+      "x-category": "authentication",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 10 s",
+      "x-priority": "high",
+      "x-retention": "R2",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "access_token_rejected"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "rejection_reason",
+                "route_template",
+                "http_method",
+                "occurrence_count"
+              ],
+              "properties": {
+                "rejection_reason": {
+                  "type": "string",
+                  "enum": [
+                    "missing_token",
+                    "expired_token",
+                    "invalid_token",
+                    "user_inactive_or_deleted",
+                    "issued_before_password_change"
+                  ],
+                  "description": "Rama de `get_current_user` que rechaza."
+                },
+                "route_template": {
+                  "$ref": "#/definitions/api_route",
+                  "description": "Plantilla de la ruta de la petición."
+                },
+                "http_method": {
+                  "$ref": "#/definitions/http_method",
+                  "description": "Método HTTP de la petición."
+                },
+                "occurrence_count": {
+                  "$ref": "#/definitions/positive_count",
+                  "description": "Rechazos iguales agrupados en la ventana (1 si no se agrega)."
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "rejection_reason": {
+                        "const": "invalid_token"
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "occurrence_count": {
+                        "const": 1
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "b30c6dcc-ca54-5cc2-bbea-e2f6e19b8ff9",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": null,
+          "event_type": "access_token_rejected",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "rejection_reason": "expired_token",
+            "route_template": "/inventory/orders/outbound",
+            "http_method": "POST",
+            "occurrence_count": 3
+          }
+        }
+      ]
+    },
+    "password_reset_requested": {
+      "title": "password_reset_requested",
+      "description": "Alguien ha pedido un enlace de recuperación de contraseña.",
+      "x-classification": "identified_opportunity",
+      "x-category": "authentication",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "lote cada 5 min",
+      "x-priority": "low",
+      "x-retention": "R2",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "password_reset_requested"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "type": "null"
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "enum": [
+                    "email_queued",
+                    "unknown_account",
+                    "inactive_account",
+                    "rate_limited"
+                  ],
+                  "description": "Decisión interna. Solo la ve el equipo técnico; el cliente siempre recibe el mismo mensaje."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "bbf55eb6-d57a-549d-92ca-4dc570680986",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": null,
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "password_reset_requested",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "outcome": "email_queued"
+          }
+        }
+      ]
+    },
+    "password_changed": {
+      "title": "password_changed",
+      "description": "Un usuario ha cambiado su contraseña (con enlace de recuperación o desde su cuenta). Cierra sus demás sesiones.",
+      "x-classification": "identified_opportunity",
+      "x-category": "authentication",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "lote cada 5 min",
+      "x-priority": "low",
+      "x-retention": "R2",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "password_changed"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "$ref": "#/definitions/user_ref"
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "change_method"
+              ],
+              "properties": {
+                "change_method": {
+                  "type": "string",
+                  "enum": [
+                    "reset_link",
+                    "authenticated_change"
+                  ],
+                  "description": "Vía del cambio."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "1e03574c-d979-5d5e-9083-afc9abf2c04b",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "password_changed",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "change_method": "authenticated_change"
+          }
+        }
+      ]
+    },
+    "user_registered": {
+      "title": "user_registered",
+      "description": "Se ha creado una cuenta de usuario con `POST /users`.",
+      "x-classification": "identified_opportunity",
+      "x-category": "user_activity",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "lote cada 5 min",
+      "x-priority": "low",
+      "x-retention": "R2",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "user_registered"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "type": "null"
+            },
+            "userId": {
+              "$ref": "#/definitions/user_ref"
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "registration_mode"
+              ],
+              "properties": {
+                "registration_mode": {
+                  "type": "string",
+                  "enum": [
+                    "open",
+                    "invitation_code"
+                  ],
+                  "description": "`invitation_code` si `REGISTRATION_CODE` está configurada."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "812c2f16-25e7-5b5c-a1e9-65e93c922bac",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": null,
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "user_registered",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "registration_mode": "invitation_code"
+          }
+        }
+      ]
+    },
+    "navigation_section_viewed": {
+      "title": "navigation_section_viewed",
+      "description": "Se ha mostrado una sección del backoffice.",
+      "x-classification": "identified_opportunity",
+      "x-category": "user_activity",
+      "x-sources": [
+        "frontend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "al ocultar la página o cada 30 s",
+      "x-priority": "medium",
+      "x-retention": "R3",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "navigation_section_viewed"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "frontend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "section",
+                "previous_section",
+                "navigation_trigger"
+              ],
+              "properties": {
+                "section": {
+                  "$ref": "#/definitions/section",
+                  "description": "Sección mostrada."
+                },
+                "previous_section": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/section"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Sección anterior en esta pestaña. Nulo cuando es la carga inicial."
+                },
+                "navigation_trigger": {
+                  "type": "string",
+                  "enum": [
+                    "initial_load",
+                    "in_app_navigation",
+                    "browser_history"
+                  ],
+                  "description": "Origen del cambio (el botón atrás/adelante se detecta con `popstate`)."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "73681e5d-3cdf-55a8-9b38-8823e4fd863f",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "navigation_section_viewed",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "frontend",
+          "environment": "production",
+          "properties": {
+            "section": "inventory_outbound",
+            "previous_section": "inventory_products",
+            "navigation_trigger": "in_app_navigation"
+          }
+        }
+      ]
+    },
+    "form_started": {
+      "title": "form_started",
+      "description": "Un usuario ha empezado a rellenar un formulario (primera modificación de un campo).",
+      "x-classification": "identified_opportunity",
+      "x-category": "user_activity",
+      "x-sources": [
+        "frontend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "al ocultar la página o cada 30 s",
+      "x-priority": "medium",
+      "x-retention": "R3",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "form_started"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "frontend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "form_id",
+                "section"
+              ],
+              "properties": {
+                "form_id": {
+                  "$ref": "#/definitions/form_id",
+                  "description": "Formulario."
+                },
+                "section": {
+                  "$ref": "#/definitions/section",
+                  "description": "Sección en la que está el formulario."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "cb6f95d5-92b2-5174-b5d5-287128bc1b4a",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "form_started",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "frontend",
+          "environment": "production",
+          "properties": {
+            "form_id": "inventory_outbound",
+            "section": "inventory_outbound"
+          }
+        }
+      ]
+    },
+    "form_submitted": {
+      "title": "form_submitted",
+      "description": "Un formulario se ha enviado a la API y ha recibido respuesta (o ha fallado la conexión).",
+      "x-classification": "identified_opportunity",
+      "x-category": "user_activity",
+      "x-sources": [
+        "frontend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "al ocultar la página o cada 30 s",
+      "x-priority": "high",
+      "x-retention": "R3",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "form_submitted"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "frontend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "form_id",
+                "outcome",
+                "http_status",
+                "attempt_number",
+                "duration_ms"
+              ],
+              "properties": {
+                "form_id": {
+                  "$ref": "#/definitions/form_id",
+                  "description": "Formulario."
+                },
+                "outcome": {
+                  "type": "string",
+                  "enum": [
+                    "success",
+                    "validation_error",
+                    "business_rejection",
+                    "unauthorized",
+                    "network_error",
+                    "server_error"
+                  ],
+                  "description": "Resultado: 2xx; 422; otro 4xx (400, 404, 409, 403); 401; sin respuesta; 5xx."
+                },
+                "http_status": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/http_status"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Estado HTTP de la respuesta. Nulo cuando no hubo respuesta."
+                },
+                "attempt_number": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "description": "Número de envío de esta instancia del formulario (2 o más = reintento)."
+                },
+                "duration_ms": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/duration_ms"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Tiempo desde `form_started` hasta el envío. Nulo cuando el formulario se envió sin modificar ningún campo."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "0fa1db7d-0dc1-5942-8d13-558b06b6c9cb",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "form_submitted",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "frontend",
+          "environment": "production",
+          "properties": {
+            "form_id": "inventory_outbound",
+            "outcome": "success",
+            "http_status": 201,
+            "attempt_number": 1,
+            "duration_ms": 42150.5
+          }
+        }
+      ]
+    },
+    "form_abandoned": {
+      "title": "form_abandoned",
+      "description": "Un usuario ha salido de un formulario empezado sin enviarlo con éxito.",
+      "x-classification": "identified_opportunity",
+      "x-category": "user_activity",
+      "x-sources": [
+        "frontend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "al ocultar la página o cada 30 s",
+      "x-priority": "medium",
+      "x-retention": "R3",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "form_abandoned"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "frontend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "form_id",
+                "duration_ms",
+                "fields_touched_count",
+                "last_field",
+                "had_failed_submit"
+              ],
+              "properties": {
+                "form_id": {
+                  "$ref": "#/definitions/form_id",
+                  "description": "Formulario."
+                },
+                "duration_ms": {
+                  "$ref": "#/definitions/duration_ms",
+                  "description": "Tiempo desde `form_started`."
+                },
+                "fields_touched_count": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "description": "Campos distintos modificados."
+                },
+                "last_field": {
+                  "$ref": "#/definitions/form_field",
+                  "description": "Último campo con el que interactuó (nombre, no valor)."
+                },
+                "had_failed_submit": {
+                  "type": "boolean",
+                  "description": "Si hubo algún envío fallido antes de abandonar."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "54814f6e-97e6-5dc7-a5e0-fcec8bee29ca",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "form_abandoned",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "frontend",
+          "environment": "production",
+          "properties": {
+            "form_id": "inventory_outbound",
+            "duration_ms": 95000,
+            "fields_touched_count": 2,
+            "last_field": "tracking_number",
+            "had_failed_submit": false
+          }
+        }
+      ]
+    },
+    "form_validation_failed": {
+      "title": "form_validation_failed",
+      "description": "La validación del navegador ha impedido enviar un formulario.",
+      "x-classification": "identified_opportunity",
+      "x-category": "frontend_experience",
+      "x-sources": [
+        "frontend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "al ocultar la página o cada 30 s",
+      "x-priority": "low",
+      "x-retention": "R3",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "form_validation_failed"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "frontend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "form_id",
+                "failed_fields",
+                "attempt_number"
+              ],
+              "properties": {
+                "form_id": {
+                  "$ref": "#/definitions/form_id",
+                  "description": "Formulario."
+                },
+                "failed_fields": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 10,
+                  "uniqueItems": true,
+                  "items": {
+                    "$ref": "#/definitions/form_field"
+                  },
+                  "description": "Campos con error (nombres, nunca valores)."
+                },
+                "attempt_number": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "description": "Intento de envío de esta instancia."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "aafbbf86-a5a1-535c-92c7-2cb88a0a3177",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "form_validation_failed",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "frontend",
+          "environment": "production",
+          "properties": {
+            "form_id": "inventory_outbound",
+            "failed_fields": [
+              "tracking_number"
+            ],
+            "attempt_number": 1
+          }
+        }
+      ]
+    },
+    "frontend_error_captured": {
+      "title": "frontend_error_captured",
+      "description": "Se ha producido un error de JavaScript no controlado, un error de renderizado o un fallo al cargar un componente.",
+      "x-classification": "identified_opportunity",
+      "x-category": "frontend_experience",
+      "x-sources": [
+        "frontend"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 60 s",
+      "x-priority": "high",
+      "x-retention": "R4",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "frontend_error_captured"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "frontend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "error_kind",
+                "error_name",
+                "boundary",
+                "section",
+                "fingerprint",
+                "digest",
+                "app_version",
+                "occurrence_count"
+              ],
+              "properties": {
+                "error_kind": {
+                  "type": "string",
+                  "enum": [
+                    "uncaught_exception",
+                    "unhandled_rejection",
+                    "render_error",
+                    "chunk_load_error"
+                  ],
+                  "description": "Clase de fallo."
+                },
+                "error_name": {
+                  "$ref": "#/definitions/error_name",
+                  "description": "Nombre del error (sin mensaje)."
+                },
+                "boundary": {
+                  "type": "string",
+                  "enum": [
+                    "panel",
+                    "root",
+                    "global",
+                    "none"
+                  ],
+                  "description": "Límite de error que lo ha capturado: `panel` = `app/(panel)/error.tsx`, `root` = `app/error.tsx`, `global` = `app/global-error.tsx`, `none` = listener de `window`."
+                },
+                "section": {
+                  "$ref": "#/definitions/section",
+                  "description": "Sección en la que ha ocurrido."
+                },
+                "fingerprint": {
+                  "$ref": "#/definitions/fingerprint",
+                  "description": "Huella para agrupar el mismo error."
+                },
+                "digest": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9]{1,64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "`error.digest` de Next.js (error del servidor). Nulo cuando el error no trae `digest`."
+                },
+                "app_version": {
+                  "$ref": "#/definitions/app_version",
+                  "description": "Versión desplegada del backoffice."
+                },
+                "occurrence_count": {
+                  "$ref": "#/definitions/positive_count",
+                  "description": "Repeticiones agrupadas en la ventana."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "893c6807-01c3-5aba-a66a-38b35db22a16",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "frontend_error_captured",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "frontend",
+          "environment": "production",
+          "properties": {
+            "error_kind": "render_error",
+            "error_name": "TypeError",
+            "boundary": "panel",
+            "section": "inventory_outbound",
+            "fingerprint": "3fa94c0d1b7e52a8",
+            "digest": null,
+            "app_version": "f3ae8b8",
+            "occurrence_count": 1
+          }
+        }
+      ]
+    },
+    "backend_request_failed": {
+      "title": "backend_request_failed",
+      "description": "El backoffice no ha podido completar una llamada a la API sin recibir una respuesta de error útil: sin conexión, tiempo agotado (20 s), API sin configurar, respuesta ilegible o con forma inesperada.",
+      "x-classification": "identified_opportunity",
+      "x-category": "frontend_experience",
+      "x-sources": [
+        "frontend"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 60 s",
+      "x-priority": "high",
+      "x-retention": "R4",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "backend_request_failed"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "frontend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "failure_kind",
+                "api_route",
+                "http_method",
+                "section",
+                "occurrence_count"
+              ],
+              "properties": {
+                "failure_kind": {
+                  "type": "string",
+                  "enum": [
+                    "network_error",
+                    "timeout",
+                    "api_not_configured",
+                    "unreadable_response",
+                    "unexpected_response_shape"
+                  ],
+                  "description": "Tipo de fallo (`network_error` y `timeout` se distinguen por el `AbortController` de `fetchApi`)."
+                },
+                "api_route": {
+                  "$ref": "#/definitions/api_route",
+                  "description": "Plantilla de la ruta llamada (constante en el cliente)."
+                },
+                "http_method": {
+                  "$ref": "#/definitions/http_method",
+                  "description": "Método HTTP de la petición."
+                },
+                "section": {
+                  "$ref": "#/definitions/section",
+                  "description": "Sección desde la que se llamó."
+                },
+                "occurrence_count": {
+                  "$ref": "#/definitions/positive_count",
+                  "description": "Fallos iguales agrupados en la ventana."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "21cc9143-c994-5357-98e0-3fe9233778e9",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "backend_request_failed",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "frontend",
+          "environment": "production",
+          "properties": {
+            "failure_kind": "timeout",
+            "api_route": "/inventory/products",
+            "http_method": "POST",
+            "section": "inventory_products",
+            "occurrence_count": 1
+          }
+        }
+      ]
+    },
+    "page_performance_measured": {
+      "title": "page_performance_measured",
+      "description": "Métricas de rendimiento real (Web Vitals) de una vista del backoffice.",
+      "x-classification": "identified_opportunity",
+      "x-category": "frontend_experience",
+      "x-sources": [
+        "frontend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "al ocultar la página o cada 30 s",
+      "x-priority": "low",
+      "x-retention": "R4",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "page_performance_measured"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "frontend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "section",
+                "lcp_ms",
+                "cls",
+                "inp_ms",
+                "ttfb_ms",
+                "navigation_type",
+                "device_class",
+                "app_version"
+              ],
+              "properties": {
+                "section": {
+                  "$ref": "#/definitions/section",
+                  "description": "Sección medida."
+                },
+                "lcp_ms": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/duration_ms"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Largest Contentful Paint. Nulo cuando el navegador no lo reporta."
+                },
+                "cls": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 10
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Cumulative Layout Shift. Nulo cuando el navegador no lo reporta."
+                },
+                "inp_ms": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/duration_ms"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Interaction to Next Paint. Nulo cuando no hubo interacción."
+                },
+                "ttfb_ms": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/duration_ms"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Time To First Byte. Nulo cuando el navegador no lo reporta."
+                },
+                "navigation_type": {
+                  "type": "string",
+                  "enum": [
+                    "navigate",
+                    "reload",
+                    "back_forward",
+                    "soft_navigation"
+                  ],
+                  "description": "Tipo de navegación."
+                },
+                "device_class": {
+                  "type": "string",
+                  "enum": [
+                    "mobile",
+                    "tablet",
+                    "desktop"
+                  ],
+                  "description": "Por ancho de ventana (< 768, < 1024, resto). Nunca el user agent."
+                },
+                "app_version": {
+                  "$ref": "#/definitions/app_version",
+                  "description": "Versión desplegada."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "13e9ab6d-9d4c-55f4-82cb-f8566753f1ae",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "page_performance_measured",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "frontend",
+          "environment": "production",
+          "properties": {
+            "section": "inventory_outbound",
+            "lcp_ms": 1840.2,
+            "cls": 0.02,
+            "inp_ms": 96,
+            "ttfb_ms": 210.7,
+            "navigation_type": "navigate",
+            "device_class": "desktop",
+            "app_version": "f3ae8b8"
+          }
+        }
+      ]
+    },
+    "api_latency_recorded": {
+      "title": "api_latency_recorded",
+      "description": "Resumen de 60 s de las peticiones de una ruta, método y estado: número, percentiles e histograma de duración y consultas SQL.",
+      "x-classification": "identified_opportunity",
+      "x-category": "backend_performance",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "ventana de 60 s + lote cada 5 min",
+      "x-priority": "high",
+      "x-retention": "R4",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "api_latency_recorded"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "type": "null"
+            },
+            "userId": {
+              "type": "null"
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "window_start",
+                "window_seconds",
+                "route_template",
+                "http_method",
+                "status_code",
+                "request_count",
+                "duration_p50_ms",
+                "duration_p95_ms",
+                "duration_max_ms",
+                "histogram_counts",
+                "sql_query_count"
+              ],
+              "properties": {
+                "window_start": {
+                  "$ref": "#/definitions/timestamp_utc",
+                  "description": "Inicio de la ventana."
+                },
+                "window_seconds": {
+                  "$ref": "#/definitions/window_seconds",
+                  "description": "Duración de la ventana."
+                },
+                "route_template": {
+                  "$ref": "#/definitions/api_route",
+                  "description": "Plantilla de la ruta de la petición."
+                },
+                "http_method": {
+                  "$ref": "#/definitions/http_method",
+                  "description": "Método HTTP de la petición."
+                },
+                "status_code": {
+                  "$ref": "#/definitions/http_status",
+                  "description": "Estado HTTP de las peticiones agrupadas."
+                },
+                "request_count": {
+                  "$ref": "#/definitions/positive_count",
+                  "description": "Peticiones en la ventana."
+                },
+                "duration_p50_ms": {
+                  "$ref": "#/definitions/duration_ms",
+                  "description": "Mediana de duración."
+                },
+                "duration_p95_ms": {
+                  "$ref": "#/definitions/duration_ms",
+                  "description": "Percentil 95 de duración."
+                },
+                "duration_max_ms": {
+                  "$ref": "#/definitions/duration_ms",
+                  "description": "Duración máxima."
+                },
+                "histogram_counts": {
+                  "type": "array",
+                  "minItems": 10,
+                  "maxItems": 10,
+                  "items": {
+                    "$ref": "#/definitions/non_negative_count"
+                  },
+                  "description": "Peticiones por cubo de duración con límites fijos (ms): ≤10, ≤25, ≤50, ≤100, ≤250, ≤500, ≤1000, ≤2500, ≤5000, >5000. Permite combinar ventanas (los percentiles no se pueden promediar)."
+                },
+                "sql_query_count": {
+                  "$ref": "#/definitions/non_negative_count",
+                  "description": "Consultas SQL del inventario sumadas en la ventana."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "8928106f-50ac-5248-809f-a90954904abf",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": null,
+          "userId": null,
+          "event_type": "api_latency_recorded",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "window_start": "2026-11-10T09:15:00Z",
+            "window_seconds": 60,
+            "route_template": "/inventory/orders/outbound",
+            "http_method": "POST",
+            "status_code": 201,
+            "request_count": 42,
+            "duration_p50_ms": 4.1,
+            "duration_p95_ms": 11.8,
+            "duration_max_ms": 19.3,
+            "histogram_counts": [
+              30,
+              10,
+              2,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "sql_query_count": 84
+          }
+        }
+      ]
+    },
+    "api_slow_request_detected": {
+      "title": "api_slow_request_detected",
+      "description": "Una petición ha tardado más de 1.000 ms.",
+      "x-classification": "identified_opportunity",
+      "x-category": "backend_performance",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "lote cada 5 min",
+      "x-priority": "medium",
+      "x-retention": "R4",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "api_slow_request_detected"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "route_template",
+                "http_method",
+                "status_code",
+                "duration_ms",
+                "sql_query_count",
+                "threshold_ms"
+              ],
+              "properties": {
+                "route_template": {
+                  "$ref": "#/definitions/api_route",
+                  "description": "Plantilla de la ruta de la petición."
+                },
+                "http_method": {
+                  "$ref": "#/definitions/http_method",
+                  "description": "Método HTTP de la petición."
+                },
+                "status_code": {
+                  "$ref": "#/definitions/http_status",
+                  "description": "Estado HTTP."
+                },
+                "duration_ms": {
+                  "$ref": "#/definitions/duration_ms",
+                  "description": "Duración total."
+                },
+                "sql_query_count": {
+                  "$ref": "#/definitions/non_negative_count",
+                  "description": "Consultas SQL de la petición."
+                },
+                "threshold_ms": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 60000,
+                  "description": "Umbral aplicado."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "9bf1b068-de16-5b1e-b6b3-32bf9120855d",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "api_slow_request_detected",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "route_template": "/inventory/orders",
+            "http_method": "GET",
+            "status_code": 200,
+            "duration_ms": 1840.6,
+            "sql_query_count": 3,
+            "threshold_ms": 1000
+          }
+        }
+      ]
+    },
+    "api_exception_raised": {
+      "title": "api_exception_raised",
+      "description": "Un error no controlado ha terminado en un 500 genérico.",
+      "x-classification": "identified_opportunity",
+      "x-category": "backend_performance",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 10 s",
+      "x-priority": "critical",
+      "x-retention": "R4",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "api_exception_raised"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "route_template",
+                "http_method",
+                "error_type",
+                "error_origin",
+                "fingerprint",
+                "app_version",
+                "occurrence_count"
+              ],
+              "properties": {
+                "route_template": {
+                  "$ref": "#/definitions/api_route",
+                  "description": "Plantilla de la ruta de la petición."
+                },
+                "http_method": {
+                  "$ref": "#/definitions/http_method",
+                  "description": "Método HTTP de la petición."
+                },
+                "error_type": {
+                  "$ref": "#/definitions/error_name",
+                  "description": "Clase de la excepción."
+                },
+                "error_origin": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_./-]+:[A-Za-z0-9_<>]+$",
+                  "maxLength": 160,
+                  "description": "Fichero propio y función donde se originó (como `_origin` en `errors.py`), sin número de línea."
+                },
+                "fingerprint": {
+                  "$ref": "#/definitions/fingerprint",
+                  "description": "Huella de `error_type` + `error_origin`."
+                },
+                "app_version": {
+                  "$ref": "#/definitions/app_version",
+                  "description": "Versión desplegada de la API."
+                },
+                "occurrence_count": {
+                  "$ref": "#/definitions/positive_count",
+                  "description": "Repeticiones agregadas (1 si no se agrega)."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "cc9a54d7-3e1f-5de9-a07d-fd0e13e5a47f",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "api_exception_raised",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "route_template": "/inventory/orders/outbound",
+            "http_method": "POST",
+            "error_type": "OperationalError",
+            "error_origin": "app/services/inventory.py:register_exit",
+            "fingerprint": "3fa94c0d1b7e52a8",
+            "app_version": "f3ae8b8",
+            "occurrence_count": 1
+          }
+        }
+      ]
+    },
+    "database_connection_failed": {
+      "title": "database_connection_failed",
+      "description": "No se ha podido usar una base de datos: Supabase/PostgreSQL o SQLite del inventario, o un fichero TinyDB.",
+      "x-classification": "identified_opportunity",
+      "x-category": "backend_performance",
+      "x-sources": [
+        "backend",
+        "internal_process"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 10 s",
+      "x-priority": "critical",
+      "x-retention": "R4",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "database_connection_failed"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend",
+                "internal_process"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "type": "null"
+            },
+            "requestId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "database",
+                "engine",
+                "failure_kind",
+                "route_template",
+                "occurrence_count"
+              ],
+              "properties": {
+                "database": {
+                  "type": "string",
+                  "enum": [
+                    "inventory_sql",
+                    "auth_store",
+                    "suppliers_store",
+                    "incidents_store"
+                  ],
+                  "description": "Base afectada (`inventory.db`/Supabase, `auth.json`, `suppliers.json`, `incidents.json`)."
+                },
+                "engine": {
+                  "type": "string",
+                  "enum": [
+                    "sqlite",
+                    "postgresql",
+                    "tinydb"
+                  ],
+                  "description": "Motor."
+                },
+                "failure_kind": {
+                  "type": "string",
+                  "enum": [
+                    "connection_refused",
+                    "connection_timeout",
+                    "authentication_failed",
+                    "storage_unavailable",
+                    "storage_corrupted",
+                    "other"
+                  ],
+                  "description": "Tipo de fallo (sin el mensaje del driver, que puede incluir host y usuario)."
+                },
+                "route_template": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/api_route"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Ruta afectada. Nulo cuando ocurre fuera de una petición (script)."
+                },
+                "occurrence_count": {
+                  "$ref": "#/definitions/positive_count",
+                  "description": "Fallos agrupados en la ventana."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "6744b570-6ed3-5bd8-a9cc-e36607e81c54",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": null,
+          "event_type": "database_connection_failed",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "database": "inventory_sql",
+            "engine": "postgresql",
+            "failure_kind": "connection_timeout",
+            "route_template": "/inventory/orders/outbound",
+            "occurrence_count": 1
+          }
+        }
+      ]
+    },
+    "database_query_slow": {
+      "title": "database_query_slow",
+      "description": "Una consulta SQL del inventario ha tardado más de 250 ms.",
+      "x-classification": "identified_opportunity",
+      "x-category": "backend_performance",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "lote cada 5 min",
+      "x-priority": "medium",
+      "x-retention": "R4",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "database_query_slow"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "statement_kind",
+                "tables",
+                "duration_ms",
+                "engine",
+                "route_template"
+              ],
+              "properties": {
+                "statement_kind": {
+                  "type": "string",
+                  "enum": [
+                    "select",
+                    "insert",
+                    "update",
+                    "delete",
+                    "other"
+                  ],
+                  "description": "Tipo de sentencia (primera palabra). Nunca el SQL ni los parámetros."
+                },
+                "tables": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 3,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "skus",
+                      "stock_entries",
+                      "stock_exits"
+                    ]
+                  },
+                  "description": "Tablas del inventario implicadas (de los metadatos de SQLAlchemy)."
+                },
+                "duration_ms": {
+                  "$ref": "#/definitions/duration_ms",
+                  "description": "Duración de la consulta."
+                },
+                "engine": {
+                  "type": "string",
+                  "enum": [
+                    "sqlite",
+                    "postgresql"
+                  ],
+                  "description": "Motor."
+                },
+                "route_template": {
+                  "$ref": "#/definitions/api_route",
+                  "description": "Plantilla de la ruta de la petición."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "23c51d4e-fe1e-5a90-b971-336f70f82608",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "database_query_slow",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "statement_kind": "select",
+            "tables": [
+              "stock_entries"
+            ],
+            "duration_ms": 312.4,
+            "engine": "postgresql",
+            "route_template": "/inventory/orders/outbound"
+          }
+        }
+      ]
+    },
+    "stock_exit_lock_contended": {
+      "title": "stock_exit_lock_contended",
+      "description": "Una salida ha esperado más de 50 ms para entrar en `_exit_lock`, el candado que serializa todas las salidas.",
+      "x-classification": "identified_opportunity",
+      "x-category": "backend_performance",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "lote cada 5 min",
+      "x-priority": "low",
+      "x-retention": "R4",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "stock_exit_lock_contended"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "wait_ms",
+                "threshold_ms",
+                "warehouse"
+              ],
+              "properties": {
+                "wait_ms": {
+                  "$ref": "#/definitions/duration_ms",
+                  "description": "Tiempo de espera del candado."
+                },
+                "threshold_ms": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 60000,
+                  "description": "Umbral aplicado."
+                },
+                "warehouse": {
+                  "$ref": "#/definitions/warehouse",
+                  "description": "Almacén de la salida que esperaba."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "ff2658e7-5f66-5b63-9aa1-f1798c0d353b",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "stock_exit_lock_contended",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "wait_ms": 84.2,
+            "threshold_ms": 50,
+            "warehouse": "los_angeles"
+          }
+        }
+      ]
+    },
+    "cache_stats_recorded": {
+      "title": "cache_stats_recorded",
+      "description": "Resumen de 5 minutos de una caché en memoria de la API.",
+      "x-classification": "identified_opportunity",
+      "x-category": "backend_performance",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "lote cada 5 min",
+      "x-priority": "low",
+      "x-retention": "R4",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "cache_stats_recorded"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "type": "null"
+            },
+            "userId": {
+              "type": "null"
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cache_name",
+                "window_seconds",
+                "hits",
+                "misses",
+                "invalidations",
+                "entries"
+              ],
+              "properties": {
+                "cache_name": {
+                  "type": "string",
+                  "enum": [
+                    "inventory.products",
+                    "incidents.summary"
+                  ],
+                  "description": "Caché (nombre registrado en `register`)."
+                },
+                "window_seconds": {
+                  "$ref": "#/definitions/window_seconds",
+                  "description": "Duración de la ventana."
+                },
+                "hits": {
+                  "$ref": "#/definitions/non_negative_count",
+                  "description": "Aciertos en la ventana."
+                },
+                "misses": {
+                  "$ref": "#/definitions/non_negative_count",
+                  "description": "Fallos en la ventana."
+                },
+                "invalidations": {
+                  "$ref": "#/definitions/non_negative_count",
+                  "description": "Invalidaciones en la ventana."
+                },
+                "entries": {
+                  "$ref": "#/definitions/non_negative_count",
+                  "description": "Entradas guardadas al cerrar la ventana."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "e96443f7-13a0-5682-abfe-681d301f0526",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": null,
+          "userId": null,
+          "event_type": "cache_stats_recorded",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "cache_name": "inventory.products",
+            "window_seconds": 300,
+            "hits": 180,
+            "misses": 22,
+            "invalidations": 9,
+            "entries": 2
+          }
+        }
+      ]
+    },
+    "authorization_denied": {
+      "title": "authorization_denied",
+      "description": "Un usuario autenticado (o un registro) ha recibido 403 al intentar una acción sin permiso.",
+      "x-classification": "identified_opportunity",
+      "x-category": "integrity_security",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 60 s",
+      "x-priority": "high",
+      "x-retention": "R2",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "authorization_denied"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "resource",
+                "action",
+                "reason",
+                "actor_role"
+              ],
+              "properties": {
+                "resource": {
+                  "type": "string",
+                  "enum": [
+                    "user_account",
+                    "user_list",
+                    "registration"
+                  ],
+                  "description": "Recurso protegido."
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "list",
+                    "read",
+                    "update",
+                    "update_role_or_status",
+                    "update_email",
+                    "delete",
+                    "register"
+                  ],
+                  "description": "Acción denegada."
+                },
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "insufficient_role",
+                    "not_resource_owner",
+                    "invalid_invitation_code"
+                  ],
+                  "description": "Motivo."
+                },
+                "actor_role": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/user_role"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Rol de quien lo intenta. Nulo cuando registro anónimo."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "64be0add-00c1-5ac5-a944-01ac174ebc70",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "authorization_denied",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "resource": "user_account",
+            "action": "update_role_or_status",
+            "reason": "insufficient_role",
+            "actor_role": "user"
+          }
+        }
+      ]
+    },
+    "user_permissions_changed": {
+      "title": "user_permissions_changed",
+      "description": "Han cambiado el rol o el estado (activo/desactivado) de un usuario.",
+      "x-classification": "identified_opportunity",
+      "x-category": "integrity_security",
+      "x-sources": [
+        "backend",
+        "internal_process"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 60 s",
+      "x-priority": "high",
+      "x-retention": "R2",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "user_permissions_changed"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend",
+                "internal_process"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/user_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "target_user_ref",
+                "changed_fields",
+                "new_role",
+                "new_is_active",
+                "change_channel"
+              ],
+              "properties": {
+                "target_user_ref": {
+                  "$ref": "#/definitions/user_ref",
+                  "description": "Seudónimo del usuario modificado."
+                },
+                "changed_fields": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 2,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "role",
+                      "is_active"
+                    ]
+                  },
+                  "description": "Campos cambiados (el email no se registra)."
+                },
+                "new_role": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/user_role"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Rol nuevo. Nulo cuando no cambia el rol."
+                },
+                "new_is_active": {
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Estado nuevo. Nulo cuando no cambia el estado."
+                },
+                "change_channel": {
+                  "type": "string",
+                  "enum": [
+                    "api",
+                    "admin_script"
+                  ],
+                  "description": "Vía del cambio."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "de49a61d-4593-5c8b-9546-db85f5326c48",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "user_permissions_changed",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "target_user_ref": "usr_7d1e3c5a9b2f4e6d8c0a1b3e5f7d9c2a",
+            "changed_fields": [
+              "role"
+            ],
+            "new_role": "admin",
+            "new_is_active": null,
+            "change_channel": "api"
+          }
+        }
+      ]
+    },
+    "inventory_integrity_violation_detected": {
+      "title": "inventory_integrity_violation_detected",
+      "description": "La revisión de integridad del inventario ha encontrado datos que rompen una regla de negocio.",
+      "x-classification": "identified_opportunity",
+      "x-category": "integrity_security",
+      "x-sources": [
+        "internal_process"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 60 s desde el fin de la revisión",
+      "x-priority": "high",
+      "x-retention": "R2",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "inventory_integrity_violation_detected"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "internal_process"
+              ]
+            },
+            "sessionId": {
+              "type": "null"
+            },
+            "userId": {
+              "type": "null"
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "check",
+                "warehouse",
+                "client_id",
+                "product_id",
+                "product_category",
+                "affected_records"
+              ],
+              "properties": {
+                "check": {
+                  "type": "string",
+                  "enum": [
+                    "negative_stock",
+                    "orphan_user_reference",
+                    "invalid_warehouse_value",
+                    "tracking_rule_violation",
+                    "invalid_category_value"
+                  ],
+                  "description": "Comprobación que falla: stock < 0 (regla 2); `user_uuid` que no existe en TinyDB (regla 4, sin clave foránea); `warehouse` o `category` fuera de los valores; `tracking_number` incoherente con `exit_type` (regla 3)."
+                },
+                "warehouse": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/warehouse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Almacén del movimiento (`StockEntry/StockExit.warehouse`), con el valor interno traducido. Nulo cuando el valor de almacén guardado no es válido."
+                },
+                "client_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/client_id"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Cliente dueño del SKU, derivado de `SKU.client_name` (§8.4). Nulo cuando la comprobación no afecta a un SKU concreto."
+                },
+                "product_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/product_id"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Código del SKU (`SKU.sku`). Nulo cuando la comprobación no afecta a un SKU concreto."
+                },
+                "product_category": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/product_category"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Categoría del SKU (`SKU.category`). Nulo cuando la comprobación no afecta a un SKU concreto o su categoría no es válida."
+                },
+                "affected_records": {
+                  "$ref": "#/definitions/positive_count",
+                  "description": "Registros afectados."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "4eeec90e-698c-5877-94aa-e49c6a5d573e",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": null,
+          "userId": null,
+          "event_type": "inventory_integrity_violation_detected",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "internal_process",
+          "environment": "production",
+          "properties": {
+            "check": "negative_stock",
+            "warehouse": "los_angeles",
+            "client_id": "purestep-footwear",
+            "product_id": "CLT-SNK-W-42",
+            "product_category": "fashion",
+            "affected_records": 1
+          }
+        }
+      ]
+    },
+    "internal_job_finished": {
+      "title": "internal_job_finished",
+      "description": "Ha terminado un script o tarea programada.",
+      "x-classification": "identified_opportunity",
+      "x-category": "internal_processes",
+      "x-sources": [
+        "internal_process"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 60 s",
+      "x-priority": "high",
+      "x-retention": "R4",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "internal_job_finished"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "internal_process"
+              ]
+            },
+            "sessionId": {
+              "type": "null"
+            },
+            "userId": {
+              "type": "null"
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "job_name",
+                "outcome",
+                "duration_ms",
+                "records_processed",
+                "records_written",
+                "error_type"
+              ],
+              "properties": {
+                "job_name": {
+                  "type": "string",
+                  "enum": [
+                    "seed_inventory",
+                    "seed_suppliers",
+                    "seed_incidents",
+                    "stock_snapshot",
+                    "integrity_check",
+                    "duplicate_detection",
+                    "telemetry_retention_purge"
+                  ],
+                  "description": "Tarea."
+                },
+                "outcome": {
+                  "type": "string",
+                  "enum": [
+                    "success",
+                    "partial",
+                    "failed"
+                  ],
+                  "description": "Resultado."
+                },
+                "duration_ms": {
+                  "$ref": "#/definitions/duration_ms",
+                  "description": "Duración."
+                },
+                "records_processed": {
+                  "$ref": "#/definitions/non_negative_count",
+                  "description": "Registros leídos o procesados."
+                },
+                "records_written": {
+                  "$ref": "#/definitions/non_negative_count",
+                  "description": "Registros creados o eventos emitidos."
+                },
+                "error_type": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/error_name"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Clase del error. Nulo cuando `outcome = success`."
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "outcome": {
+                        "const": "success"
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "error_type": {
+                        "type": "null"
+                      }
+                    }
+                  },
+                  "else": {
+                    "properties": {
+                      "error_type": {
+                        "$ref": "#/definitions/error_name"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "49ef446b-372f-5a05-a14f-21e2cfee3196",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": null,
+          "userId": null,
+          "event_type": "internal_job_finished",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "internal_process",
+          "environment": "production",
+          "properties": {
+            "job_name": "integrity_check",
+            "outcome": "success",
+            "duration_ms": 1532.0,
+            "records_processed": 1240,
+            "records_written": 0,
+            "error_type": null
+          }
+        }
+      ]
+    },
+    "email_delivery_attempted": {
+      "title": "email_delivery_attempted",
+      "description": "La API ha intentado enviar un email transaccional (hoy, el de recuperación de contraseña por Resend).",
+      "x-classification": "identified_opportunity",
+      "x-category": "internal_processes",
+      "x-sources": [
+        "backend"
+      ],
+      "x-delivery": "batch",
+      "x-latencyTarget": "lote cada 5 min",
+      "x-priority": "medium",
+      "x-retention": "R4",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "email_delivery_attempted"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend"
+              ]
+            },
+            "sessionId": {
+              "type": "null"
+            },
+            "userId": {
+              "$ref": "#/definitions/user_ref"
+            },
+            "requestId": {
+              "$ref": "#/definitions/uuid"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "email_kind",
+                "outcome",
+                "provider_status_code",
+                "duration_ms"
+              ],
+              "properties": {
+                "email_kind": {
+                  "type": "string",
+                  "enum": [
+                    "password_reset"
+                  ],
+                  "description": "Propósito del email."
+                },
+                "outcome": {
+                  "type": "string",
+                  "enum": [
+                    "sent",
+                    "provider_rejected",
+                    "provider_unreachable",
+                    "disabled",
+                    "unexpected_error"
+                  ],
+                  "description": "Resultado (`disabled` = sin `RESEND_API_KEY`)."
+                },
+                "provider_status_code": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/http_status"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Estado HTTP de Resend. Nulo cuando no hubo respuesta del proveedor."
+                },
+                "duration_ms": {
+                  "$ref": "#/definitions/duration_ms",
+                  "description": "Duración del envío."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "e40fa486-e3c1-58e3-a8af-d5833ab96928",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": null,
+          "userId": "usr_4b0c6f2e9d1a7c3b5e8f0a2d4c6b8e1f",
+          "event_type": "email_delivery_attempted",
+          "schemaVersion": "1.0.0",
+          "requestId": "c4a8e2f6-1b3d-4e5f-9a7c-2d4f6b8e0a1c",
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "email_kind": "password_reset",
+            "outcome": "sent",
+            "provider_status_code": 200,
+            "duration_ms": 412.9
+          }
+        }
+      ]
+    },
+    "telemetry_events_dropped": {
+      "title": "telemetry_events_dropped",
+      "description": "El sistema de telemetría ha descartado eventos (esquema no válido, buffer lleno, límite de frecuencia o envío fallido).",
+      "x-classification": "identified_opportunity",
+      "x-category": "internal_processes",
+      "x-sources": [
+        "backend",
+        "frontend",
+        "internal_process"
+      ],
+      "x-delivery": "stream",
+      "x-latencyTarget": "≤ 60 s",
+      "x-priority": "high",
+      "x-retention": "R4",
+      "allOf": [
+        {
+          "$ref": "#/definitions/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "telemetry_events_dropped"
+            },
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "source": {
+              "enum": [
+                "backend",
+                "frontend",
+                "internal_process"
+              ]
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "type": "null"
+            },
+            "requestId": {
+              "type": "null"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "component",
+                "drop_reason",
+                "affected_event_type",
+                "dropped_count",
+                "window_seconds"
+              ],
+              "properties": {
+                "component": {
+                  "type": "string",
+                  "enum": [
+                    "backend_emitter",
+                    "frontend_emitter",
+                    "collector",
+                    "job_emitter"
+                  ],
+                  "description": "Dónde se descartan."
+                },
+                "drop_reason": {
+                  "type": "string",
+                  "enum": [
+                    "schema_validation_failed",
+                    "buffer_overflow",
+                    "rate_limited",
+                    "delivery_failed",
+                    "unknown_event_type",
+                    "unsupported_schema_version"
+                  ],
+                  "description": "Motivo."
+                },
+                "affected_event_type": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/event_type_name"
+                    },
+                    {
+                      "const": "unknown"
+                    }
+                  ],
+                  "description": "Evento descartado (`unknown` si no se pudo leer)."
+                },
+                "dropped_count": {
+                  "$ref": "#/definitions/positive_count",
+                  "description": "Eventos descartados en la ventana."
+                },
+                "window_seconds": {
+                  "$ref": "#/definitions/window_seconds",
+                  "description": "Duración de la ventana."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "eventId": "9fdb938d-943f-5230-875b-38341e9069eb",
+          "timestamp": "2026-11-10T09:15:42.318Z",
+          "sessionId": "0b7e9c2a-5d4f-4a1b-8c3e-6f9d2a7b1c4e",
+          "userId": null,
+          "event_type": "telemetry_events_dropped",
+          "schemaVersion": "1.0.0",
+          "requestId": null,
+          "source": "backend",
+          "environment": "production",
+          "properties": {
+            "component": "backend_emitter",
+            "drop_reason": "schema_validation_failed",
+            "affected_event_type": "inbound_order_created",
+            "dropped_count": 3,
+            "window_seconds": 300
+          }
+        }
+      ]
+    }
+  }
+}

@@ -8,6 +8,7 @@
  * validaciones de los formularios (las mismas reglas que la API, que es quien decide) y los mensajes de error.
  */
 import { ApiError, apiErrorMessage, http, type ApiOptions } from "@/lib/http";
+import { reportRequestFailure } from "@/lib/telemetryCapture";
 import type {
   ExitType,
   Movement,
@@ -95,13 +96,21 @@ export function isMovement(value: unknown): value is Movement {
   return false;
 }
 
-function expectItem<T>(value: unknown, guard: Guard<T>): T {
-  if (!guard(value)) throw new ApiError(UNEXPECTED_RESPONSE_MESSAGE, 200);
+/** Petición de la que viene una respuesta (para la telemetría de `unexpected_response_shape`). */
+type Origin = [method: string, path: string];
+
+function unexpected(origin: Origin): ApiError {
+  reportRequestFailure("unexpected_response_shape", origin[1], origin[0]);
+  return new ApiError(UNEXPECTED_RESPONSE_MESSAGE, 200);
+}
+
+function expectItem<T>(value: unknown, guard: Guard<T>, origin: Origin): T {
+  if (!guard(value)) throw unexpected(origin);
   return value;
 }
 
-function expectList<T>(value: unknown, guard: Guard<T>): T[] {
-  if (!Array.isArray(value) || !value.every(guard)) throw new ApiError(UNEXPECTED_RESPONSE_MESSAGE, 200);
+function expectList<T>(value: unknown, guard: Guard<T>, origin: Origin): T[] {
+  if (!Array.isArray(value) || !value.every(guard)) throw unexpected(origin);
   return value;
 }
 
@@ -110,22 +119,29 @@ function expectList<T>(value: unknown, guard: Guard<T>): T[] {
 export const inventoryApi = {
   /** `GET /inventory/products`: todos los SKUs con `current_stock` y `stock_by_warehouse`, ordenados por `id`. */
   async listProducts(signal?: AbortSignal): Promise<Product[]> {
-    return expectList(await http.get<unknown>("/inventory/products", signal, OPTIONS), isProduct);
+    const path = "/inventory/products";
+    return expectList(await http.get<unknown>(path, signal, OPTIONS), isProduct, ["GET", path]);
   },
 
   /** `GET /inventory/products/{id}`: un SKU con su stock actual (404 si no existe). */
   async getProduct(id: number, signal?: AbortSignal): Promise<Product> {
-    return expectItem(await http.get<unknown>(`/inventory/products/${id}`, signal, OPTIONS), isProduct);
+    const path = `/inventory/products/${id}`;
+    return expectItem(await http.get<unknown>(path, signal, OPTIONS), isProduct, ["GET", path]);
   },
 
-  /** `POST /inventory/orders/inbound`: recepción de mercancía. El `user_uuid` lo pone la API a partir del token. */
-  async createInbound(payload: StockEntryPayload): Promise<StockEntry> {
-    return expectItem(await http.post<unknown>("/inventory/orders/inbound", payload, OPTIONS), isStockEntry);
+  /**
+   * `POST /inventory/orders/inbound`: recepción de mercancía. El `user_uuid` lo pone la API a partir del token.
+   * `requestId`: el `X-Request-Id` reservado por el formulario (telemetría).
+   */
+  async createInbound(payload: StockEntryPayload, requestId?: string): Promise<StockEntry> {
+    const path = "/inventory/orders/inbound";
+    return expectItem(await http.post<unknown>(path, payload, { ...OPTIONS, requestId }), isStockEntry, ["POST", path]);
   },
 
   /** `POST /inventory/orders/outbound`: despacho o pérdida. 400 si deja el stock del almacén por debajo de cero. */
-  async createOutbound(payload: StockExitPayload): Promise<StockExit> {
-    return expectItem(await http.post<unknown>("/inventory/orders/outbound", payload, OPTIONS), isStockExit);
+  async createOutbound(payload: StockExitPayload, requestId?: string): Promise<StockExit> {
+    const path = "/inventory/orders/outbound";
+    return expectItem(await http.post<unknown>(path, payload, { ...OPTIONS, requestId }), isStockExit, ["POST", path]);
   },
 
   /** `GET /inventory/orders`: entradas y salidas con los datos de su SKU, de la más reciente a la más antigua. */
@@ -134,7 +150,8 @@ export const inventoryApi = {
     if (filters.warehouse) params.set("warehouse", filters.warehouse);
     if (filters.sku_id) params.set("sku_id", filters.sku_id);
     const query = params.toString();
-    return expectList(await http.get<unknown>(`/inventory/orders${query ? `?${query}` : ""}`, signal, OPTIONS), isMovement);
+    const path = `/inventory/orders${query ? `?${query}` : ""}`;
+    return expectList(await http.get<unknown>(path, signal, OPTIONS), isMovement, ["GET", path]);
   },
 };
 

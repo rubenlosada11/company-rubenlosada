@@ -17,6 +17,7 @@ import {
   REFERENCE_MAX_LENGTH,
   validateInboundDraft,
 } from "@/lib/inventory";
+import { useFormTelemetry } from "@/lib/useFormTelemetry";
 import type { Product, StockEntry } from "@/types/inventory";
 import {
   FieldError,
@@ -43,6 +44,7 @@ interface Created {
 /** Registro de una recepción de mercancía (`POST /inventory/orders/inbound`). */
 export function InboundForm({ initialSkuId }: { initialSkuId: number | null }) {
   const products = useProducts();
+  const telemetry = useFormTelemetry("inventory_inbound", "inventory_inbound");
   const [draft, setDraft] = useState<InboundDraft>({
     ...EMPTY_INBOUND_DRAFT,
     skuId: initialSkuId ? String(initialSkuId) : "",
@@ -78,6 +80,7 @@ export function InboundForm({ initialSkuId }: { initialSkuId: number | null }) {
   function update<K extends keyof InboundDraft>(key: K, value: InboundDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
     const field: InboundField = key === "skuId" ? "sku_id" : (key as InboundField);
+    telemetry.fieldChanged(field);
     setErrors((current) => {
       if (!current[field]) return current;
       const rest = { ...current };
@@ -100,6 +103,7 @@ export function InboundForm({ initialSkuId }: { initialSkuId: number | null }) {
     setCreated(null);
     const { payload, errors: clientErrors } = validateInboundDraft(linkedMissing ? { ...draft, skuId: "" } : draft);
     if (!payload) {
+      telemetry.validationFailed(INBOUND_FIELDS.filter((field) => clientErrors[field]));
       showErrors(clientErrors, "Revisa los campos marcados antes de registrar la entrada.");
       return;
     }
@@ -108,14 +112,17 @@ export function InboundForm({ initialSkuId }: { initialSkuId: number | null }) {
     setFormMessage(null);
     submittingRef.current = true;
     setSubmitting(true);
+    telemetry.submitStarted();
     try {
-      const entry = await inventoryApi.createInbound(payload);
+      const entry = await inventoryApi.createInbound(payload, telemetry.reserveRequestId());
+      telemetry.submitted(null, 201);
       // Stock actualizado para la confirmación. Si esta consulta falla, la entrada ya está registrada igualmente.
       const after = await inventoryApi.getProduct(entry.sku_id).catch(() => null);
       setCreated({ entry, product: after ?? selected, stockAfter: after?.current_stock ?? null });
       setDraft(EMPTY_INBOUND_DRAFT);
       setFocusRequest({ target: "success" });
     } catch (error) {
+      telemetry.submitted(error);
       const fieldErrors: Partial<Record<InboundField, string>> = {};
       for (const [field, message] of Object.entries(inventoryFieldErrors(error))) {
         if (isFormField(field)) fieldErrors[field] = message;

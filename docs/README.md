@@ -19,6 +19,12 @@ This folder holds **cross-cutting documentation** for the monorepo: architecture
   endpoints, backoffice pages, error handling, tests and limitations (in Spanish).
 - [`inventario.md`](./inventario.md) — Milestone 5, inventory backend: `/inventory` API with SQLModel, mapping to the
   briefing's file structure, per-warehouse stock rules, seed data, Supabase and limitations (in Spanish).
+- [`telemetry/telemetry-plan.md`](./telemetry/telemetry-plan.md) and
+  [`telemetry/event-schemas.json`](./telemetry/event-schemas.json) — telemetry plan (design, in Spanish): 43 events,
+  envelope, allowlists, privacy and retention (validatable JSON Schema).
+- [`telemetry/telemetry-capture.md`](./telemetry/telemetry-capture.md) — telemetry capture (in Spanish): backoffice
+  `TelemetryService` (`track()`, batching, retries, `sendBeacon`), temporary receiver `POST /telemetry/events`,
+  instrumented events, variables, tests and limitations.
 - [`docker.md`](./docker.md) — Docker setup of the monorepo (in Spanish): `interfaces` (website + backoffice) and
   `backend` (API) containers, development Compose with hot reload, production Compose, environment variables and
   deployment to the VPS without public access.
