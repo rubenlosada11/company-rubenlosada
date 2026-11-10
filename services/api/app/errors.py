@@ -104,7 +104,17 @@ async def unexpected_error(request: Request, error: Exception) -> JSONResponse:
     return internal_error_response()
 
 
-async def validation_error(_: Request, error: RequestValidationError) -> JSONResponse:
+# Rutas de login: su 422 es un `login_failed` (`invalid_payload`) para la telemetría.
+LOGIN_ROUTES = {"/auth/login": "password_json", "/auth/token": "oauth2_form"}
+
+
+async def validation_error(request: Request, error: RequestValidationError) -> JSONResponse:
     """422 con `type`, `loc` y `msg` de cada error, sin el valor recibido (`input`) ni su contexto (`ctx`)."""
+    auth_method = LOGIN_ROUTES.get(request.url.path) if request.method == "POST" else None
+    if auth_method:
+        # Import diferido: `errors` se importa antes que la telemetría (que depende de la base de usuarios).
+        from app.telemetry.emitter import emit_login_failed
+
+        emit_login_failed(reason="invalid_payload", auth_method=auth_method, email=None)
     detail = [{key: item[key] for key in VALIDATION_KEYS if key in item} for item in error.errors()]
     return JSONResponse({"detail": jsonable_encoder(detail)}, status_code=422, media_type=JSON_UTF8)

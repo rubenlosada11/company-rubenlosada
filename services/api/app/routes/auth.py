@@ -37,6 +37,7 @@ from app.services import users as users_service
 from app.services.email import EmailSender, deliver, get_email_sender
 from app.services.profiles import get_or_create_profile
 from app.services.users import get_user_by_email
+from app.telemetry import emitter as telemetry
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -58,16 +59,22 @@ LOGIN_RESPONSES = {
 }
 
 
-def authenticate(email: str, password: str) -> User:
+def authenticate(email: str, password: str, auth_method: str = "password_json") -> User:
+    """Comprueba las credenciales. Telemetría: `login_succeeded` / `login_failed` (`auth_method`: `password_json` =
+    `/auth/login`, `oauth2_form` = `/auth/token`), sin el email (solo su seudónimo) ni la contraseña."""
     user = get_user_by_email(email)
     if user is None:
         burn_password_check(password)
-        raise unauthorized(BAD_CREDENTIALS)
-    if not verify_password(password, user.hashed_password):
+    if user is None or not verify_password(password, user.hashed_password):
+        telemetry.emit_login_failed(reason="invalid_credentials", auth_method=auth_method, email=email)
         raise unauthorized(BAD_CREDENTIALS)
     # Solo se informa de la desactivación a quien ya ha demostrado conocer la contraseña.
     if not user.is_active:
+        telemetry.emit_login_failed(
+            reason="account_inactive", auth_method=auth_method, email=email, inactive_user_id=user.id
+        )
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail=INACTIVE_ACCOUNT)
+    telemetry.emit_login_succeeded(user_id=user.id, role=user.role.value, auth_method=auth_method)
     return user
 
 
@@ -85,7 +92,7 @@ def login(payload: LoginRequest) -> Token:
 @router.post("/token", response_model=Token, responses=LOGIN_RESPONSES)
 def login_form(form: Annotated[OAuth2PasswordRequestForm, Depends()]) -> Token:
     """Mismo login en formato de formulario OAuth2 (`username` = email). Lo usa el botón «Authorize» de `/docs`."""
-    return issue_token(authenticate(normalize_email(form.username), form.password))
+    return issue_token(authenticate(normalize_email(form.username), form.password, "oauth2_form"))
 
 
 @router.get("/me", response_model=UserWithProfile)
