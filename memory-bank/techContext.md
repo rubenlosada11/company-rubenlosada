@@ -491,6 +491,20 @@ Práctica sin hito, rama `feature/caching-optimisation` (2026-11-03). Informe y 
 | Benchmarks con `next build --webpack`, Edge + `playwright-core` fuera del repo y prefetch del router bloqueado | Turbopack no compila aquí (Google Fonts); el prefetch del sidebar mezcla el JS de otras rutas |
 | Commits `Optimización con caché — …` escalonados, sin `docs/hitos.md` ni `Co-authored-by` | Práctica sin hito; el prompt prohíbe firmas de IA |
 
+## Decisiones técnicas del plan de telemetría (diseño, sin implementar)
+
+Práctica sin hito, rama `docs/telemetry-design` (2026-11-10). Especificación en `docs/telemetry/telemetry-plan.md` y
+`docs/telemetry/event-schemas.json` (JSON Schema Draft-07). Quien implemente debe seguir estas decisiones:
+
+| Decisión | Motivo |
+| --- | --- |
+| Envelope con `eventId`, `timestamp`, `sessionId`, `userId`, `event_type`, `schemaVersion`, `requestId`, `source`, `environment`, `properties`; allowlist cerrada sin propiedades opcionales (lo que no aplica, `null`) | Forma fija y validable; separar datos del seed y de desarrollo |
+| `userId` = `usr_` + HMAC-SHA256(`TELEMETRY_PSEUDONYM_KEY`, `"user:" + User.id`)[:32]; el navegador nunca lo envía (lo pone el colector desde el token) | Seudonimizar sin perder el recuento por usuario; nadie puede atribuir eventos a otro |
+| `sessionId` lo crea el backoffice al hacer login (`X-Session-Id`, en `localStorage`); `requestId` lo crea la API (`X-Request-Id`) | La API es JWT sin estado; correlación frontend ↔ API ↔ logs. Requiere tocar CORS |
+| `eventId` UUID v5 determinista en los eventos que nacen de una fila (órdenes, altas, fotos de stock) | Reconstruir eventos perdidos desde `stock_entries`/`stock_exits` sin duplicar |
+| Eventos de negocio emitidos en los servicios tras el `commit`, con `source = internal_process` desde los seeds | Un solo punto para API y scripts |
+| Validar en Python exige `jsonschema` (dependencia nueva, por aprobar) o modelos Pydantic equivalentes | No añadir dependencias sin aprobación |
+
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 
 - `CONTEXT.es.md` y `CONTEXT-trackflow.es.md` (fuente de verdad del negocio).
