@@ -15,9 +15,9 @@
   (`services/api/migrations/20261110120000_telemetry_events.sql`): 10 columnas (los 10 campos del envelope), 3 índices
   (B-tree `timestamp` y `event_type`, GIN `tags`), RLS sin políticas, privilegios revocados a `anon`/`authenticated`
   y triggers que bloquean UPDATE/DELETE/TRUNCATE. Documentación:
-  [`docs/telemetry/telemetry-storage.md`](../docs/telemetry/telemetry-storage.md). **Implementado y probado**
-  (2026-11-11): API 1475 tests; migración y API probadas contra PostgreSQL 16 local. **Pendiente:** aplicar la
-  migración en Supabase (la aplica el desarrollador) y E2E con eventos reales del backoffice.
+  [`docs/telemetry/telemetry-storage.md`](../docs/telemetry/telemetry-storage.md). **Implementado y verificado**
+  (2026-11-11): API 1476 tests; migración probada con PostgreSQL 16 local y aplicada en Supabase por el
+  desarrollador; E2E real (backoffice → API → Supabase): 31 filas, técnicas y de negocio. Pendiente: PR y Notion.
 - **Telemetría de la compañía — Captura en el frontend** (práctica sin número de hito; fase 2 de la serie de
   telemetría): `TelemetryService` único en el backoffice (`uis/backoffice/lib/telemetry.ts`, función pública
   `track()`; lotes de 10 s o 20 eventos, 3 reintentos con backoff 1/2/4 s, `sendBeacon` al ocultar la página),
@@ -107,7 +107,7 @@
 | `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
 | Telemetría: captura en el frontend | ✅ Implementada y validada: API 1413 tests (144 nuevos), Jest 255 (107 nuevos), E2E 46/46; PR #27 fusionada |
-| Telemetría: almacenamiento | 🟡 Implementado y probado en `feature/telemetry-storage` (API 1475 tests, PostgreSQL local); falta aplicar la migración en Supabase y el E2E real |
+| Telemetría: almacenamiento | ✅ Implementado y verificado en `feature/telemetry-storage` (API 1476 tests, migración en Supabase, E2E con 31 eventos reales); PR pendiente |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | Autenticación (AUTH-01) | ✅ API: `User`/`Profile` en TinyDB, JWT, `/auth`, `/users`, `/profiles` y 8 rutas existentes protegidas (269 tests). Backoffice: `/login` y panel protegido (E2E 34/34). Solo local |
 | Autenticación frontend (AUTH-02) | ✅ PR #13 fusionada (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE` |
@@ -1454,6 +1454,10 @@ Prompt del curso por fases (1–11); el desarrollador pidió ejecutarlas seguida
 - **Supabase:** aplicar la migración desde la sesión fue bloqueado por el control de permisos (despliegue a
   producción); se probó con PostgreSQL 16 local (`pgserver`, fuera del repo) con los roles de Supabase simulados.
 - `services/api/.env.example` mantiene el comentario antiguo de `TELEMETRY_ENDPOINT` (tocarlo requiere confirmación).
+- **E2E (2026-11-11):** el desarrollador aplicó la migración; Chrome sobre el backoffice y la API con el `.env` real
+  (usuario de pruebas en una copia de `auth.json`): 2 entradas y 2 salidas con la misma cantidad (stock neto igual),
+  login fallido y correcto; 31 filas en Supabase. **Bug encontrado y corregido:** `rowcount` llega como -1 con psycopg
+  detrás del pooler y el log marcaba todo como duplicado; ahora se cuenta con `RETURNING id`.
 
 ## Trabajo pendiente
 
@@ -1547,8 +1551,8 @@ Prompt del curso por fases (1–11); el desarrollador pidió ejecutarlas seguida
     compartida si la API pasa a varios workers, medir con Supabase real, precarga en reposo del formulario de
     proveedores para pantallas táctiles.
 13. Plan de telemetría: PR #26 fusionada. Captura: PR #27 fusionada. Almacenamiento (`feature/telemetry-storage`):
-    aplicar `services/api/migrations/20261110120000_telemetry_events.sql` en el SQL Editor de Supabase
-    (`docs/telemetry/telemetry-storage.md` §8), verificar con eventos reales del backoffice y fusionar la PR.
+    migración aplicada en Supabase y E2E verificado (2026-11-11); revisar y fusionar la PR y añadir las capturas de
+    la tabla en Supabase.
     Recomendado: un rol de base de datos de solo inserción para la telemetría (§10). Decisiones de `docs/telemetry/telemetry-plan.md` §18.2: mínimos de stock por cliente, proceso
     de conteo físico, destino de los eventos, custodia de `TELEMETRY_PSEUDONYM_KEY` y si el alta de SKUs rechaza
     `current_stock` con 422.

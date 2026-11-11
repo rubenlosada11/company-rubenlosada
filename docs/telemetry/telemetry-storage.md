@@ -4,7 +4,7 @@
 | --- | --- |
 | Serie | Fase 3 de «Plan · Captura · Almacenamiento · Reporte» (antes: [`telemetry-plan.md`](./telemetry-plan.md) y [`telemetry-capture.md`](./telemetry-capture.md)) |
 | Rama | `feature/telemetry-storage` |
-| Estado | Implementado y probado (tests + PostgreSQL local). Pendiente: aplicar la migración en Supabase y verificación E2E con datos reales (§9) |
+| Estado | Implementado y verificado de extremo a extremo en Supabase (2026-11-11): migración aplicada, 31 eventos reales (§11) |
 | Contrato | [`event-schemas.json`](./event-schemas.json) (sin cambios) y el modelo Pydantic `TelemetryEvent` (sin cambios) |
 
 `POST /telemetry/events` deja de ser un receptor temporal: valida cada evento por separado, acepta lotes mixtos y
@@ -117,7 +117,7 @@ group by 1;
 | Envelope | Se comprueba a mano (`parse_envelope`): JSON válido, objeto, sin claves de más, `events` presente, lista y de 50 elementos como máximo. Si no, **422** con el formato del resto de la API y sin tocar la base. Más de 64 KB: **413** |
 | Validación | Cada elemento, por separado, con `TelemetryEvent.model_validate(raw)`; un `ValidationError` suma un rechazo y se sigue con el siguiente. Solo se aceptan eventos con `source = frontend` (§15 del plan); los demás se cuentan como rechazados |
 | `userId` | Lo pone el receptor desde el Bearer (seudónimo HMAC). Lo que envíe el navegador se ignora |
-| Persistencia | Los válidos, en **un único** `INSERT … VALUES (…), (…) ON CONFLICT (id) DO NOTHING`, en una transacción. Sin válidos no se ejecuta ningún INSERT |
+| Persistencia | Los válidos, en **un único** `INSERT … VALUES (…), (…) ON CONFLICT (id) DO NOTHING RETURNING id`, en una transacción. Sin válidos no se ejecuta ningún INSERT. Las filas nuevas se cuentan con `RETURNING` (con psycopg detrás del pooler de Supabase, `rowcount` llega como -1) |
 | Respuesta | **200** `{"received": n, "stored": s, "rejected": r}`, siempre con `received = stored + rejected` |
 | Fallo de la base | **503** `{"detail": "No se han podido guardar los eventos…"}`, sin cifras. El navegador reintenta con 5xx (3 veces). No se reintenta en el servidor ni se inserta evento a evento |
 
@@ -214,7 +214,7 @@ Alternativa con psql: `psql "<cadena de conexión>" -v ON_ERROR_STOP=1 -f migrat
 | Unitarias e integración (SQLite) | Casos 1–7 del enunciado, envelope, duplicados, mapeo de los 43 eventos del catálogo, allowlist, log sin PII, hilo de escritura, migración (columnas, índices, permisos) | `uv run pytest tests/test_telemetry_endpoint.py tests/test_telemetry_storage.py` |
 | Bulk insert | Se cuentan las llamadas a `insert_events` y las sentencias `INSERT INTO telemetry_events` que llegan a la base (`before_cursor_execute`): 5 válidos → 1 sentencia con 5 filas; 3+2 → 1 con 3; 0 válidos → ninguna | Mismos tests |
 | PostgreSQL real (local) | Migración aplicada dos veces sobre PostgreSQL 16 con los roles de Supabase simulados; API real contra esa base (lote mixto, reenvío, órdenes de entrada y salida, `tags` JSONB, consulta GIN) | `pgserver` en un entorno aislado fuera del repo (sin dependencias nuevas) |
-| Supabase + backoffice (E2E) | Eventos reales del backoffice en `telemetry_events` | Pendiente de aplicar la migración en Supabase (§8) |
+| Supabase + backoffice (E2E) | Eventos reales del backoffice en `telemetry_events`, lote mixto con `curl` | Chrome (playwright-core) sobre el backoffice en `next dev` y la API con el `.env` real (Supabase). Resultados en §11 |
 
 Regresión: toda la suite de la API (`uv run pytest -q`).
 
@@ -228,3 +228,59 @@ Regresión: toda la suite de la API (`uv run pytest -q`).
 - **Pérdida en un apagado brusco**: los eventos del backend pendientes en el hilo de escritura se pierden si el proceso
   muere; se reconstruyen desde las tablas de movimientos (§18.3 del plan).
 - `TELEMETRY_ENDPOINT` sigue declarada pero no se usa: los eventos se guardan directamente en `DATABASE_URL`.
+- **Eventos del navegador sin `userId`**: los lotes que el backoffice envía con `sendBeacon` (al cambiar de página o
+  cerrarla) no llevan token, así que se guardan con `user_id` nulo (diseño de la captura, `telemetry-capture.md`). Los
+  eventos de negocio, que emite la API, siempre lo llevan.
+
+## 11. Verificación de extremo a extremo (2026-11-11)
+
+Migración aplicada por el desarrollador en el SQL Editor de Supabase y comprobada con consultas de solo lectura:
+10 columnas con sus tipos (`tags` `jsonb`), 4 índices (los 3 pedidos + la clave primaria), RLS activado sin políticas,
+privilegios solo del propietario y de `service_role` (`INSERT, SELECT`) y los dos triggers.
+
+**Eventos reales.** Backoffice (`next dev`, `:3002`, sin cambios) → API (`:8000`, `.env` real con `DATABASE_URL` de
+Supabase; usuario de pruebas en una copia de `auth.json`) operado con Chrome: login fallido y correcto, navegación, dos
+órdenes de entrada y dos de salida (Zaragoza y Los Ángeles, misma cantidad para no cambiar el stock neto) y cierre de
+sesión. Los 8 lotes del navegador respondieron 200 y los 6 eventos del backend se guardaron en segundo plano.
+
+| `event_type` | `service` | Filas | Con `user_id` |
+| --- | --- | --- | --- |
+| `inbound_order_created` | backend | 2 | 2 |
+| `outbound_order_created` | backend | 2 | 2 |
+| `login_succeeded` | backend | 1 | 1 |
+| `login_failed` | backend | 1 | 0 |
+| `navigation_section_viewed` | frontend | 9 (+3 del lote mixto) | 2 |
+| `form_submitted` | frontend | 6 | 1 |
+| `form_started` | frontend | 5 | 1 |
+| `form_validation_failed` | frontend | 1 | 0 |
+| `session_ended` | frontend | 1 | 0 |
+
+Dimensiones del BRIEFING en `tags` (consulta con `@>` sobre el índice GIN):
+
+| `warehouse` | `event_type` | `client_id` | `product_id` | `product_category` | `quantity` |
+| --- | --- | --- | --- | --- | --- |
+| `zaragoza` | `inbound_order_created` | `purestep-footwear` | `CLT-SNK-W-42-Z` | `fashion` | 4 |
+| `los_angeles` | `inbound_order_created` | `soundwave-electronics` | `TEC-EAR-001` | `electronics` | 3 |
+| `zaragoza` | `outbound_order_created` | `purestep-footwear` | `CLT-SNK-W-42-Z` | `fashion` | 4 |
+| `los_angeles` | `outbound_order_created` | `soundwave-electronics` | `TEC-EAR-001` | `electronics` | 3 |
+
+**Lote mixto con `curl`** contra la API conectada a Supabase: 3 `navigation_section_viewed` válidos, un objeto sin
+envelope (`{"evento_incorrecto": true}`) y un `event_type` fuera del catálogo.
+
+```text
+POST /telemetry/events            → 200 {"received":5,"stored":3,"rejected":2}   (log: duplicates 0)
+POST /telemetry/events (reenvío)  → 200 {"received":5,"stored":3,"rejected":2}   (log: duplicates 3)
+POST /telemetry/events {"eventos": []} → 422 extra_forbidden
+```
+
+En Supabase quedan exactamente 3 filas con esos `eventId` (el reenvío no duplica). Total tras la verificación: 31 filas
+(6 del backend y 25 del frontend), ninguna con `event_type`, `timestamp` o `tags` vacíos.
+
+Comprobación en Supabase (SQL Editor):
+
+```sql
+select service, event_type, count(*) from public.telemetry_events group by 1, 2 order by 1, 2;
+select "timestamp", event_type, service, tags from public.telemetry_events order by "timestamp" desc limit 20;
+```
+
+Las capturas de la tabla en Supabase las añade el desarrollador a mano.
