@@ -242,7 +242,9 @@ Variables (`.env.example`; todas van al navegador, así que **nunca** llevan tok
 Telemetría: un único servicio (`lib/telemetry.ts`, función pública `track()`) captura navegación, errores, fallos de
 red, Web Vitals, el embudo de los formularios de login y de inventario, el filtro del historial y el fin de sesión, y
 los envía en lotes (10 s o 20 eventos) a la API. Detalle en
-[`docs/telemetry/telemetry-capture.md`](../../docs/telemetry/telemetry-capture.md).
+[`docs/telemetry/telemetry-capture.md`](../../docs/telemetry/telemetry-capture.md). La sección «Telemetría técnica» del
+panel de inicio (`/#telemetria`) muestra el reporte de `GET /telemetry/report`
+([`docs/telemetry/telemetry-report.md`](../../docs/telemetry/telemetry-report.md)).
 
 Para tener datos en el inventario, en `services\api`: `uv run seed-inventory` (necesita un usuario creado; ver
 [`docs/inventario.md`](../../docs/inventario.md)).

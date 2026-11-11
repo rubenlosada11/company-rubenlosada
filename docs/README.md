@@ -28,6 +28,9 @@ This folder holds **cross-cutting documentation** for the monorepo: architecture
 - [`telemetry/telemetry-storage.md`](./telemetry/telemetry-storage.md) — telemetry storage (in Spanish):
   `telemetry_events` table in Supabase (migration, indexes, RLS and immutability), per-event validation with partial
   batch acceptance, bulk insert and the `{received, stored, rejected}` response.
+- [`telemetry/telemetry-report.md`](./telemetry/telemetry-report.md) — technical telemetry report (in Spanish):
+  Pandas pipeline over `telemetry_events` (SQL period and event-type filters), `GET /telemetry/report` with a 60 s
+  cache, metric definitions, error classification, real Supabase verification and the backoffice section.
 - [`docker.md`](./docker.md) — Docker setup of the monorepo (in Spanish): `interfaces` (website + backoffice) and
   `backend` (API) containers, development Compose with hot reload, production Compose, environment variables and
   deployment to the VPS without public access.

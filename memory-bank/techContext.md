@@ -47,7 +47,7 @@ El `.gitignore` raíz contiene `node_modules/`, los cachés de Python (`__pycach
 - **Backend:** `services/api/` — Python ≥ 3.12 (máquina: 3.14.6), **uv** 0.12, FastAPI 0.141, Pydantic 2.13,
   TinyDB 4.9, uvicorn, `python-multipart` (subida de ficheros), `python-jose[cryptography]` 3.5 (JWT),
   `libpass[bcrypt]` 1.9.3 (módulo `passlib`, bcrypt 5.0), **SQLModel 0.0.48** (SQLAlchemy 2.1.6; inventario, Hito 5),
-  **psycopg[binary] 3.3.6** (driver de PostgreSQL/Supabase)
+  **psycopg[binary] 3.3.6** (driver de PostgreSQL/Supabase), **pandas 3.1.1** (+ numpy 2.5; reporte de telemetría)
   y el paquete local `analisis-incidencias` (editable,
   `[tool.uv.sources]`); desarrollo: pytest 9 + `httpx2` (Starlette 1.7 marca obsoleto `httpx` en `TestClient`) +
   `pytest-cov` 7.1 (cobertura; `[tool.coverage.run] source = ["app"]`).
@@ -533,6 +533,19 @@ Práctica sin hito, rama `feature/telemetry-storage` (2026-11-11). Detalle en `d
 | Un único `INSERT … VALUES … ON CONFLICT (id) DO NOTHING` por lote, en una transacción; 503 si falla, sin reintentos ni inserciones sueltas | Bulk insert atómico; reintentos idempotentes |
 | Eventos del backend guardados en un hilo aparte (`collector.run_in_background`, 1 hilo, ≤ 1000 pendientes) | La telemetría no bloquea ni rompe la operación (§15) |
 | Persistencia por `DATABASE_URL` (SQLAlchemy), sin `supabase-py`; SQLite local sin `DATABASE_URL` | Reutilizar la conexión existente; sin dependencias nuevas |
+
+## Decisiones técnicas del reporte técnico de telemetría
+
+Práctica sin hito, rama `feature/telemetry-report` (2026-11-11). Detalle en `docs/telemetry/telemetry-report.md`.
+
+| Decisión | Motivo |
+| --- | --- |
+| Pipeline en `services/api/app/telemetry/analysis.py`; periodo, caché y modelos en `report.py`; endpoint en el router existente | Sin servicio paralelo; reutiliza la conexión (`storage.telemetry_engine`) y el router `/telemetry` |
+| Cada métrica: `SELECT` de sus columnas con `timestamp >= from AND timestamp < to` (y `event_type IN`), luego Pandas (`str.get` sobre `tags`, `to_datetime(utc=True)`, `groupby` + `size/sum/agg`) | Requisito del ejercicio; los índices de la migración sirven los filtros |
+| Incidencias = lista fija de `event_type` del catálogo (`ERROR_EVENT_TYPES`), común a las dos métricas de errores | Clasificación estable y comprobable (un test la contrasta con el catálogo) |
+| `TTLCache` de `app/cache.py` (60 s) + candado por clave; clave `(DATABASE_URL, from, to)` en UTC; «ahora» redondeado al minuto siguiente | Reutilizar la caché existente; sin cálculos duplicados; las peticiones sin fechas comparten entrada |
+| `pandas` como dependencia de la API | Exigida por el ejercicio; el analizador de incidencias sigue sin pandas |
+| Vista como sección `#telemetria` del panel de inicio, sin librería de gráficos | El enum `section` del catálogo es cerrado; no cambiar el contrato por una vista opcional |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 

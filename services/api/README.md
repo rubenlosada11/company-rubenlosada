@@ -441,7 +441,7 @@ uv run seed-inventory operario@trackflow.test
   carga los datos) y la API con `--env-file .env`. Guía paso a paso, con la activación de RLS:
   [`docs/inventario.md`](../../docs/inventario.md#conectar-supabase).
 
-## Telemetría (captura y almacenamiento)
+## Telemetría (captura, almacenamiento y reporte)
 
 `POST /telemetry/events` recibe los lotes del backoffice (`{"events": [...]}`), valida **cada evento por separado**
 con `TelemetryEvent` contra el catálogo aprobado (`app/telemetry/event-schemas.json`, copia exacta de
@@ -459,6 +459,12 @@ La API emite además, tras el commit, los eventos que solo ella puede afirmar (`
   Supabase); sin ella, el SQLite local la crea solo.
 - Detalle: [`docs/telemetry/telemetry-capture.md`](../../docs/telemetry/telemetry-capture.md) (captura) y
   [`docs/telemetry/telemetry-storage.md`](../../docs/telemetry/telemetry-storage.md) (almacenamiento).
+
+`GET /telemetry/report?start_date=…&end_date=…` (autenticado) devuelve el reporte técnico: eventos por día,
+incidencias técnicas por tipo y por día, tasa de fallos de inicio de sesión y envíos fallidos por formulario. Fechas
+ISO 8601 (sin zona = UTC), periodo `[from, to)`; sin fechas, los últimos 7 días. Lo calcula
+`app/telemetry/analysis.py` (SQL + Pandas) y se guarda 60 s en caché por periodo. Detalle:
+[`docs/telemetry/telemetry-report.md`](../../docs/telemetry/telemetry-report.md).
 
 ## Tests
 
