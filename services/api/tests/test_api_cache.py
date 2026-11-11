@@ -286,7 +286,8 @@ def test_suppliers_list_is_not_cached(seeded_client):
     assert len(seeded_client.get("/suppliers").json()) == total + 1
 
 
-def test_only_the_two_measured_endpoints_have_a_cache():
+def test_only_the_two_measured_endpoints_and_the_telemetry_report_have_a_cache():
     from app.cache import all_caches
 
-    assert set(all_caches()) == {"incidents.summary", "inventory.products"}
+    # `telemetry.report`: 60 s exigidos por el reporte técnico (tests en `test_telemetry_report.py`).
+    assert set(all_caches()) == {"incidents.summary", "inventory.products", "telemetry.report"}

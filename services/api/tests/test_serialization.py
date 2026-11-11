@@ -104,8 +104,8 @@ def test_route_inventory_matches_the_registered_app():
         (method.upper(), path) for path, item in app.openapi()["paths"].items() for method in item
     }
     assert declared == published
-    # 33 de la auditoría + `POST /telemetry/events` (captura de telemetría).
-    assert len(declared) == 34
+    # 33 de la auditoría + `POST /telemetry/events` (captura de telemetría) + `GET /telemetry/report` (reporte).
+    assert len(declared) == 35
 
 
 @pytest.mark.parametrize("route", application_routes(), ids=lambda route: f"{sorted(route.methods)[0]} {route.path}")

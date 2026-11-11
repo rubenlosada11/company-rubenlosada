@@ -1,4 +1,10 @@
-"""Receptor de telemetría del backoffice (`POST /telemetry/events`): valida cada evento y guarda los válidos.
+"""Telemetría: receptor de eventos (`POST /telemetry/events`) y reporte técnico (`GET /telemetry/report`).
+
+`GET /telemetry/report` (autenticado): métricas operacionales de `telemetry_events` en el periodo pedido. El endpoint
+solo resuelve el periodo y devuelve el reporte de `app/telemetry/report.py` (caché de 60 s); las métricas las calcula
+`app/telemetry/analysis.py` con SQL + Pandas. Documentación: `docs/telemetry/telemetry-report.md`.
+
+`POST /telemetry/events` valida cada evento y guarda los válidos.
 
 Recibe lotes `{"events": [...]}` del `TelemetryService` del backoffice (misma URL, método y envelope que en la fase de
 captura) y responde `200 {"received": n, "stored": s, "rejected": r}`, con `received = stored + rejected`.
@@ -16,20 +22,25 @@ captura) y responde `200 {"received": n, "stored": s, "rejected": r}`, con `rece
 """
 
 import json
-from typing import Any
+from datetime import datetime
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 
+from app.dependencies import get_current_user
+from app.telemetry.analysis import TelemetryAnalysisError
 from app.telemetry.collector import log_batch, store_batch, user_ref_from_authorization, validate_batch
 from app.telemetry.models import MAX_BATCH_BYTES, MAX_BATCH_EVENTS, TelemetryBatch, TelemetryBatchResult
+from app.telemetry.report import PeriodError, TelemetryReport, get_report, resolve_period
 from app.telemetry.storage import TelemetryStorageError
 
 router = APIRouter(prefix="/telemetry", tags=["telemetry"])
 
 BODY_TOO_LARGE = f"El lote supera el tamaño máximo ({MAX_BATCH_BYTES // 1024} KB)."
 STORAGE_UNAVAILABLE = "No se han podido guardar los eventos de telemetría. Inténtalo de nuevo más tarde."
+REPORT_UNAVAILABLE = "No se ha podido calcular el reporte de telemetría. Inténtalo de nuevo más tarde."
 
 
 def _envelope_error(error_type: str, loc: tuple[Any, ...], msg: str) -> RequestValidationError:
@@ -95,3 +106,36 @@ async def receive_events(request: Request) -> TelemetryBatchResult:
 
     log_batch("http", len(raw_events), batch.valid, inserted, batch.rejections)
     return TelemetryBatchResult(received=len(raw_events), stored=len(batch.valid), rejected=len(batch.rejections))
+
+
+@router.get(
+    "/report",
+    response_model=TelemetryReport,
+    dependencies=[Depends(get_current_user)],
+    summary="Reporte técnico de la telemetría: volumen, incidencias, autenticación y envíos fallidos",
+    description=(
+        "Métricas operacionales de `telemetry_events` en el periodo `[from, to)` (UTC, inicio inclusivo y fin "
+        "exclusivo). Sin fechas: los últimos 7 días hasta el minuto siguiente al actual. Solo `start_date`: hasta "
+        "ahora. Solo `end_date`: los 7 días anteriores. Fechas ISO 8601; sin zona horaria se interpretan como UTC. "
+        "Máximo 366 días. El resultado se guarda 60 s en una caché en memoria por periodo."
+    ),
+    responses={
+        401: {"description": "Sin token o token no válido"},
+        422: {"description": "Fecha no válida, inicio no anterior al fin o periodo de más de 366 días"},
+        503: {"description": "No se han podido leer los eventos (no se cachea nada)"},
+    },
+)
+def telemetry_report(
+    start_date: Annotated[datetime | None, Query(description="Inicio del periodo (ISO 8601, inclusivo).")] = None,
+    end_date: Annotated[datetime | None, Query(description="Fin del periodo (ISO 8601, exclusivo).")] = None,
+) -> TelemetryReport:
+    try:
+        start, end = resolve_period(start_date, end_date)
+    except PeriodError as error:
+        raise RequestValidationError(
+            [{"type": "value_error", "loc": ("query", error.field), "msg": str(error)}]
+        ) from None
+    try:
+        return get_report(start, end)
+    except TelemetryAnalysisError:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=REPORT_UNAVAILABLE) from None

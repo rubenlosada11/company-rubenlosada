@@ -1,4 +1,4 @@
-"""Telemetría de TrackFlow: captura y almacenamiento (plan en `docs/telemetry/telemetry-plan.md`).
+"""Telemetría de TrackFlow: captura, almacenamiento y reporte (plan en `docs/telemetry/telemetry-plan.md`).
 
 - `contract`: el catálogo aprobado (`event-schemas.json`, copia exacta de `docs/telemetry/`) y su validación.
 - `models`: modelos Pydantic del envelope (`TelemetryEvent`), del lote (solo para OpenAPI) y de la respuesta.
@@ -8,6 +8,9 @@
 - `storage`: tabla `telemetry_events` (migración `migrations/20261110120000_telemetry_events.sql`) e inserción.
 - `context`: correlación por petición (`X-Request-Id`, `X-Session-Id`) y detección de ediciones directas de stock.
 - `emitter`: emisor del backend (eventos de negocio que solo conoce la API, como las órdenes de inventario).
+- `analysis`: métricas técnicas con SQL + Pandas (volumen, incidencias, login, envíos fallidos).
+- `report`: periodo, caché de 60 s y respuesta de `GET /telemetry/report`.
 
-Documentación: `docs/telemetry/telemetry-capture.md` (captura) y `docs/telemetry/telemetry-storage.md` (almacenamiento).
+Documentación: `docs/telemetry/telemetry-capture.md` (captura), `docs/telemetry/telemetry-storage.md` (almacenamiento)
+y `docs/telemetry/telemetry-report.md` (reporte).
 """
