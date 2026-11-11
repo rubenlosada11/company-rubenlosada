@@ -23,6 +23,9 @@ Esta carpeta contiene la **documentación transversal** del monorepo: guías de 
 - [`telemetry/telemetry-capture.md`](./telemetry/telemetry-capture.md) — captura de telemetría: `TelemetryService`
   del backoffice (`track()`, lotes, reintentos, `sendBeacon`), receptor temporal `POST /telemetry/events`, eventos
   instrumentados, variables, pruebas y limitaciones.
+- [`telemetry/telemetry-storage.md`](./telemetry/telemetry-storage.md) — almacenamiento de telemetría: tabla
+  `telemetry_events` en Supabase (migración, índices, RLS e inmutabilidad), validación individual con aceptación
+  parcial de lotes, bulk insert y respuesta `{received, stored, rejected}`.
 - [`docker.md`](./docker.md) — Docker del monorepo: contenedores `interfaces` (website + backoffice) y `backend`
   (API), Compose de desarrollo con hot reload y de producción, variables, despliegue en el VPS sin acceso público,
   actualización, vuelta atrás y problemas habituales.

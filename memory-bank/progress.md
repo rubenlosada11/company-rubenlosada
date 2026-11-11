@@ -6,7 +6,18 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/telemetry-capture` (desde `main` @ `1e8a842`, que incluye las PR #3–#26).
+- **Rama de trabajo:** `feature/telemetry-storage` (desde `main` @ `cbd52b1`, que incluye las PR #3–#27).
+- **Telemetría de la compañía — Almacenamiento** (práctica sin número de hito; fase 3 de la serie de telemetría):
+  `POST /telemetry/events` deja de ser temporal. Valida cada evento por separado con `TelemetryEvent` (sin cambios),
+  acepta lotes mixtos y guarda los válidos en `telemetry_events` con un único `INSERT … ON CONFLICT (id) DO NOTHING`;
+  responde `{received, stored, rejected}` (422 envelope mal formado, 503 si falla la base). Los eventos del backend se
+  guardan por el mismo camino en un hilo aparte. Migración SQL versionada
+  (`services/api/migrations/20261110120000_telemetry_events.sql`): 10 columnas (los 10 campos del envelope), 3 índices
+  (B-tree `timestamp` y `event_type`, GIN `tags`), RLS sin políticas, privilegios revocados a `anon`/`authenticated`
+  y triggers que bloquean UPDATE/DELETE/TRUNCATE. Documentación:
+  [`docs/telemetry/telemetry-storage.md`](../docs/telemetry/telemetry-storage.md). **Implementado y probado**
+  (2026-11-11): API 1475 tests; migración y API probadas contra PostgreSQL 16 local. **Pendiente:** aplicar la
+  migración en Supabase (la aplica el desarrollador) y E2E con eventos reales del backoffice.
 - **Telemetría de la compañía — Captura en el frontend** (práctica sin número de hito; fase 2 de la serie de
   telemetría): `TelemetryService` único en el backoffice (`uis/backoffice/lib/telemetry.ts`, función pública
   `track()`; lotes de 10 s o 20 eventos, 3 reintentos con backoff 1/2/4 s, `sendBeacon` al ocultar la página),
@@ -16,7 +27,7 @@
   `outbound_order_created`, `direct_stock_edit_rejected`); `stock_threshold_triggered` e
   `inventory_discrepancy_detected` siguen bloqueadas (sin mínimos por cliente ni conteo físico). Documentación:
   [`docs/telemetry/telemetry-capture.md`](../docs/telemetry/telemetry-capture.md). **Implementada y validada**
-  (2026-11-10): API 1413 tests, Jest 255, E2E en Chrome 46/46. Rama pendiente de PR.
+  (2026-11-10): API 1413 tests, Jest 255, E2E en Chrome 46/46. **PR #27 fusionada** (`cbd52b1`).
 - **Diseño del plan de telemetría** (práctica sin número de hito; contexto en
   [`CONTEXT-telemetria.es.md`](../CONTEXT-telemetria.es.md), el BRIEFING de telemetría): solo documentación, sin
   código. [`docs/telemetry/telemetry-plan.md`](../docs/telemetry/telemetry-plan.md) +
@@ -95,7 +106,8 @@
 | `.agents/skills/validate-delivery/` | ✅ Creada (`SKILL.md` + `check-route.mjs` + `check-hygiene.mjs`) |
 | `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
-| Telemetría: captura en el frontend | ✅ Implementada y validada en `feature/telemetry-capture`: API 1413 tests (144 nuevos), Jest 255 (107 nuevos), E2E 46/46; PR pendiente |
+| Telemetría: captura en el frontend | ✅ Implementada y validada: API 1413 tests (144 nuevos), Jest 255 (107 nuevos), E2E 46/46; PR #27 fusionada |
+| Telemetría: almacenamiento | 🟡 Implementado y probado en `feature/telemetry-storage` (API 1475 tests, PostgreSQL local); falta aplicar la migración en Supabase y el E2E real |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | Autenticación (AUTH-01) | ✅ API: `User`/`Profile` en TinyDB, JWT, `/auth`, `/users`, `/profiles` y 8 rutas existentes protegidas (269 tests). Backoffice: `/login` y panel protegido (E2E 34/34). Solo local |
 | Autenticación frontend (AUTH-02) | ✅ PR #13 fusionada (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE` |
@@ -1424,6 +1436,25 @@ Prompt del curso por fases (0–15); el desarrollador pidió ejecutarlas seguida
 - **Hallazgo:** CLS de 0,31 en la pantalla de login (escritorio) durante el E2E; no corregido (fuera del alcance).
 - **Capturas** del desarrollador (6) en `docs/screenshots/telemetry-capture/`, enlazadas en `telemetry-capture.md` §9.1.
 
+### 2026-11-11 — Telemetría de la compañía: almacenamiento (rama `feature/telemetry-storage`)
+
+Prompt del curso por fases (1–11); el desarrollador pidió ejecutarlas seguidas siguiendo mis recomendaciones.
+
+- **Columnas:** el enunciado pide «ocho columnas» que el BRIEFING no define. Se guardan los 10 campos del envelope
+  (los 8 de la lista mínima del enunciado + `source` → `service` y `environment`, que añadió el plan §8.1); quitar dos
+  perdería `schemaVersion` o `requestId`. `eventId` es la clave primaria y `properties` va a `tags` (JSONB, copia de
+  la allowlist).
+- **Sin cliente `supabase-py`:** la API ya llega a Supabase por `DATABASE_URL` (SQLAlchemy + psycopg); no se añade
+  ninguna dependencia. La tabla vive en un `MetaData` propio para que el `create_all` del inventario no la cree en
+  PostgreSQL sin RLS; en SQLite la crea la API.
+- **Duplicados:** `ON CONFLICT (id) DO NOTHING` (reintentos del navegador y UUID v5 deterministas); cuentan en
+  `stored` y el log los separa (`duplicates`).
+- **Backend en segundo plano:** un hilo `telemetry-writer` (máximo 1000 lotes pendientes) para no bloquear órdenes,
+  logins ni manejadores asíncronos; en los tests, `conftest.py` lo ejecuta en el momento.
+- **Supabase:** aplicar la migración desde la sesión fue bloqueado por el control de permisos (despliegue a
+  producción); se probó con PostgreSQL 16 local (`pgserver`, fuera del repo) con los roles de Supabase simulados.
+- `services/api/.env.example` mantiene el comentario antiguo de `TELEMETRY_ENDPOINT` (tocarlo requiere confirmación).
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -1515,9 +1546,9 @@ Prompt del curso por fases (0–15); el desarrollador pidió ejecutarlas seguida
     (`CACHING_REPORT.md` §10): paginación de `/inventory/orders` y `/api/incidents` (cambia el contrato), invalidación
     compartida si la API pasa a varios workers, medir con Supabase real, precarga en reposo del formulario de
     proveedores para pantallas táctiles.
-13. Plan de telemetría: PR #26 fusionada. Captura (`feature/telemetry-capture`): revisar y fusionar la PR y añadir
-    `TELEMETRY_PSEUDONYM_KEY` al `.env` de la API (sin ella se descartan los eventos que exigen `userId`). Para la
-    fase de Almacenamiento: sustituir `collector.ingest` por la escritura real y usar `TELEMETRY_ENDPOINT`.
-    Decisiones de `docs/telemetry/telemetry-plan.md` §18.2: mínimos de stock por cliente, proceso
+13. Plan de telemetría: PR #26 fusionada. Captura: PR #27 fusionada. Almacenamiento (`feature/telemetry-storage`):
+    aplicar `services/api/migrations/20261110120000_telemetry_events.sql` en el SQL Editor de Supabase
+    (`docs/telemetry/telemetry-storage.md` §8), verificar con eventos reales del backoffice y fusionar la PR.
+    Recomendado: un rol de base de datos de solo inserción para la telemetría (§10). Decisiones de `docs/telemetry/telemetry-plan.md` §18.2: mínimos de stock por cliente, proceso
     de conteo físico, destino de los eventos, custodia de `TELEMETRY_PSEUDONYM_KEY` y si el alta de SKUs rechaza
     `current_stock` con 422.

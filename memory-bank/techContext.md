@@ -516,9 +516,23 @@ Práctica sin hito, rama `feature/telemetry-capture` (2026-11-10). Detalle en `d
 | El navegador envía `userId = null`; `POST /telemetry/events` lo calcula con el Bearer (HMAC, `TELEMETRY_PSEUDONYM_KEY`) y solo para eventos con sesión; un lote nunca mezcla sesiones | Contrato §8.3: nadie puede atribuir eventos a otro |
 | Métricas obligatorias emitidas por la API (`app/telemetry/emitter.py`) tras el commit, hacia el mismo receptor; `source = internal_process` desde el seed | El contrato no admite `frontend` para ellas; solo la API sabe si la orden existe |
 | Validación contra la copia `services/api/app/telemetry/event-schemas.json` (idéntica a `docs/`, lo comprueba un test) con un validador propio de las palabras clave del catálogo | Sin `jsonschema` (dependencia por aprobar); la imagen Docker solo incluye `services/api/app` |
-| El receptor no guarda nada: `collector.ingest` registra `telemetry_batch_received` en `trackflow.telemetry` | La persistencia es la fase siguiente: solo habrá que cambiar `ingest` |
+| El receptor no guardaba nada en la captura (sustituido en la fase de almacenamiento, ver abajo) | La persistencia era la fase siguiente |
 | `X-Request-Id` (lo genera el backoffice o la API) y `X-Session-Id` en todas las peticiones; CORS los admite y expone `X-Request-Id` | Unir `form_submitted` con el evento de negocio y con los logs |
 | Cola solo en memoria (sin `localStorage` para eventos) | El enunciado prohíbe persistencia local de eventos sin aprobación |
+
+## Decisiones técnicas del almacenamiento de telemetría
+
+Práctica sin hito, rama `feature/telemetry-storage` (2026-11-11). Detalle en `docs/telemetry/telemetry-storage.md`.
+
+| Decisión | Motivo |
+| --- | --- |
+| Tabla `telemetry_events` con los 10 campos del envelope (`id` = `eventId` PK, `service` = `source`, `tags` JSONB = `properties`) | El BRIEFING no define las «8 columnas»; las 8 de la lista mínima + las 2 del plan §8.1, sin perder datos |
+| Migración SQL versionada en `services/api/migrations/` (nombre compatible con Supabase CLI), idempotente; se aplica en el SQL Editor | No había sistema de migraciones; no se introduce ninguno |
+| RLS sin políticas, `revoke all` a `anon`/`authenticated`/`service_role` (esta recupera `select, insert`) y triggers que bloquean UPDATE/DELETE/TRUNCATE | Los privilegios por defecto de Supabase daban todo; la API se conecta como propietario |
+| Validación individual con `TelemetryEvent.model_validate`; envelope comprobado a mano (422); `TelemetryBatch` solo documenta OpenAPI | Aceptación parcial de lotes sin modificar el modelo |
+| Un único `INSERT … VALUES … ON CONFLICT (id) DO NOTHING` por lote, en una transacción; 503 si falla, sin reintentos ni inserciones sueltas | Bulk insert atómico; reintentos idempotentes |
+| Eventos del backend guardados en un hilo aparte (`collector.run_in_background`, 1 hilo, ≤ 1000 pendientes) | La telemetría no bloquea ni rompe la operación (§15) |
+| Persistencia por `DATABASE_URL` (SQLAlchemy), sin `supabase-py`; SQLite local sin `DATABASE_URL` | Reutilizar la conexión existente; sin dependencias nuevas |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 
