@@ -56,6 +56,13 @@ def inventory_db_url(tmp_path, monkeypatch):
     dispose_engine()
 
 
+@pytest.fixture(autouse=True)
+def telemetry_writes_inline(monkeypatch):
+    """Los eventos de telemetría del backend se guardan en el momento, no en el hilo de escritura: así cada test
+    termina con sus eventos ya en la base temporal y ninguno escribe después de que se borre."""
+    monkeypatch.setattr("app.telemetry.collector.run_in_background", lambda job: job())
+
+
 @pytest.fixture
 def db_path(tmp_path, monkeypatch):
     """Base de datos TinyDB temporal y aislada para cada test (nunca toca `db/suppliers.json`)."""

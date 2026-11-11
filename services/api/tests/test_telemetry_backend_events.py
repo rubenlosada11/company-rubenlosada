@@ -358,14 +358,14 @@ def test_un_fallo_del_receptor_no_rompe_la_operacion(api, monkeypatch):
     assert api.put(f"/inventory/products/{sku_id}", json={"current_stock": 9}).status_code == 405
 
 
-def test_el_receptor_registra_los_eventos_del_backend(api, caplog):
+def test_el_colector_guarda_y_registra_los_eventos_del_backend(api, caplog):
     caplog.set_level(logging.INFO, logger="trackflow.telemetry")
     sku_id = create_sku(api)
     inbound(api, sku_id, 5)
     lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("telemetry_batch_received")]
     summaries = [json.loads(line.split(" ", 1)[1]) for line in lines]
-    assert {"channel": "backend", "count": 1, "event_types": ["inbound_order_created"],
-            "by_type": {"inbound_order_created": 1}} in summaries
+    assert {"channel": "backend", "received": 1, "stored": 1, "rejected": 0, "duplicates": 0,
+            "event_types": ["inbound_order_created"], "by_type": {"inbound_order_created": 1}} in summaries
 
 
 @pytest.mark.parametrize(

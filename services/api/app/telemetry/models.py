@@ -2,8 +2,8 @@
 
 Los nombres de campo de Python siguen la convención del backend (`snake_case`) y los del JSON los del contrato
 (`eventId`, `sessionId`, `userId`, `schemaVersion`, `requestId` en camelCase; `event_type` en snake_case): cada campo
-declara su alias. `model_dump(by_alias=True)` devuelve el evento tal y como lo define el contrato, listo para guardarlo
-cuando exista el almacenamiento (fase siguiente).
+declara su alias. `model_dump(by_alias=True)` devuelve el evento tal y como lo define el contrato; `storage.to_row` lo
+convierte en una fila de `telemetry_events`.
 
 Validación en dos capas:
 
@@ -60,14 +60,20 @@ class TelemetryEvent(BaseModel):
 
 
 class TelemetryBatch(BaseModel):
-    """Cuerpo de `POST /telemetry/events`."""
+    """Cuerpo de `POST /telemetry/events`, **solo para documentar** el endpoint en OpenAPI.
+
+    El receptor no lo usa para validar: valida el envelope a mano y cada evento por separado con `TelemetryEvent`, para
+    que un evento no válido no rechace el lote entero.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    events: Annotated[list[TelemetryEvent], Field(min_length=1, max_length=MAX_BATCH_EVENTS)]
+    events: Annotated[list[TelemetryEvent], Field(max_length=MAX_BATCH_EVENTS)]
 
 
-class TelemetryBatchAccepted(BaseModel):
-    """Respuesta del receptor: cuántos eventos del lote se han aceptado."""
+class TelemetryBatchResult(BaseModel):
+    """Respuesta del receptor. Siempre se cumple `received = stored + rejected`."""
 
-    received: int = Field(ge=1, description="Eventos aceptados (todos los del lote).")
+    received: int = Field(ge=0, description="Elementos recibidos en `events`.")
+    stored: int = Field(ge=0, description="Eventos válidos guardados en `telemetry_events` (o que ya estaban).")
+    rejected: int = Field(ge=0, description="Elementos que no cumplen el contrato y no se han guardado.")
