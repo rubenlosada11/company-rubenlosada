@@ -133,6 +133,15 @@ def test_timestamp_con_milisegundos_y_microsegundos():
         assert to_row(event)["timestamp"] == expected
 
 
+def test_cuenta_las_filas_nuevas_y_no_las_repetidas():
+    events = [TelemetryEvent.model_validate(example("navigation_section_viewed")) for _ in range(2)]
+    assert storage.insert_events(events) == 2
+    assert storage.insert_events(events) == 0  # ya estaban: ON CONFLICT DO NOTHING
+    extra = TelemetryEvent.model_validate(example("form_started"))
+    assert storage.insert_events([*events, extra]) == 1
+    assert len(stored_rows()) == 3
+
+
 def test_sin_eventos_no_toca_la_base(monkeypatch):
     monkeypatch.setattr("app.telemetry.storage._engine", lambda: pytest.fail("no debe abrir la base"))
     assert storage.insert_events([]) == 0

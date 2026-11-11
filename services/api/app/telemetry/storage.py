@@ -94,12 +94,19 @@ def _engine() -> Engine:
 
 
 def _insert_statement(engine: Engine, rows: list[dict[str, Any]]):
+    """`INSERT … VALUES (…), (…) ON CONFLICT (id) DO NOTHING RETURNING id`: devuelve solo los ids insertados.
+
+    Las filas nuevas se cuentan con `RETURNING` y no con `rowcount`, que no todos los drivers informan (con psycopg
+    detrás del pooler de Supabase llega como -1).
+    """
     dialect = engine.dialect.name
     if dialect == "postgresql":
-        return postgresql_insert(telemetry_events).values(rows).on_conflict_do_nothing(index_elements=["id"])
-    if dialect == "sqlite":
-        return sqlite_insert(telemetry_events).values(rows).on_conflict_do_nothing(index_elements=["id"])
-    return insert(telemetry_events).values(rows)
+        statement = postgresql_insert(telemetry_events).values(rows).on_conflict_do_nothing(index_elements=["id"])
+    elif dialect == "sqlite":
+        statement = sqlite_insert(telemetry_events).values(rows).on_conflict_do_nothing(index_elements=["id"])
+    else:
+        statement = insert(telemetry_events).values(rows)
+    return statement.returning(telemetry_events.c.id)
 
 
 def insert_events(events: Sequence[TelemetryEvent]) -> int:
@@ -114,10 +121,10 @@ def insert_events(events: Sequence[TelemetryEvent]) -> int:
     try:
         engine = _engine()
         with engine.begin() as connection:
-            result = connection.execute(_insert_statement(engine, rows))
+            inserted = len(connection.execute(_insert_statement(engine, rows)).all())
     except SQLAlchemyError as error:
         cause = getattr(error, "orig", None) or error
         sqlstate = getattr(cause, "sqlstate", None)
         detail = type(cause).__name__ + (f" (SQLSTATE {sqlstate})" if sqlstate else "")
         raise TelemetryStorageError(detail) from None
-    return max(result.rowcount, 0)
+    return inserted
