@@ -83,7 +83,7 @@ uv run --env-file .env uvicorn app.main:app --reload --port 8000
 | `DATABASE_URL` | SQLite en `services/api/db/inventory.db` | Base SQL del inventario (URL de SQLAlchemy). Para Supabase/PostgreSQL (cadena *Session pooler*, `postgresql+psycopg://…?sslmode=require`, entre comillas) ver [`docs/inventario.md`](../../docs/inventario.md#conectar-supabase) |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3002,http://127.0.0.1:3002` | Orígenes del navegador autorizados (el backoffice). Admite las cabeceras `Authorization`, `X-Request-Id` y `X-Session-Id` y expone `Content-Disposition` (descargas) y `X-Request-Id` |
 | `TELEMETRY_PSEUDONYM_KEY` | — | Clave secreta (≥ 32 caracteres) de los seudónimos de usuario de la telemetría. Sin ella, los eventos que exigen `userId` se descartan (aviso al arrancar) |
-| `TELEMETRY_ENDPOINT` | — | Colector definitivo de la telemetría (fase de Almacenamiento). Se valida al arrancar; hoy no se usa para enviar |
+| `TELEMETRY_ENDPOINT` | — | Reservada para un colector externo. Se valida al arrancar, pero no se usa: los eventos se guardan en `DATABASE_URL` |
 | `TELEMETRY_ENVIRONMENT` | `development` | `environment` de los eventos (`development`, `test` o `production`) |
 
 ## Seeder
@@ -441,15 +441,24 @@ uv run seed-inventory operario@trackflow.test
   carga los datos) y la API con `--env-file .env`. Guía paso a paso, con la activación de RLS:
   [`docs/inventario.md`](../../docs/inventario.md#conectar-supabase).
 
-## Telemetría (captura)
+## Telemetría (captura y almacenamiento)
 
-`POST /telemetry/events` es el receptor **temporal** de los lotes del backoffice: valida cada evento contra el
-catálogo aprobado (`app/telemetry/event-schemas.json`, copia exacta de `docs/telemetry/`), pone el `userId`
-seudonimizado a partir del token y registra el lote en el log (`trackflow.telemetry`), **sin guardar nada**. La API
-emite además, tras el commit, los eventos que solo ella puede afirmar (`inbound_order_created`,
+`POST /telemetry/events` recibe los lotes del backoffice (`{"events": [...]}`), valida **cada evento por separado**
+con `TelemetryEvent` contra el catálogo aprobado (`app/telemetry/event-schemas.json`, copia exacta de
+`docs/telemetry/`), pone el `userId` seudonimizado a partir del token y guarda los válidos en la tabla
+`telemetry_events` con **un único INSERT** por lote. Responde `200 {"received": n, "stored": s, "rejected": r}`; los
+eventos no válidos no cancelan el lote. 422 si el envelope está mal formado y 503 si la base falla (no se guarda nada).
+
+La API emite además, tras el commit, los eventos que solo ella puede afirmar (`inbound_order_created`,
 `outbound_order_created`, `stock_loss_recorded`, `inventory_order_rejected`, `direct_stock_edit_rejected`,
-`login_succeeded`, `login_failed`). Cada respuesta lleva `X-Request-Id`. Detalle en
-[`docs/telemetry/telemetry-capture.md`](../../docs/telemetry/telemetry-capture.md).
+`login_succeeded`, `login_failed`) y los guarda en la misma tabla desde un hilo aparte. Cada respuesta lleva
+`X-Request-Id`.
+
+- Tabla: con `DATABASE_URL` (Supabase), aplica antes la migración
+  [`migrations/20261110120000_telemetry_events.sql`](./migrations/20261110120000_telemetry_events.sql) (SQL Editor de
+  Supabase); sin ella, el SQLite local la crea solo.
+- Detalle: [`docs/telemetry/telemetry-capture.md`](../../docs/telemetry/telemetry-capture.md) (captura) y
+  [`docs/telemetry/telemetry-storage.md`](../../docs/telemetry/telemetry-storage.md) (almacenamiento).
 
 ## Tests
 

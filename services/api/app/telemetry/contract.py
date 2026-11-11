@@ -71,6 +71,18 @@ def schema_version(event_type: str) -> str | None:
     return None
 
 
+def allowed_properties(event_type: str) -> tuple[str, ...]:
+    """Claves de la allowlist de `properties` de ese `event_type` (§11), en el orden del catálogo."""
+    definition = event_definition(event_type)
+    if definition is None:
+        return ()
+    for part in definition.get("allOf", []):
+        allowlist = part.get("properties", {}).get("properties", {}).get("properties")
+        if allowlist is not None:
+            return tuple(allowlist)
+    return ()
+
+
 def _ecma_pattern(pattern: str) -> re.Pattern[str]:
     # En ECMAScript (el dialecto de JSON Schema) `$` es el final del texto; en Python también acepta un `\n` final.
     return re.compile(re.sub(r"(?<!\\)\$", r"\\Z", pattern))

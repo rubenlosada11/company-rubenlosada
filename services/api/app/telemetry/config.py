@@ -1,8 +1,9 @@
 """Configuración de la telemetría (variables de entorno, leídas en cada uso como el resto de la API).
 
-- `TELEMETRY_ENDPOINT`: URL del colector definitivo al que la API **reenviará** los eventos cuando exista el
-  almacenamiento (fase siguiente). En esta fase el receptor es un *stub* (`POST /telemetry/events`) que solo valida y
-  registra: la variable se declara y se valida para fijar el patrón, pero no se envía nada a esa URL.
+- `DATABASE_URL`: base donde se guardan los eventos (`telemetry_events`, ver `storage`), la misma del inventario:
+  Supabase/PostgreSQL con la migración aplicada, o SQLite local si no está definida.
+- `TELEMETRY_ENDPOINT`: reservada para un colector externo. Desde la fase de almacenamiento los eventos se guardan
+  directamente en `DATABASE_URL`, así que no se usa: solo se valida y se muestra al arrancar.
 - `TELEMETRY_PSEUDONYM_KEY`: clave secreta (≥ 32 bytes) de los seudónimos HMAC `userId` y `account_ref` (§8.3). Solo
   en el `.env` de la API, nunca en el repositorio ni en el navegador. Sin ella, los eventos que exigen `userId` no se
   pueden emitir y se descartan con un aviso en el log.
@@ -46,6 +47,14 @@ def get_environment() -> Environment:
     return value if value in get_args(Environment) else DEFAULT_ENVIRONMENT  # type: ignore[return-value]
 
 
+def _storage_description() -> str:
+    """Dónde se guardan los eventos, sin la cadena de conexión (lleva la contraseña)."""
+    url = os.environ.get("DATABASE_URL", "").strip()
+    if not url:
+        return "SQLite local db/inventory.db"
+    return "SQLite de DATABASE_URL" if url.startswith("sqlite") else "PostgreSQL de DATABASE_URL"
+
+
 def log_telemetry_config() -> None:
     """Resumen al arrancar, sin secretos: qué falta y qué consecuencias tiene."""
     raw_endpoint = os.environ.get("TELEMETRY_ENDPOINT", "").strip()
@@ -53,8 +62,9 @@ def log_telemetry_config() -> None:
     if raw_endpoint and endpoint is None:
         logger.warning("TELEMETRY_ENDPOINT no es una URL http(s) válida: se ignora.")
     logger.info(
-        "Telemetría en modo receptor temporal (POST /telemetry/events, sin almacenamiento). Entorno: %s. "
-        "Colector definitivo (TELEMETRY_ENDPOINT): %s.",
+        "Telemetría: POST /telemetry/events guarda los eventos en la tabla telemetry_events (%s). Entorno: %s. "
+        "TELEMETRY_ENDPOINT (no se usa): %s.",
+        _storage_description(),
         get_environment(),
         endpoint or "sin definir",
     )

@@ -1,8 +1,8 @@
 """Emisor de telemetría del backend: los eventos que solo la API puede afirmar (órdenes registradas, rechazos, login).
 
 Cada evento se construye **campo a campo** desde valores conocidos (modelos y enums, nunca la petición entera), se
-valida contra el catálogo con `TelemetryEvent` y se entrega al receptor (`collector.ingest`, canal `backend`), el
-mismo que recibe los lotes del navegador. En esta fase el receptor solo registra en el log.
+valida contra el catálogo con `TelemetryEvent` y se entrega al colector (`collector.ingest`, canal `backend`), que lo
+guarda en `telemetry_events` en segundo plano, con el mismo almacenamiento que los lotes del navegador.
 
 Garantías (plan §15): emitir **nunca lanza ni bloquea** la operación de negocio. Un evento que no cumple el contrato
 (p. ej. falta `TELEMETRY_PSEUDONYM_KEY` y el evento exige `userId`) se descarta con un aviso en el log, sin valores.

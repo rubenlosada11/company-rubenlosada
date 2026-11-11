@@ -5,7 +5,7 @@
 | Fase | 2 de «Plan · Captura · Almacenamiento · Reporte» (la fase 1 es [`telemetry-plan.md`](./telemetry-plan.md)) |
 | Contrato | [`event-schemas.json`](./event-schemas.json), catálogo `1.0.0` (43 eventos), sin cambios |
 | BRIEFING | [`CONTEXT-telemetria.es.md`](../../CONTEXT-telemetria.es.md) (el enunciado lo llama `empresa-BRIEFING.md`) |
-| Estado | Implementado y verificado de extremo a extremo (2026-11-10). Sin almacenamiento: el receptor es temporal |
+| Estado | Implementado y verificado de extremo a extremo (2026-11-10). El almacenamiento llegó en la fase 3: [`telemetry-storage.md`](./telemetry-storage.md) (el receptor ya no es temporal) |
 
 ## 1. Resumen
 
