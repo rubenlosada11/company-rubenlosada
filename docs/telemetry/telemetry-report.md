@@ -181,6 +181,19 @@ ruta y no como `unmatched`).
 | Vista (Chrome, build de producción) | Datos reales, cambio a 30 días, error 503 y periodo vacío (estos dos simulados en el navegador solo para ver esos estados), móvil sin scroll horizontal |
 | Escrituras | Ninguna: la tabla tiene 31 filas antes y después (sesión del navegador por token, telemetría del build desactivada) |
 
+### 8.1. Capturas
+
+Hechas por el desarrollador en local (backoffice con `npm run dev`, API con su `.env` contra Supabase), en
+[`docs/screenshots/telemetry-report/`](../screenshots/telemetry-report/). Son posteriores a la verificación: sus
+sesiones de login y navegación añadieron eventos reales, por eso las cifras superan las 31 filas de la tabla anterior.
+
+| Captura | Qué muestra |
+| --- | --- |
+| [Dashboard, 7 días](../screenshots/telemetry-report/01-dashboard-7-dias.png) | La sección «Telemetría técnica» con el periodo en UTC, las cuatro tarjetas, las columnas diarias (días sin eventos a cero) y las incidencias por tipo |
+| [Dashboard, 30 días](../screenshots/telemetry-report/02-dashboard-30-dias.png) | El mismo reporte tras cambiar a «Últimos 30 días»: otro periodo, otra entrada de caché |
+| [Incidencias y tablas](../screenshots/telemetry-report/03-incidencias-y-tablas.png) | Incidencias por categoría · evento · motivo y las tablas de inicios de sesión por día y de envíos por formulario |
+| [Endpoint en Swagger](../screenshots/telemetry-report/04-swagger-report.png) | `GET /telemetry/report` autenticado con un periodo fijo: respuesta 200 con `period` y `metrics` (token tapado) |
+
 ## 9. Limitaciones conocidas
 
 - **Pocos datos**: los 31 eventos son de un único día y dos minutos (la verificación E2E del almacenamiento). Las

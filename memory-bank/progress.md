@@ -1489,6 +1489,8 @@ Supabase (confirmada por él) y antes de la PR.
 - **Vista:** sección del panel de inicio y no una ruta propia, porque `section` es un enum cerrado del catálogo (una
   ruta nueva sería `not_found` o un cambio MINOR del contrato en 5 eventos). Columnas y barras HTML, sin librería.
 - **Dependencia:** `pandas` 3.1.1 (+ `numpy`); `services/requirements.txt` regenerado con `uv export`.
+- **Capturas** del desarrollador (4) en `docs/screenshots/telemetry-report/`, enlazadas en `telemetry-report.md` §8.1
+  y en la PR #29.
 - **Verificación sin escrituras:** API con el `.env` real y una copia de `auth.json` (token generado, sin login);
   build del backoffice con la telemetría desactivada; la tabla sigue con 31 filas.
 
