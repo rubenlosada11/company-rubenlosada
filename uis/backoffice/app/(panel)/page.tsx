@@ -1,6 +1,7 @@
 import { Explorer } from "@/components/Explorer";
 import { Milestones } from "@/components/Milestones";
 import { Overview } from "@/components/Overview";
+import { TelemetryReport } from "@/components/telemetry/TelemetryReport";
 
 export default function HomePage() {
   return (
@@ -13,14 +14,15 @@ export default function HomePage() {
           Backoffice de TrackFlow
         </h1>
         <p className="mt-3 max-w-3xl text-slate-600">
-          Estructura del negocio, backlog de iniciativas de TrackFlow Tech y estado de los hitos del proyecto, a
-          partir del contexto de empresa.
+          Estructura del negocio, backlog de iniciativas de TrackFlow Tech, estado de los hitos del proyecto, a
+          partir del contexto de empresa, y estado técnico del sistema a partir de la telemetría.
         </p>
       </header>
 
       <Overview />
       <Explorer />
       <Milestones />
+      <TelemetryReport />
     </div>
   );
 }

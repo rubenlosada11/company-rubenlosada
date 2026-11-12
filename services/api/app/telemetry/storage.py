@@ -93,6 +93,11 @@ def _engine() -> Engine:
     return engine
 
 
+def telemetry_engine() -> Engine:
+    """Motor de la base de `telemetry_events` (en SQLite crea la tabla si falta). Lo usa el reporte (`analysis`)."""
+    return _engine()
+
+
 def _insert_statement(engine: Engine, rows: list[dict[str, Any]]):
     """`INSERT … VALUES (…), (…) ON CONFLICT (id) DO NOTHING RETURNING id`: devuelve solo los ids insertados.
 

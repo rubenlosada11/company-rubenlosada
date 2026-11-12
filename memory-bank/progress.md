@@ -6,7 +6,15 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/telemetry-storage` (desde `main` @ `cbd52b1`, que incluye las PR #3–#27).
+- **Rama de trabajo:** `feature/telemetry-report` (desde `main` @ `8ee2c58`, que incluye las PR #3–#28).
+- **Telemetría de la compañía — Reporte técnico** (práctica sin número de hito; fase 4 y última de la serie de
+  telemetría): pipeline de análisis con Pandas (`services/api/app/telemetry/analysis.py`, 5 métricas independientes:
+  SQL con el periodo `[from, to)` y `event_type IN (…)` en la consulta, dimensiones de `tags` y agregación en Pandas) y
+  `GET /telemetry/report` (autenticado; últimos 7 días por defecto; caché `TTLCache` de 60 s con candado por clave).
+  Sección «Telemetría técnica» en el panel del backoffice (`/#telemetria`). Única dependencia nueva: `pandas`.
+  Documentación: [`docs/telemetry/telemetry-report.md`](../docs/telemetry/telemetry-report.md). **Implementado y
+  verificado** (2026-11-11): API 1536 tests, Jest 263; contra Supabase real (31 filas) contrastado con SQL
+  independiente, caché comprobada (6 ms dentro del TTL, recálculo tras 60 s), vista en Chrome. Pendiente: PR y Notion.
 - **Telemetría de la compañía — Almacenamiento** (práctica sin número de hito; fase 3 de la serie de telemetría):
   `POST /telemetry/events` deja de ser temporal. Valida cada evento por separado con `TelemetryEvent` (sin cambios),
   acepta lotes mixtos y guarda los válidos en `telemetry_events` con un único `INSERT … ON CONFLICT (id) DO NOTHING`;
@@ -17,7 +25,8 @@
   y triggers que bloquean UPDATE/DELETE/TRUNCATE. Documentación:
   [`docs/telemetry/telemetry-storage.md`](../docs/telemetry/telemetry-storage.md). **Implementado y verificado**
   (2026-11-11): API 1476 tests; migración probada con PostgreSQL 16 local y aplicada en Supabase por el
-  desarrollador; E2E real (backoffice → API → Supabase): 31 filas, técnicas y de negocio. Pendiente: PR y Notion.
+  desarrollador; E2E real (backoffice → API → Supabase): 31 filas, técnicas y de negocio. **PR #28 fusionada**
+  (`8ee2c58`) y registrada en Notion.
 - **Telemetría de la compañía — Captura en el frontend** (práctica sin número de hito; fase 2 de la serie de
   telemetría): `TelemetryService` único en el backoffice (`uis/backoffice/lib/telemetry.ts`, función pública
   `track()`; lotes de 10 s o 20 eventos, 3 reintentos con backoff 1/2/4 s, `sendBeacon` al ocultar la página),
@@ -1458,6 +1467,32 @@ Prompt del curso por fases (1–11); el desarrollador pidió ejecutarlas seguida
   (usuario de pruebas en una copia de `auth.json`): 2 entradas y 2 salidas con la misma cantidad (stock neto igual),
   login fallido y correcto; 31 filas en Supabase. **Bug encontrado y corregido:** `rowcount` llega como -1 con psycopg
   detrás del pooler y el log marcaba todo como duplicado; ahora se cuenta con `RETURNING id`.
+- **PR #28 fusionada** (`8ee2c58`, 2026-11-11).
+
+### 2026-11-11 — Telemetría de la compañía: reporte técnico (rama `feature/telemetry-report`)
+
+Prompt del curso por fases (1–12); el desarrollador pidió ejecutarlas seguidas, parando en la comprobación de
+Supabase (confirmada por él) y antes de la PR.
+
+- **Ubicación:** `services/api/app/telemetry/analysis.py` (pipeline) y `report.py` (periodo, caché y modelos), no un
+  `services/telemetry/` nuevo: en `services/` cada carpeta es un servicio y la telemetría ya vive en la API.
+- **Datos reales (lectura, transacción `READ ONLY`):** 31 filas del 2026-11-11, 9 tipos, `tags` conforme a la
+  allowlist. Hay incidencias (`login_failed`, `form_validation_failed`) y login correcto/fallido; **no hay latencia de
+  la API** (la categoría F del catálogo no está instrumentada; `form_submitted.duration_ms` es tiempo de rellenado).
+- **Clasificación de incidencias por `event_type` del catálogo** (11 tipos, 8 categorías), común a
+  `error_rate_by_type` y `errors_per_day`; fuera los rechazos de negocio y `form_submitted` (duplicaría el 401 del
+  login). Quinta métrica: `submission_failures_by_form` (envíos con `outcome` ≠ `success` por formulario).
+- **Periodo:** sin fechas, `to` = minuto siguiente al actual (las peticiones del mismo minuto comparten caché);
+  fechas sin zona = UTC; 422 si `from ≥ to` o más de 366 días.
+- **Caché:** `TTLCache("telemetry.report", 60 s)` de `app/cache.py` con clave `(DATABASE_URL, from, to)` y un candado
+  por clave (las peticiones simultáneas del mismo periodo calculan una vez); los errores no se cachean.
+- **Vista:** sección del panel de inicio y no una ruta propia, porque `section` es un enum cerrado del catálogo (una
+  ruta nueva sería `not_found` o un cambio MINOR del contrato en 5 eventos). Columnas y barras HTML, sin librería.
+- **Dependencia:** `pandas` 3.1.1 (+ `numpy`); `services/requirements.txt` regenerado con `uv export`.
+- **Capturas** del desarrollador (4) en `docs/screenshots/telemetry-report/`, enlazadas en `telemetry-report.md` §8.1
+  y en la PR #29.
+- **Verificación sin escrituras:** API con el `.env` real y una copia de `auth.json` (token generado, sin login);
+  build del backoffice con la telemetría desactivada; la tabla sigue con 31 filas.
 
 ## Trabajo pendiente
 
@@ -1551,8 +1586,10 @@ Prompt del curso por fases (1–11); el desarrollador pidió ejecutarlas seguida
     compartida si la API pasa a varios workers, medir con Supabase real, precarga en reposo del formulario de
     proveedores para pantallas táctiles.
 13. Plan de telemetría: PR #26 fusionada. Captura: PR #27 fusionada. Almacenamiento (`feature/telemetry-storage`):
-    migración aplicada en Supabase y E2E verificado (2026-11-11); revisar y fusionar la PR y añadir las capturas de
-    la tabla en Supabase.
+    PR #28 fusionada. Reporte técnico (`feature/telemetry-report`): implementado y verificado (2026-11-11); pendiente
+    la PR (la fusiona el desarrollador) y la ficha de Notion. Mejoras posibles (`docs/telemetry/telemetry-report.md`
+    §9): filtrar por `environment`, instrumentar la latencia de la API (categoría F) y agregar en SQL si crece el
+    volumen.
     Recomendado: un rol de base de datos de solo inserción para la telemetría (§10). Decisiones de `docs/telemetry/telemetry-plan.md` §18.2: mínimos de stock por cliente, proceso
     de conteo físico, destino de los eventos, custodia de `TELEMETRY_PSEUDONYM_KEY` y si el alta de SKUs rechaza
     `current_stock` con 422.

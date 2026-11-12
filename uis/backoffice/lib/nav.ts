@@ -4,6 +4,7 @@ export const NAV_ITEMS = [
   { label: "Áreas de negocio", href: "/#areas" },
   { label: "Iniciativas", href: "/#iniciativas" },
   { label: "Hitos del proyecto", href: "/#hitos" },
+  { label: "Telemetría técnica", href: "/#telemetria" },
   { label: "Proveedores", href: "/proveedores" },
   { label: "Análisis de incidencias", href: "/incidencias" },
   { label: "Incidencias", href: "/gestor-incidencias" },

@@ -26,6 +26,9 @@ Esta carpeta contiene la **documentación transversal** del monorepo: guías de 
 - [`telemetry/telemetry-storage.md`](./telemetry/telemetry-storage.md) — almacenamiento de telemetría: tabla
   `telemetry_events` en Supabase (migración, índices, RLS e inmutabilidad), validación individual con aceptación
   parcial de lotes, bulk insert y respuesta `{received, stored, rejected}`.
+- [`telemetry/telemetry-report.md`](./telemetry/telemetry-report.md) — reporte técnico de telemetría: pipeline con
+  Pandas sobre `telemetry_events` (periodo y tipos filtrados en SQL), `GET /telemetry/report` con caché de 60 s,
+  definición de las métricas, clasificación de incidencias, verificación en Supabase y sección del backoffice.
 - [`docker.md`](./docker.md) — Docker del monorepo: contenedores `interfaces` (website + backoffice) y `backend`
   (API), Compose de desarrollo con hot reload y de producción, variables, despliegue en el VPS sin acceso público,
   actualización, vuelta atrás y problemas habituales.

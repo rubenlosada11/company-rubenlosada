@@ -58,6 +58,7 @@ const API_ROUTES = [
   "/suppliers/{supplier_id}",
   "/suppliers/{supplier_id}/rate",
   "/suppliers/{supplier_id}/status",
+  "/telemetry/report",
   "/users",
   "/users/{user_id}",
 ].map((template) => ({ template, parts: template.split("/") }));
