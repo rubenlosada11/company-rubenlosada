@@ -5,6 +5,7 @@ import {
   reportPeriod,
   reportTotals,
   shortDay,
+  showAxisLabel,
   utcInstant,
 } from "@/lib/telemetryReport";
 import type { TelemetryReport } from "@/types/telemetryReport";
@@ -85,6 +86,15 @@ describe("etiquetas y fechas", () => {
       "Autenticación · login_failed · invalid_credentials"
     );
     expect(errorTypeLabel(REPORT.metrics.error_rate_by_type[1])).toBe("Validación · form_validation_failed");
+  });
+
+  it("rotula todos los días de «7 días» (8 fechas) y como mucho 8 de «30 días», siempre el último", () => {
+    const labelled = (count: number) => [...Array(count).keys()].filter((index) => showAxisLabel(index, count));
+    expect(labelled(8)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(labelled(31)).toEqual([2, 6, 10, 14, 18, 22, 26, 30]);
+    expect(labelled(30)).toEqual([1, 5, 9, 13, 17, 21, 25, 29]);
+    expect(labelled(9)).toEqual([0, 2, 4, 6, 8]);
+    expect(labelled(1)).toEqual([0]);
   });
 
   it("formatea días e instantes en UTC y no rompe con valores no válidos", () => {

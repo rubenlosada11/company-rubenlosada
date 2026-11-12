@@ -14,6 +14,7 @@ import {
   type ReportDays,
   reportTotals,
   shortDay,
+  showAxisLabel,
   telemetryReportApi,
   telemetryReportErrorMessage,
   utcInstant,
@@ -192,8 +193,6 @@ interface DailyColumnsProps {
 /** Columnas de una sola serie por día (alto relativo al máximo), con el valor en el tooltip y una tabla desplegable. */
 function DailyColumns({ title, rows, unit }: DailyColumnsProps) {
   const max = Math.max(1, ...rows.map((row) => row.value));
-  // Con muchos días solo se rotulan algunos para que las etiquetas no se monten.
-  const labelEvery = Math.ceil(rows.length / 8);
 
   return (
     <figure className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -215,12 +214,20 @@ function DailyColumns({ title, rows, unit }: DailyColumnsProps) {
           </div>
         ))}
       </div>
-      <div className="mt-1.5 flex gap-0.5 text-[11px] text-slate-500" aria-hidden="true">
-        {rows.map((row, index) => (
-          <span key={row.date} className="min-w-0 flex-1 truncate text-center tabular-nums">
-            {index % labelEvery === 0 ? shortDay(row.date) : ""}
-          </span>
-        ))}
+      {/* Con muchos días las columnas son más estrechas que «12/10»: solo se rotulan algunos días y cada etiqueta se
+          centra bajo su columna sin cortarse. */}
+      <div className="relative mt-1.5 h-4 text-[11px] text-slate-500" aria-hidden="true">
+        {rows.map((row, index) =>
+          showAxisLabel(index, rows.length) ? (
+            <span
+              key={row.date}
+              className="absolute top-0 -translate-x-1/2 whitespace-nowrap tabular-nums"
+              style={{ left: `${((index + 0.5) / rows.length) * 100}%` }}
+            >
+              {shortDay(row.date)}
+            </span>
+          ) : null
+        )}
       </div>
       <details className="mt-3 text-sm">
         <summary className="cursor-pointer font-semibold text-blue-800">Ver tabla</summary>

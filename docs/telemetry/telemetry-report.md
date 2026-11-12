@@ -171,7 +171,7 @@ ruta y no como `unmatched`).
 | Prueba | Resultado |
 | --- | --- |
 | `services/api`: `uv run pytest -q` | 1536 tests en verde (59 nuevos: 31 de análisis, 28 de endpoint/periodo/caché; 2 existentes actualizados: inventario de rutas, 35, y registro de cachés) |
-| `uis/backoffice`: `npm run lint`, `npm run typecheck`, `npx jest` | Sin errores; 262 tests (7 nuevos) |
+| `uis/backoffice`: `npm run lint`, `npm run typecheck`, `npx jest` | Sin errores; 263 tests (8 nuevos) |
 | API real contra Supabase | 6 peticiones: sin parámetros, día completo, la misma con `+01:00`, ventana de 740 ms para comprobar los límites, 401, dos 422 |
 | Contraste con SQL independiente (`GROUP BY` en PostgreSQL) | Las cinco métricas coinciden: 31 eventos el 11/11, 2 incidencias, login 1/2 = 50 %, `login` 2 envíos / 1 fallido |
 | Límites del periodo | `[19:35:07.973, 19:35:08.713)`: entra el `login_failed` del inicio exacto y queda fuera el `login_succeeded` del fin exacto |

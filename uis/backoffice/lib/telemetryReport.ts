@@ -92,6 +92,15 @@ export function shortDay(value: string): string {
   return match ? `${match[2]}/${match[1]}` : value;
 }
 
+/**
+ * ¿Se rotula el día `index` de una serie de `count` días? Como mucho `maxLabels` etiquetas, a intervalos iguales y
+ * contados desde el final, para que el último día (el más reciente) siempre tenga la suya.
+ */
+export function showAxisLabel(index: number, count: number, maxLabels = 8): boolean {
+  const step = Math.max(1, Math.ceil(count / maxLabels));
+  return (count - 1 - index) % step === 0;
+}
+
 /** «2026-11-11» → «11 nov 2026» (día UTC). */
 export function longDay(value: string): string {
   const date = parse(value);

@@ -13,7 +13,7 @@
   `GET /telemetry/report` (autenticado; últimos 7 días por defecto; caché `TTLCache` de 60 s con candado por clave).
   Sección «Telemetría técnica» en el panel del backoffice (`/#telemetria`). Única dependencia nueva: `pandas`.
   Documentación: [`docs/telemetry/telemetry-report.md`](../docs/telemetry/telemetry-report.md). **Implementado y
-  verificado** (2026-11-11): API 1536 tests, Jest 262; contra Supabase real (31 filas) contrastado con SQL
+  verificado** (2026-11-11): API 1536 tests, Jest 263; contra Supabase real (31 filas) contrastado con SQL
   independiente, caché comprobada (6 ms dentro del TTL, recálculo tras 60 s), vista en Chrome. Pendiente: PR y Notion.
 - **Telemetría de la compañía — Almacenamiento** (práctica sin número de hito; fase 3 de la serie de telemetría):
   `POST /telemetry/events` deja de ser temporal. Valida cada evento por separado con `TelemetryEvent` (sin cambios),
