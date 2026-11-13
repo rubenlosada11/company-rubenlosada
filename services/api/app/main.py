@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.errors import UnexpectedErrorMiddleware, unexpected_error, validation_error
-from app.routes import auth, incident_manager, incidents, inventory, profiles, suppliers, telemetry, users
+from app.routes import auth, incident_manager, incidents, inventory, profiles, reporting, suppliers, telemetry, users
 from app.security import ConfigError, check_auth_config
 from app.services.email import check_email_config
 from app.telemetry.config import log_telemetry_config
@@ -55,7 +55,8 @@ app = FastAPI(
     title="TrackFlow API",
     description=(
         "Directorio de proveedores de TrackFlow (USA + Spain), analizador de incidencias de CX, gestor de "
-        "incidencias e inventario unificado de los almacenes de Los Ángeles y Zaragoza (`/inventory`). "
+        "incidencias, inventario unificado de los almacenes de Los Ángeles y Zaragoza (`/inventory`), telemetría "
+        "(`/telemetry`) y reporte semanal de desempeño por almacén y cliente (`/reporting`). "
         "Autenticación con Bearer JWT: `POST /auth/login` (o el botón «Authorize»)."
     ),
     version="0.1.0",
@@ -101,6 +102,7 @@ app.include_router(incidents.router)
 app.include_router(incident_manager.router)
 app.include_router(inventory.router)
 app.include_router(telemetry.router)
+app.include_router(reporting.router)
 
 
 # Errores que no gestiona ningún router (ver `app/errors.py`): 422 sin los valores recibidos y, como último recurso
