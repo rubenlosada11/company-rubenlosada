@@ -31,10 +31,11 @@ This folder holds **cross-cutting documentation** for the monorepo: architecture
 - [`telemetry/telemetry-report.md`](./telemetry/telemetry-report.md) — technical telemetry report (in Spanish):
   Pandas pipeline over `telemetry_events` (SQL period and event-type filters), `GET /telemetry/report` with a 60 s
   cache, metric definitions, error classification, real Supabase verification and the backoffice section.
-- [`reporting/PIPELINE_DESIGN.md`](./reporting/PIPELINE_DESIGN.md) and
+- [`../data/pipelines/PIPELINE_DESIGN.md`](../data/pipelines/PIPELINE_DESIGN.md) and
   [`reporting/weekly-performance-pipeline.md`](./reporting/weekly-performance-pipeline.md) — weekly warehouse/client
-  performance pipeline (in Spanish): design (KPI → event traceability, subflows, ISO week, idempotency, run log) and
-  operations (commands, cron, `/reporting` endpoints, verification).
+  performance pipeline (in Spanish): design (KPI → event traceability, ISO week, idempotency, run log and the Prefect 3
+  implementation: flows, tasks, retries, caching and partial failures) and operations (commands, cron, `/reporting`
+  endpoints, verification).
 - [`docker.md`](./docker.md) — Docker setup of the monorepo (in Spanish): `interfaces` (website + backoffice) and
   `backend` (API) containers, development Compose with hot reload, production Compose, environment variables and
   deployment to the VPS without public access.
