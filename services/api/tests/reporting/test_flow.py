@@ -1,7 +1,7 @@
-"""Flow completo y registro de ejecuciones (`app/reporting/flow.py` y `runs.py`, PIPELINE_DESIGN.md §5, §7–§9).
+"""Flow completo y registro de ejecuciones (`data/pipelines/pipeline.py` y `app/reporting/runs.py`, §5, §7–§9, §18).
 
 Idempotencia, autorreparación, ejecuciones fallidas y abandonadas, concurrencia, solo lectura del origen y la línea de
-comandos (`python -m app.reporting`).
+comandos (`python data/pipelines/pipeline.py`). Reintentos, caché y fallos parciales: `test_pipeline_prefect.py`.
 
 Ejecutar desde services/api: uv run pytest tests/reporting/test_flow.py
 """
@@ -14,9 +14,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import select
 
-from app.reporting import __main__ as cli
-from app.reporting import flow, runs
-from app.reporting.flow import (
+from app.reporting import runs
+from data.pipelines import pipeline as cli
+from data.pipelines import pipeline as flow
+from data.pipelines.pipeline import (
     PIPELINE_NAME,
     PipelineAlreadyRunning,
     PipelineRunFailed,
@@ -167,11 +168,11 @@ def test_failure_is_recorded_and_the_report_is_unchanged(week_of_activity, monke
     def broken(*args, **kwargs):
         raise ValueError("detalle interno que no debe guardarse")
 
-    monkeypatch.setattr(flow, "aggregate_rows", broken)
+    monkeypatch.setattr(flow, "transform_events", broken)
     with pytest.raises(PipelineRunFailed) as error:
         run_weekly_performance(now=NOW)
     assert error.value.run["status"] == "failed" and error.value.run["error"] == "ValueError"
-    assert error.value.run["phase"] == "validated"  # checkpoint: murió en aggregate
+    assert error.value.run["phase"] == "extracted"  # checkpoint: murió en la transformación
     assert kpis(report_rows()) == before
     latest = runs.latest_run(PIPELINE_NAME)
     assert latest["status"] == "failed" and "detalle" not in latest["error"]
@@ -259,14 +260,14 @@ def test_a_running_run_of_another_process_blocks_a_second_one():
 
 def test_only_one_run_at_a_time_in_the_process(monkeypatch):
     entered, release = threading.Event(), threading.Event()
-    original = flow.compute_weekly_performance
+    original = flow.extract_events
 
     def slow(*args, **kwargs):
         entered.set()
         release.wait(5)
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(flow, "compute_weekly_performance", slow)
+    monkeypatch.setattr(flow, "extract_events", slow)
     worker = threading.Thread(target=lambda: run_weekly_performance(now=NOW))
     worker.start()
     try:
@@ -304,10 +305,9 @@ def test_environment_comes_from_telemetry_config(week_of_activity, monkeypatch):
 
 @pytest.fixture
 def frozen_now(monkeypatch):
-    """`python -m app.reporting` usa la hora real: se fija para que la ventana por defecto sea W1–W2."""
+    """La línea de comandos usa la hora real: se fija para que la ventana por defecto sea W1–W2."""
     original = flow.resolve_window
     monkeypatch.setattr(flow, "resolve_window", lambda week_start, weeks, now=None: original(week_start, weeks, NOW))
-    monkeypatch.setattr(cli, "resolve_window", lambda week_start, weeks, now=None: original(week_start, weeks, NOW))
 
 
 def test_cli_runs_the_pipeline(week_of_activity, frozen_now, capsys):
@@ -330,6 +330,6 @@ def test_cli_rejects_an_unfinished_week(frozen_now, capsys):
 
 
 def test_cli_reports_a_failed_run(week_of_activity, frozen_now, monkeypatch, capsys):
-    monkeypatch.setattr(flow, "aggregate_rows", lambda *a: 1 / 0)
+    monkeypatch.setattr(flow, "transform_events", lambda *a: 1 / 0)
     assert cli.main([]) == 1
     assert "ZeroDivisionError" in capsys.readouterr().err

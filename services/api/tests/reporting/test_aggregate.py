@@ -1,20 +1,20 @@
-"""Subflow aggregate: grano, fórmulas de los KPIs y semana ISO (`app/reporting/aggregate.py`, PIPELINE_DESIGN §6.4).
+"""aggregate: grano, fórmulas de los KPIs y semana ISO (`data/process/weekly_performance/aggregate.py`, §6.4).
 
 Ejecutar desde services/api: uv run pytest tests/reporting/test_aggregate.py
 """
 
 from datetime import timedelta
 
-from app.reporting.aggregate import ROW_COLUMNS, aggregate_rows
-from app.reporting.validate import validate_events
 from app.reporting.weeks import WeekWindow
+from data.process.weekly_performance.aggregate import ROW_COLUMNS, aggregate_rows
+from data.process.weekly_performance.validate import validate_events
 from tests.reporting.helpers import CURRENT, DISCREPANCY, INBOUND, OUTBOUND, STOCKOUT, W0, W1, W2, at, event, frame
 
 WINDOW = WeekWindow(first=W1, last=W2)
 
 
 def rows_for(*events, window=WINDOW):
-    return aggregate_rows(validate_events(frame(*events)).valid, window)
+    return aggregate_rows(validate_events(frame(*events)).valid, window.weeks)
 
 
 def test_one_row_with_the_four_kpis():

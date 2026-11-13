@@ -29,7 +29,8 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import InterfaceError, OperationalError, SQLAlchemyError
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 
 from app.database import get_engine
 
@@ -97,20 +98,53 @@ pipeline_runs = Table(
     ),
 )
 
+# `validated` sigue siendo válido (ejecuciones anteriores a Prefect); el flow de Prefect valida y agrega en una sola
+# task, así que pasa de `extracted` a `aggregated`.
 PHASES = ("started", "extracted", "validated", "aggregated", "loaded")
 
 
 class ReportingStorageError(Exception):
-    """No se ha podido leer o escribir en el esquema `reporting` (base caída, migración sin aplicar, permisos…).
+    """No se ha podido leer o escribir en la base (base caída, migración sin aplicar, permisos…).
 
-    El mensaje solo dice el tipo de error, nunca la cadena de conexión ni los datos.
+    El mensaje solo dice el tipo de error, nunca la cadena de conexión ni los datos. `transient` dice si el fallo es
+    de los que se arreglan solos (conexión cortada, base reiniciando, bloqueo): el pipeline solo reintenta esos.
     """
+
+    def __init__(self, message: str, *, transient: bool = False) -> None:
+        super().__init__(message)
+        self.transient = transient
+
+
+# SQLSTATE que indican un fallo pasajero: clase 08 (conexión), 53 (recursos: demasiadas conexiones), 57P (servidor
+# apagándose o arrancando), 40001 (serialización) y 40P01 (interbloqueo). El resto (42P01 tabla inexistente, 28P01
+# contraseña, 23505 clave duplicada…) es permanente: reintentar solo retrasaría el fallo.
+_TRANSIENT_SQLSTATE_PREFIXES = ("08", "53", "57P")
+_TRANSIENT_SQLSTATES = {"40001", "40P01"}
+
+
+def is_transient(error: SQLAlchemyError) -> bool:
+    """¿Merece la pena reintentar la operación que ha lanzado `error`?"""
+    if getattr(error, "connection_invalidated", False) or isinstance(error, PoolTimeoutError):
+        return True  # la conexión se cortó a mitad, o el pool no dio conexión a tiempo
+    cause = getattr(error, "orig", None)
+    sqlstate = getattr(cause, "sqlstate", None)
+    if sqlstate:
+        return sqlstate in _TRANSIENT_SQLSTATES or sqlstate.startswith(_TRANSIENT_SQLSTATE_PREFIXES)
+    if not isinstance(error, (OperationalError, InterfaceError)) or cause is None:
+        return False
+    message = str(cause).lower()
+    if type(cause).__module__ == "sqlite3":
+        return "locked" in message or "busy" in message  # «no such table» y similares son permanentes
+    # psycopg sin SQLSTATE: fallo al conectar o red caída. Una contraseña errónea no se arregla reintentando.
+    return "authentication" not in message and "password" not in message
 
 
 def storage_error(error: SQLAlchemyError) -> ReportingStorageError:
     cause = getattr(error, "orig", None) or error
     sqlstate = getattr(cause, "sqlstate", None)
-    return ReportingStorageError(type(cause).__name__ + (f" (SQLSTATE {sqlstate})" if sqlstate else ""))
+    return ReportingStorageError(
+        type(cause).__name__ + (f" (SQLSTATE {sqlstate})" if sqlstate else ""), transient=is_transient(error)
+    )
 
 
 # Motores SQLite en los que ya se han creado las tablas (los tests usan una base distinta en cada test).

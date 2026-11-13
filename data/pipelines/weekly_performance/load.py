@@ -1,4 +1,4 @@
-"""Subflow 4 · load: escritura idempotente en `reporting.weekly_warehouse_client_performance` (PIPELINE_DESIGN §8).
+"""load: escritura idempotente en `reporting.weekly_warehouse_client_performance` (PIPELINE_DESIGN §8).
 
 Todo en **una transacción** (o se escriben todas las semanas de la ventana o ninguna):
 
@@ -8,7 +8,9 @@ Todo en **una transacción** (o se escriben todas las semanas de la ventana o ni
 2. **Upsert** sobre `unique (warehouse, client_id, week_start)`: `INSERT … ON CONFLICT (…) DO UPDATE` de los KPIs,
    `computed_at` y `run_id`. Una fila existente conserva su `id`.
 
-Repetir la carga con las mismas filas deja la tabla igual (salvo `computed_at`). Solo escribe en `reporting`.
+Repetir la carga con las mismas filas deja la tabla igual (salvo `computed_at` y `run_id`). Solo escribe en
+`reporting`. Como es una única transacción idempotente, la task `load-weekly-kpis` puede reintentarla sin riesgo ante
+un fallo transitorio: un intento fallido no deja nada escrito y el siguiente parte de la misma tabla.
 """
 
 import logging

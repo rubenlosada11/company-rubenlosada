@@ -1,4 +1,4 @@
-"""Subflow 2 · validate: reglas de calidad de los eventos de origen (PIPELINE_DESIGN.md §6.3).
+"""validate: reglas de calidad de los eventos de origen (PIPELINE_DESIGN.md §6.3).
 
 Una fila que no cumple una regla se **rechaza**: no se corrige ni se imputa. Cada rechazo se cuenta por `event_type` y
 motivo (el primero que falla, en el orden de `REASONS`) para el registro de la ejecución. Con Pandas, sin tocar la
@@ -11,6 +11,10 @@ base. Los valores de `tags` se comprueban por tipo exacto (un `"5"` de texto no 
 | `invalid_client_id` | `tags.client_id` no es un slug `^[a-z0-9]+(-[a-z0-9]+)*$` de 1–64 caracteres |
 | `invalid_quantity` | `inbound_order_created` sin `tags.quantity` entero ≥ 1 (los demás eventos no la usan) |
 | `duplicate_order` | Misma orden (`event_type` + `warehouse` + `order_id`) ya vista con otro `id`: cuenta la primera |
+
+Además de las reglas por fila hay una comprobación de **esquema**: si a la extracción le falta una columna de
+`events.COLUMNS` o trae un `event_type` que no es de los cuatro del BRIEFING, `SourceSchemaError` (la ejecución falla:
+no se puede calcular nada fiable sin esas columnas, y rechazar fila a fila escondería un error de la consulta).
 """
 
 import re
@@ -19,7 +23,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from app.reporting.extract import INBOUND, OUTBOUND, SOURCE_EVENT_TYPES
+from data.process.weekly_performance.events import COLUMNS, INBOUND, OUTBOUND, SOURCE_EVENT_TYPES
 
 WAREHOUSES = ("los_angeles", "zaragoza")
 CLIENT_ID_PATTERN = r"[a-z0-9]+(?:-[a-z0-9]+)*"
@@ -43,6 +47,10 @@ class ValidationResult:
         return sum(sum(by_reason.values()) for by_reason in self.rejected.values())
 
 
+class SourceSchemaError(ValueError):
+    """La extracción no tiene la forma esperada (columnas o tipos de evento): fallo de la consulta, no de los datos."""
+
+
 _CLIENT_ID = re.compile(CLIENT_ID_PATTERN)
 
 
@@ -61,7 +69,16 @@ def _tag(tags: pd.Series, key: str) -> pd.Series:
 
 
 def validate_events(raw: pd.DataFrame) -> ValidationResult:
-    """Separa los eventos válidos de los rechazados. `raw` tiene las columnas de `extract.COLUMNS`."""
+    """Separa los eventos válidos de los rechazados. `raw` tiene las columnas de `events.COLUMNS`.
+
+    `SourceSchemaError` si faltan columnas o hay tipos de evento fuera de los cuatro del BRIEFING.
+    """
+    missing = [column for column in COLUMNS if column not in raw.columns]
+    if missing:
+        raise SourceSchemaError(f"Faltan columnas en la extracción: {', '.join(missing)}")
+    unexpected = sorted(set(raw["event_type"].dropna()) - set(SOURCE_EVENT_TYPES))
+    if unexpected:
+        raise SourceSchemaError(f"Tipos de evento fuera del alcance del reporte: {', '.join(unexpected)}")
     events_read = {event_type: 0 for event_type in SOURCE_EVENT_TYPES}
     events_read.update(raw["event_type"].value_counts().astype(int).to_dict())
 
