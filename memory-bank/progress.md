@@ -6,7 +6,19 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/telemetry-report` (desde `main` @ `8ee2c58`, que incluye las PR #3–#28).
+- **Rama de trabajo:** `feature/weekly-performance-pipeline` (desde `main` @ `eb7f47d`, que incluye las PR #3–#29).
+- **Pipeline de desempeño semanal** (práctica sin número de hito; BRIEFING
+  [`CONTEXT-datapipelines.es.md`](../CONTEXT-datapipelines.es.md)): Reporte Semanal de Desempeño por Almacén y Cliente.
+  Flow con 4 subflows en `services/api/app/reporting/` (extract de `telemetry_events` en transacción `READ ONLY` →
+  validate → aggregate con Pandas → load con upsert + reconciliación en una transacción), semana ISO en UTC, ventana
+  por defecto de las 2 últimas semanas completas (autorreparación), registro `reporting.pipeline_runs`, línea de
+  comandos `python -m app.reporting` (`--dry-run`) y endpoints `/reporting` (2 GET autenticados + `POST` para
+  `admin`/`manager`). Migración `services/api/migrations/20261113120000_reporting_weekly_performance.sql`. Sin
+  dependencias nuevas. Documentación: [`docs/reporting/PIPELINE_DESIGN.md`](../docs/reporting/PIPELINE_DESIGN.md)
+  (diseño) y [`docs/reporting/weekly-performance-pipeline.md`](../docs/reporting/weekly-performance-pipeline.md).
+  **Implementado y verificado** (2026-11-13): API 1647 tests (+4 opcionales de PostgreSQL), migración y flow en
+  PostgreSQL 16 local, Supabase en solo lectura (coincide con SQL independiente), API y CLI arrancadas. Pendiente:
+  aplicar la migración en Supabase (desarrollador), instalar el `cron` (infraestructura), PR y Notion.
 - **Telemetría de la compañía — Reporte técnico** (práctica sin número de hito; fase 4 y última de la serie de
   telemetría): pipeline de análisis con Pandas (`services/api/app/telemetry/analysis.py`, 5 métricas independientes:
   SQL con el periodo `[from, to)` y `event_type IN (…)` en la consulta, dimensiones de `tags` y agregación en Pandas) y
@@ -14,7 +26,8 @@
   Sección «Telemetría técnica» en el panel del backoffice (`/#telemetria`). Única dependencia nueva: `pandas`.
   Documentación: [`docs/telemetry/telemetry-report.md`](../docs/telemetry/telemetry-report.md). **Implementado y
   verificado** (2026-11-11): API 1536 tests, Jest 263; contra Supabase real (31 filas) contrastado con SQL
-  independiente, caché comprobada (6 ms dentro del TTL, recálculo tras 60 s), vista en Chrome. Pendiente: PR y Notion.
+  independiente, caché comprobada (6 ms dentro del TTL, recálculo tras 60 s), vista en Chrome. **PR #29 fusionada**
+  (`eb7f47d`, 2026-11-12) y registrada en Notion.
 - **Telemetría de la compañía — Almacenamiento** (práctica sin número de hito; fase 3 de la serie de telemetría):
   `POST /telemetry/events` deja de ser temporal. Valida cada evento por separado con `TelemetryEvent` (sin cambios),
   acepta lotes mixtos y guarda los válidos en `telemetry_events` con un único `INSERT … ON CONFLICT (id) DO NOTHING`;
@@ -105,7 +118,7 @@
   `/inventory/orders/outbound` y `/inventory/orders`, con un único módulo de integración (`lib/inventory.ts`).
   **Implementado y validado** en `feature/inventory-backoffice`, por fases (prompt del curso) sin paradas intermedias
   por indicación del desarrollador. **PR #19 fusionada** (`01ddccb`). **Hito 5 entregado** (2026-11-01).
-- **Última actualización:** 2026-11-10.
+- **Última actualización:** 2026-11-13.
 
 | Componente | Estado |
 | --- | --- |
@@ -116,7 +129,9 @@
 | `uis/website` | ✅ Implementado, validado y en producción: https://websitetrackflow.rubenlosada.com/ (local `:3001`) |
 | `uis/backoffice` | ✅ Implementado, validado y en producción: https://backofficetrackflow.rubenlosada.com/ (local `:3002`; sin autenticación) |
 | Telemetría: captura en el frontend | ✅ Implementada y validada: API 1413 tests (144 nuevos), Jest 255 (107 nuevos), E2E 46/46; PR #27 fusionada |
-| Telemetría: almacenamiento | ✅ Implementado y verificado en `feature/telemetry-storage` (API 1476 tests, migración en Supabase, E2E con 31 eventos reales); PR pendiente |
+| Telemetría: almacenamiento | ✅ API 1476 tests, migración en Supabase, E2E con 31 eventos reales; PR #28 fusionada (`8ee2c58`) |
+| Telemetría: reporte técnico | ✅ API 1536 tests, Jest 263; PR #29 fusionada (`eb7f47d`) |
+| Pipeline de desempeño semanal (`/reporting`) | ✅ Implementado y verificado en `feature/weekly-performance-pipeline` (API 1647 + 4 de PostgreSQL); migración en Supabase y `cron` pendientes; PR pendiente |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | Autenticación (AUTH-01) | ✅ API: `User`/`Profile` en TinyDB, JWT, `/auth`, `/users`, `/profiles` y 8 rutas existentes protegidas (269 tests). Backoffice: `/login` y panel protegido (E2E 34/34). Solo local |
 | Autenticación frontend (AUTH-02) | ✅ PR #13 fusionada (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE` |
@@ -1494,6 +1509,33 @@ Supabase (confirmada por él) y antes de la PR.
 - **Verificación sin escrituras:** API con el `.env` real y una copia de `auth.json` (token generado, sin login);
   build del backoffice con la telemetría desactivada; la tabla sigue con 31 filas.
 
+### 2026-11-13 — Pipeline de desempeño semanal (rama `feature/weekly-performance-pipeline`)
+
+BRIEFING de data pipelines (Diseño · Implementación · Subflows y Tests); el desarrollador pidió ejecutar todas las
+fases seguidas siguiendo mis recomendaciones. Diseño primero (`docs/reporting/PIPELINE_DESIGN.md`, commit propio) y
+después el código.
+
+- **Ubicación:** `services/api/app/reporting/` + router `/reporting` (el `services/reporting/` del BRIEFING), como la
+  telemetría: una API, una conexión. No importa nada de `analysis.py`/`report.py` (fuera de alcance).
+- **Subflows como funciones Python**, sin Prefect/Airflow (un pipeline semanal pequeño; sin dependencias nuevas).
+- **Semana ISO en UTC**, solo semanas completas; ventana por defecto de 2 semanas (eventos tardíos y autorreparación
+  si un lunes falla). `POST` síncrono; una ejecución a la vez por proceso (409).
+- **Calidad:** almacén, `client_id`, cantidad (solo entrada), timestamp y pedido repetido (`event_type` + almacén +
+  `order_id`); los rechazos se cuentan en `pipeline_runs.stats`, no se corrigen.
+- **Idempotencia:** upsert sobre el `unique` del BRIEFING + borrado de combinaciones desaparecidas en las semanas
+  recalculadas, todo en una transacción. Filtro por `environment` = `TELEMETRY_ENVIRONMENT`.
+- **Tabla:** columnas exactas del BRIEFING más checks con nombre; `discrepancy_rate` con 4 decimales (0 sin pedidos,
+  puede ser > 1). La respuesta añade `computed_at`.
+- **Dos KPIs sin datos:** `stock_threshold_triggered` e `inventory_discrepancy_detected` siguen sin emitirse (sin
+  mínimos por cliente ni conteo físico): valen 0 y `stats.events_read` lo deja a la vista.
+- **Verificación:** 1647 tests; migración aplicada dos veces en PostgreSQL 16 (pgserver con Python 3.12) y
+  `tests/reporting/test_postgres.py` 4/4 (upsert, `tuple NOT IN`, `READ ONLY` → 25006); Supabase solo lectura: 83
+  filas, los 4 eventos de órdenes son de la semana en curso → la ventana por defecto da 0 filas; calculando esa
+  semana, 2 filas idénticas a un `GROUP BY` SQL independiente. API en :8010 con SQLite desechable (401, 403, 404,
+  422, 201, 200) y CLI (códigos 0 y 2, `--dry-run`).
+- **No hecho (requiere confirmación o al desarrollador):** migración en Supabase, `cron` en el VPS, vista en el
+  backoffice.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -1586,10 +1628,14 @@ Supabase (confirmada por él) y antes de la PR.
     compartida si la API pasa a varios workers, medir con Supabase real, precarga en reposo del formulario de
     proveedores para pantallas táctiles.
 13. Plan de telemetría: PR #26 fusionada. Captura: PR #27 fusionada. Almacenamiento (`feature/telemetry-storage`):
-    PR #28 fusionada. Reporte técnico (`feature/telemetry-report`): implementado y verificado (2026-11-11); pendiente
-    la PR (la fusiona el desarrollador) y la ficha de Notion. Mejoras posibles (`docs/telemetry/telemetry-report.md`
+    PR #28 fusionada. Reporte técnico: PR #29 fusionada y registrado en Notion. Mejoras posibles (`docs/telemetry/telemetry-report.md`
     §9): filtrar por `environment`, instrumentar la latencia de la API (categoría F) y agregar en SQL si crece el
     volumen.
     Recomendado: un rol de base de datos de solo inserción para la telemetría (§10). Decisiones de `docs/telemetry/telemetry-plan.md` §18.2: mínimos de stock por cliente, proceso
     de conteo físico, destino de los eventos, custodia de `TELEMETRY_PSEUDONYM_KEY` y si el alta de SKUs rechaza
     `current_stock` con 422.
+14. Pipeline de desempeño semanal (`feature/weekly-performance-pipeline`): aplicar
+    `services/api/migrations/20261113120000_reporting_weekly_performance.sql` en el SQL Editor de Supabase y lanzar
+    una primera ejecución; decidir si se instala el `cron` del lunes en el VPS
+    (`docs/reporting/weekly-performance-pipeline.md` §3.3); PR y ficha de Notion. Siguiente paso natural: vista del
+    reporte en el backoffice para Thomas y Ana.
