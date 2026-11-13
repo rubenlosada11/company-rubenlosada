@@ -175,6 +175,24 @@ uv run pytest tests/reporting/test_postgres.py
 
 (solo admite `localhost`/`127.0.0.1`, con las dos migraciones aplicadas: vacía las tablas de `reporting`).
 
+### 6.1. Capturas
+
+El desarrollador las hizo en local el 2026-11-13. Usó la API con su `.env` contra Supabase (con la migración ya
+aplicada) y Swagger con un usuario `admin`. Están en
+[`docs/screenshots/weekly-performance-pipeline/`](../screenshots/weekly-performance-pipeline/). Las semanas
+completas de la ventana (26-oct → 8-nov) son anteriores a la captura de telemetría, así que el reporte sale vacío y
+con avisos. Es el resultado esperado (§6).
+
+| Captura | Qué muestra |
+| --- | --- |
+| [Ejecución por la API](../screenshots/weekly-performance-pipeline/01-swagger-post-pipeline-run.png) | El log de `POST /reporting/pipeline-runs`. Muestra el inicio de la corrida (`api`, `development`, su `request` y las semanas del 26-oct y del 2-nov), el extract de 0 eventos, los avisos de `observe` (`no_events_in_window`, `capture_gap`), los cambios por semana del load y la respuesta 201. Antes hay dos intentos rechazados con 422 por la validación del cuerpo |
+| [Última corrida](../screenshots/weekly-performance-pipeline/02-swagger-latest-run.png) | El log de `GET /reporting/pipeline-runs/latest`: 200, con una sola consulta SQL |
+| [Reporte semanal: log](../screenshots/weekly-performance-pipeline/03-swagger-weekly-report-a.png) | El log de `GET /reporting/weekly-warehouse-client-performance` sin parámetros: 200 |
+| [Reporte semanal: respuesta](../screenshots/weekly-performance-pipeline/03-swagger-weekly-report-b.png) | La última semana calculada (`2026-11-02`), con `computed_at`, el `run_id` de la corrida de la captura 01 y `entries: []`: se calculó y no tuvo actividad. Debajo, los códigos documentados (401, 404, 422, 503) |
+| [Semana no calculada: log](../screenshots/weekly-performance-pipeline/04-swagger-week-not-computed-a.png) | El log del mismo `GET` con `week_start=2026-10-19`: 404 |
+| [Semana no calculada: respuesta](../screenshots/weekly-performance-pipeline/04-swagger-week-not-computed-b.png) | El 404 «Esa semana no la ha calculado ninguna ejecución correcta del pipeline.» No se confunde «sin calcular» con «sin actividad» |
+| [Línea de comandos, `--dry-run`](../screenshots/weekly-performance-pipeline/05-cli-dry-run.png) | `python -m app.reporting --dry-run` contra Supabase. Muestra `source_health` (eventos y sesiones por día, a cero, y los 14 días en silencio) y `capture_coverage`: en la semana del 26-oct, Los Ángeles tiene 4 entradas y 2 despachos, y Zaragoza 3 entradas, todo sin eventos. No escribe nada |
+
 ## 7. Limitaciones y pendientes
 
 - **Programación automática** del lunes: aplazada hasta que el backend se despliegue con las imágenes nuevas (§3.3).
