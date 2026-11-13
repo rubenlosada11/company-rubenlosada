@@ -78,3 +78,29 @@ def telemetry_count() -> int:
 def frame(*rows: dict[str, Any]) -> pd.DataFrame:
     """DataFrame con la forma de la salida de `extract` (sin pasar por la base)."""
     return pd.DataFrame([{name: row[name] for name in COLUMNS} for row in rows], columns=COLUMNS)
+
+
+def record_orders(*orders: tuple[str, str, datetime]) -> None:
+    """Órdenes del inventario (fuente de verdad): `(tipo, almacén, cuándo)`; tipo `inbound`, `dispatch` o `loss`."""
+    from sqlmodel import Session
+
+    from app.database import get_engine
+    from app.inventory_models import SKU, StockEntry, StockExit
+
+    with Session(get_engine()) as session:
+        sku = SKU(
+            name="Camiseta",
+            sku=f"SKU-{uuid.uuid4().hex[:8]}",
+            client_name="Fashion Co",
+            category="fashion",
+            warehouse="LA",
+        )
+        session.add(sku)
+        session.flush()
+        for kind, warehouse, moment in orders:
+            common = {"sku_id": sku.id, "quantity": 1, "warehouse": warehouse, "created_at": moment, "user_uuid": "u-1"}
+            if kind == "inbound":
+                session.add(StockEntry(reference="REF", **common))
+            else:
+                session.add(StockExit(exit_type=kind, **common))
+        session.commit()

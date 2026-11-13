@@ -12,8 +12,8 @@ from fastapi.testclient import TestClient
 
 from app.auth_models import Role
 from app.main import app
-from app.reporting import flow, queries, runs
-from app.reporting.flow import PipelineAlreadyRunning, run_weekly_performance
+from app.reporting import flow, runs
+from app.reporting.flow import PipelineAlreadyRunning, PipelineRunFailed, run_weekly_performance
 from app.reporting.tables import ReportingStorageError
 from app.reporting.weeks import last_complete_week
 from tests.conftest import bearer
@@ -37,9 +37,11 @@ RUN_KEYS = {
     "status",
     "trigger",
     "triggered_by",
+    "request_id",
     "environment",
     "week_from",
     "week_to",
+    "phase",
     "started_at",
     "finished_at",
     "duration_ms",
@@ -98,8 +100,8 @@ def test_report_defaults_to_the_latest_computed_week_with_the_briefing_shape(use
     response = user_api.get(REPORT)
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"week_start", "computed_at", "entries"}
-    assert body["week_start"] == W2.isoformat()
+    assert set(body) == {"week_start", "computed_at", "run_id", "entries"}
+    assert body["week_start"] == W2.isoformat() and body["run_id"] == str(computed["id"])
     assert body["computed_at"].endswith("Z") or body["computed_at"].endswith("+00:00")
     assert all(set(entry) == ENTRY_KEYS for entry in body["entries"])
     assert body["entries"] == [
@@ -130,10 +132,24 @@ def test_report_of_a_given_week(user_api, computed):
     assert [(e["client_id"], e["inbound_units_count"]) for e in body["entries"]] == [("fashion-co", 500)]
 
 
-def test_week_without_rows_returns_empty_entries(user_api, computed):
-    response = user_api.get(REPORT, params={"week_start": (W1 - timedelta(days=7)).isoformat()})
+def test_computed_week_without_activity_is_200_with_empty_entries(user_api, computed):
+    quiet = W1 - timedelta(days=7)
+    run = run_weekly_performance(week_start=quiet, weeks=1, now=NOW)
+    response = user_api.get(REPORT, params={"week_start": quiet.isoformat()})
     assert response.status_code == 200
-    assert response.json()["entries"] == [] and response.json()["computed_at"] is None
+    assert response.json()["entries"] == [] and response.json()["run_id"] == str(run["id"])
+
+
+def test_week_never_computed_is_404_not_an_empty_report(user_api, computed):
+    response = user_api.get(REPORT, params={"week_start": (W1 - timedelta(days=14)).isoformat()})
+    assert response.status_code == 404 and "ninguna ejecución" in response.json()["detail"]
+
+
+def test_failed_runs_do_not_count_as_computed(user_api, monkeypatch, frozen_now):
+    monkeypatch.setattr(flow, "aggregate_rows", lambda *a: 1 / 0)
+    with pytest.raises(PipelineRunFailed):
+        run_weekly_performance()
+    assert user_api.get(REPORT).status_code == 404
 
 
 def test_no_computed_week_yet_is_404(user_api):
@@ -149,10 +165,10 @@ def test_week_start_must_be_a_monday_date(user_api, week_start):
 
 
 def test_report_storage_failure_is_503(user_api, monkeypatch):
-    def broken():
+    def broken(*args):
         raise ReportingStorageError("OperationalError")
 
-    monkeypatch.setattr(queries, "latest_week", broken)
+    monkeypatch.setattr(runs, "latest_covered_week", broken)
     response = user_api.get(REPORT)
     assert response.status_code == 503 and "OperationalError" not in response.text
 
@@ -205,6 +221,8 @@ def test_staff_runs_the_default_window(make_user, role, frozen_now):
     body = response.json()
     assert set(body) == RUN_KEYS
     assert body["status"] == "succeeded" and body["trigger"] == "api" and body["triggered_by"] == user.id
+    # El X-Request-Id de la respuesta queda en la ejecución: une la petición, sus logs y la corrida.
+    assert body["request_id"] == response.headers["x-request-id"] and body["phase"] == "loaded"
     assert (body["week_from"], body["week_to"]) == (W1.isoformat(), W2.isoformat())
     assert body["rows_upserted"] == 1
 

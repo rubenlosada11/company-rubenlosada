@@ -96,12 +96,20 @@ def test_full_run_writes_the_report_and_records_the_run(week_of_activity):
     assert (run["trigger"], run["triggered_by"], run["environment"]) == ("api", "user-1", "development")
     assert (run["week_from"], run["week_to"]) == (W1, W2)
     assert (run["events_read"], run["events_rejected"], run["rows_upserted"], run["rows_deleted"]) == (12, 1, 3, 0)
-    assert run["stats"] == {
-        "weeks": [W1.isoformat(), W2.isoformat()],
-        "events_read": {INBOUND: 3, OUTBOUND: 7, STOCKOUT: 1, DISCREPANCY: 1},
-        "events_rejected": {OUTBOUND: {"invalid_client_id": 1}},
+    stats = run["stats"]
+    assert stats["weeks"] == [W1.isoformat(), W2.isoformat()]
+    assert stats["events_read"] == {INBOUND: 3, OUTBOUND: 7, STOCKOUT: 1, DISCREPANCY: 1}
+    assert stats["events_rejected"] == {OUTBOUND: {"invalid_client_id": 1}}
+    assert stats["changes"] == {
+        W1.isoformat(): {"inserted": 1, "updated": 0, "unchanged": 0, "deleted": 0},
+        W2.isoformat(): {"inserted": 2, "updated": 0, "unchanged": 0, "deleted": 0},
     }
+    # Sin órdenes en el inventario de prueba: todos los eventos de órdenes «sobran» frente a la fuente de verdad.
+    assert "capture_gap" in stats["warnings"] and "silent_days" in stats["warnings"]
+    assert stats["source_health"]["total_events"] == 13  # también cuenta login_failed: la captura funciona
+    assert run["phase"] == "loaded" and run["request_id"] is None
     assert run["finished_at"] is not None and run["duration_ms"] >= 0 and run["error"] is None
+    assert {row["run_id"] for row in report_rows()} == {run["id"]}  # cada fila dice qué ejecución la escribió
 
 
 def test_rerunning_is_idempotent(week_of_activity):
@@ -121,6 +129,20 @@ def test_late_events_are_picked_up_by_the_next_run(week_of_activity):
     run_weekly_performance(now=next_monday)  # ventana W2–W3: W2 se recalcula
     w2 = [r for r in report_rows() if r["week_start"] == W2 and r["client_id"] == "fashion-co"]
     assert w2[0]["outbound_orders_count"] == 5
+
+
+def test_each_run_records_which_published_weeks_it_changed(week_of_activity):
+    first = run_weekly_performance(now=NOW)
+    insert(event(OUTBOUND, at(W2, 23), order_id=201))  # evento tardío de W2
+    second = run_weekly_performance(now=NOW)
+    assert second["stats"]["changes"] == {
+        W1.isoformat(): {"inserted": 0, "updated": 0, "unchanged": 1, "deleted": 0},
+        W2.isoformat(): {"inserted": 0, "updated": 1, "unchanged": 1, "deleted": 0},
+    }
+    rows = {(r["week_start"], r["client_id"]): r for r in report_rows()}
+    # La fila corregida y las demás de la ventana apuntan a la última ejecución; la anterior queda en el registro.
+    assert rows[(W2, "fashion-co")]["run_id"] == second["id"] != first["id"]
+    assert runs.get_run(first["id"])["status"] == "succeeded"
 
 
 def test_a_failed_week_is_filled_by_the_next_scheduled_run(week_of_activity, monkeypatch):
@@ -149,6 +171,7 @@ def test_failure_is_recorded_and_the_report_is_unchanged(week_of_activity, monke
     with pytest.raises(PipelineRunFailed) as error:
         run_weekly_performance(now=NOW)
     assert error.value.run["status"] == "failed" and error.value.run["error"] == "ValueError"
+    assert error.value.run["phase"] == "validated"  # checkpoint: murió en aggregate
     assert kpis(report_rows()) == before
     latest = runs.latest_run(PIPELINE_NAME)
     assert latest["status"] == "failed" and "detalle" not in latest["error"]
@@ -203,7 +226,17 @@ def test_stale_running_run_is_marked_abandoned():
     assert (stale["status"], stale["error"]) == ("failed", "abandoned")
 
 
-def test_recent_running_run_of_another_process_is_left_alone():
+def test_load_failure_leaves_the_aggregated_checkpoint(week_of_activity, monkeypatch):
+    def broken(*args, **kwargs):
+        raise ReportingStorageError("OperationalError")
+
+    monkeypatch.setattr(flow, "load_rows", broken)
+    with pytest.raises(PipelineRunFailed) as error:
+        run_weekly_performance(now=NOW)
+    assert error.value.run["phase"] == "aggregated" and report_rows() == []
+
+
+def test_a_running_run_of_another_process_blocks_a_second_one():
     other_id = uuid.uuid4()
     with reporting_engine().begin() as connection:
         connection.execute(
@@ -218,8 +251,10 @@ def test_recent_running_run_of_another_process_is_left_alone():
                 started_at=datetime.now(UTC) - timedelta(minutes=5),
             )
         )
-    run_weekly_performance(now=NOW)
+    with pytest.raises(PipelineAlreadyRunning):  # p. ej. el cron a las 06:00 y un POST a las 06:05
+        run_weekly_performance(now=NOW)
     assert runs.get_run(other_id)["status"] == "running"
+    assert [run["id"] for run in all_runs()] == [other_id]  # el segundo no llega a registrarse ni a leer nada
 
 
 def test_only_one_run_at_a_time_in_the_process(monkeypatch):

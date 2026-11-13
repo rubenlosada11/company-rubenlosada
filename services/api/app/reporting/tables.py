@@ -18,6 +18,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     Engine,
+    Index,
     Integer,
     MetaData,
     Numeric,
@@ -25,6 +26,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import SQLAlchemyError
@@ -36,7 +38,7 @@ MIGRATION_FILE = "migrations/20261113120000_reporting_weekly_performance.sql"
 
 metadata = MetaData(schema=SCHEMA)
 
-# Columnas exactas del BRIEFING (§5). `discrepancy_rate` es `numeric` en la base y `float` en Python.
+# Columnas del BRIEFING (§5) más `run_id` (trazabilidad). `discrepancy_rate`: `numeric` en la base, `float` en Python.
 weekly_performance = Table(
     "weekly_warehouse_client_performance",
     metadata,
@@ -50,6 +52,7 @@ weekly_performance = Table(
     Column("discrepancy_events_count", Integer, nullable=False, default=0),
     Column("discrepancy_rate", Numeric(asdecimal=False), nullable=False, default=0),
     Column("computed_at", DateTime(timezone=True), nullable=False),
+    Column("run_id", Uuid, nullable=True),
     UniqueConstraint("warehouse", "client_id", "week_start"),
 )
 
@@ -70,9 +73,11 @@ pipeline_runs = Table(
     Column("status", Text, nullable=False),
     Column("trigger", Text, nullable=False),
     Column("triggered_by", Text, nullable=True),
+    Column("request_id", Uuid, nullable=True),
     Column("environment", Text, nullable=False),
     Column("week_from", Date, nullable=False),
     Column("week_to", Date, nullable=False),
+    Column("phase", Text, nullable=False, default="started"),
     Column("started_at", DateTime(timezone=True), nullable=False),
     Column("finished_at", DateTime(timezone=True), nullable=True),
     Column("duration_ms", Integer, nullable=True),
@@ -82,7 +87,17 @@ pipeline_runs = Table(
     Column("rows_deleted", Integer, nullable=True),
     Column("stats", JSON().with_variant(JSONB(), "postgresql"), nullable=True),
     Column("error", Text, nullable=True),
+    # Candado entre procesos: como mucho una ejecución `running` por pipeline (índice único parcial).
+    Index(
+        "pipeline_runs_one_running_idx",
+        "pipeline",
+        unique=True,
+        sqlite_where=text("status = 'running'"),
+        postgresql_where=text("status = 'running'"),
+    ),
 )
+
+PHASES = ("started", "extracted", "validated", "aggregated", "loaded")
 
 
 class ReportingStorageError(Exception):

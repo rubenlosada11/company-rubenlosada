@@ -30,8 +30,11 @@ class WeeklyPerformanceEntry(BaseModel):
 
 class WeeklyPerformanceReport(BaseModel):
     week_start: date = Field(description="Lunes de la semana ISO (UTC).")
-    computed_at: datetime | None = Field(description="Último recálculo de la semana (UTC); nulo si no tiene filas.")
-    entries: list[WeeklyPerformanceEntry] = Field(description="Una entrada por almacén y cliente con actividad.")
+    computed_at: datetime | None = Field(description="Fin de la última ejecución que calculó la semana (UTC).")
+    run_id: uuid.UUID | None = Field(description="Ejecución (pipeline-runs) que calculó la semana por última vez.")
+    entries: list[WeeklyPerformanceEntry] = Field(
+        description="Una entrada por almacén y cliente con actividad; vacía si la semana se calculó sin actividad."
+    )
 
     @field_validator("computed_at")
     @classmethod
@@ -58,9 +61,13 @@ class PipelineRun(BaseModel):
     status: Literal["running", "succeeded", "failed"]
     trigger: Literal["api", "cli"] = Field(description="`api` (POST) o `cli` (manual o cron).")
     triggered_by: str | None = Field(description="Id interno del usuario que la lanzó por la API.")
+    request_id: uuid.UUID | None = Field(description="X-Request-Id de la petición que la lanzó (trigger = api).")
     environment: str = Field(description="Entorno de los eventos leídos (`TELEMETRY_ENVIRONMENT`).")
     week_from: date = Field(description="Primera semana (lunes) de la ventana.")
     week_to: date = Field(description="Última semana (lunes) de la ventana.")
+    phase: Literal["started", "extracted", "validated", "aggregated", "loaded"] = Field(
+        description="Último subflow completado (checkpoint): en una ejecución fallida, dónde se paró."
+    )
     started_at: datetime
     finished_at: datetime | None
     duration_ms: int | None
@@ -69,7 +76,10 @@ class PipelineRun(BaseModel):
     rows_upserted: int | None = Field(description="Filas escritas (insertadas o actualizadas).")
     rows_deleted: int | None = Field(description="Filas eliminadas al reconciliar las semanas recalculadas.")
     stats: dict[str, Any] | None = Field(
-        description="Semanas, eventos leídos por event_type y rechazos por event_type y motivo."
+        description=(
+            "Semanas, eventos leídos y rechazados, avisos (`warnings`), salud del origen por día, cobertura de la "
+            "captura frente al inventario y cambios por semana (`changes`)."
+        )
     )
     error: str | None = Field(description="Tipo de error si ha fallado (nunca datos ni credenciales).")
 

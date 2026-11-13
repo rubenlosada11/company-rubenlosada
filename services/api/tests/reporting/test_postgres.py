@@ -124,3 +124,38 @@ def test_endpoints_on_postgres(make_user, monkeypatch):
     }
     latest = api.get("/reporting/pipeline-runs/latest").json()
     assert latest["status"] == "succeeded" and latest["trigger"] == "api"
+
+
+def test_partial_unique_index_blocks_a_second_running_run():
+    from app.reporting.flow import PipelineAlreadyRunning
+    from app.reporting.tables import pipeline_runs
+
+    other = uuid.uuid4()
+    with reporting_engine().begin() as connection:
+        connection.execute(
+            pipeline_runs.insert().values(
+                id=other,
+                pipeline=flow.PIPELINE_NAME,
+                status="running",
+                trigger="cli",
+                environment="development",
+                week_from=W1,
+                week_to=W2,
+                phase="extracted",
+                started_at=NOW.replace(year=2100),  # «reciente»: no se marca como abandonada
+            )
+        )
+    with pytest.raises(PipelineAlreadyRunning):
+        run_weekly_performance(now=NOW)
+    with reporting_engine().connect() as connection:
+        statuses = connection.execute(text("select status, count(*) from reporting.pipeline_runs group by 1")).all()
+    assert statuses == [("running", 1)]
+
+
+def test_rows_point_to_their_run_on_postgres():
+    brand = client()
+    insert(event(OUTBOUND, at(W2), client_id=brand, order_id=900))
+    run = run_weekly_performance(now=NOW)
+    (row,) = rows_of(brand)
+    assert row["run_id"] == run["id"] and run["phase"] == "loaded"
+    assert "capture_coverage" in run["stats"] and "changes" in run["stats"]

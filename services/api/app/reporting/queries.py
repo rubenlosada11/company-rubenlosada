@@ -3,21 +3,12 @@
 from datetime import date
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.reporting.tables import KPI_COLUMNS, reporting_engine, storage_error, weekly_performance
 
 ENTRY_COLUMNS = ("warehouse", "client_id", *KPI_COLUMNS)
-
-
-def latest_week() -> date | None:
-    """`week_start` más reciente con filas calculadas, o `None` si la tabla está vacía."""
-    try:
-        with reporting_engine().connect() as connection:
-            return connection.execute(select(func.max(weekly_performance.c.week_start))).scalar()
-    except SQLAlchemyError as error:
-        raise storage_error(error) from None
 
 
 def week_rows(week_start: date) -> list[dict[str, Any]]:

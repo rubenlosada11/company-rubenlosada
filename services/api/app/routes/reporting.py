@@ -11,6 +11,7 @@ este router solo valida parámetros, lee las tablas de `reporting` y lanza ejecu
 Las lecturas exigen un usuario autenticado. Un fallo de la base es un 503 sin detalles (nunca la cadena de conexión).
 """
 
+import uuid
 from datetime import date
 from typing import Annotated
 
@@ -24,12 +25,14 @@ from app.reporting.flow import PIPELINE_NAME, PipelineAlreadyRunning, PipelineRu
 from app.reporting.models import PipelineRun, PipelineRunRequest, WeeklyPerformanceEntry, WeeklyPerformanceReport
 from app.reporting.tables import ReportingStorageError
 from app.reporting.weeks import WindowError, is_monday
+from app.telemetry.context import current_context
 
 router = APIRouter(prefix="/reporting", tags=["reporting"])
 
 RUNNER_ROLES = {Role.ADMIN, Role.MANAGER}
 REPORTING_UNAVAILABLE = "No se ha podido leer el reporte semanal. Inténtalo de nuevo más tarde."
 NO_WEEKS_YET = "Aún no hay ninguna semana calculada: ejecuta el pipeline (POST /reporting/pipeline-runs)."
+WEEK_NOT_COMPUTED = "Esa semana no la ha calculado ninguna ejecución correcta del pipeline."
 NO_RUNS_YET = "El pipeline semanal todavía no se ha ejecutado nunca."
 RUN_FORBIDDEN = "Solo un administrador o un manager puede ejecutar el pipeline."
 RUN_IN_PROGRESS = "Ya hay una ejecución del pipeline semanal en curso. Espera a que termine."
@@ -51,11 +54,12 @@ def _query_error(field: str, message: str) -> RequestValidationError:
     description=(
         "Volumen de entrada, throughput de salida, quiebres de stock y tasa de discrepancia de cada combinación "
         "almacén/cliente con actividad en la semana ISO `week_start` (un lunes, UTC). Sin `week_start`: la semana "
-        "calculada más reciente. Una semana calculada sin actividad devuelve `entries` vacío."
+        "calculada más reciente. Una semana calculada sin actividad devuelve `entries` vacío; una semana que ninguna "
+        "ejecución correcta ha calculado, 404 (así no se confunde «sin actividad» con «sin calcular»)."
     ),
     responses={
         401: {"description": "Sin token o token no válido"},
-        404: {"description": "Aún no se ha calculado ninguna semana (solo sin `week_start`)"},
+        404: {"description": "La semana (o ninguna, sin `week_start`) no se ha calculado todavía"},
         422: {"description": "`week_start` no es una fecha o no es un lunes"},
         503: {"description": "No se ha podido leer la tabla del reporte"},
     },
@@ -66,15 +70,19 @@ def weekly_warehouse_client_performance(
     if week_start is not None and not is_monday(week_start):
         raise _query_error("week_start", "week_start debe ser un lunes (inicio de la semana ISO).")
     try:
-        week = week_start or queries.latest_week()
+        week = week_start or runs.latest_covered_week(PIPELINE_NAME)
         if week is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=NO_WEEKS_YET)
+        run = runs.latest_covering_run(PIPELINE_NAME, week)
+        if run is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=WEEK_NOT_COMPUTED)
         rows = queries.week_rows(week)
     except ReportingStorageError:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=REPORTING_UNAVAILABLE) from None
     return WeeklyPerformanceReport(
         week_start=week,
-        computed_at=max((row["computed_at"] for row in rows), default=None),
+        computed_at=run["finished_at"],
+        run_id=run["id"],
         entries=[WeeklyPerformanceEntry.model_validate(row) for row in rows],
     )
 
@@ -126,9 +134,15 @@ def create_pipeline_run(
     if current_user.role not in RUNNER_ROLES:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail=RUN_FORBIDDEN)
     params = request or PipelineRunRequest()
+    context = current_context()
     try:
         run = run_weekly_performance(
-            week_start=params.week_start, weeks=params.weeks, trigger="api", triggered_by=current_user.id
+            week_start=params.week_start,
+            weeks=params.weeks,
+            trigger="api",
+            triggered_by=current_user.id,
+            # Mismo X-Request-Id que la respuesta: une la petición, sus logs y la ejecución.
+            request_id=uuid.UUID(context.request_id) if context else None,
         )
     except WindowError as error:
         raise RequestValidationError(
