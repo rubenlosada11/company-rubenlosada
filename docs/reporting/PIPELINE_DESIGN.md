@@ -310,13 +310,14 @@ el mismo flow pasaría a una cola sin cambiar el contrato salvo el código de es
 ## 16. Riesgos, limitaciones y pendientes
 
 - **Dos KPIs sin datos** hasta que negocio defina mínimos por cliente y un proceso de conteo (§4.1).
-- **Instalar el `cron`** en el VPS es infraestructura: requiere confirmación del desarrollador (AGENTS.md §4). Hasta
-  entonces el pipeline se ejecuta con `POST /reporting/pipeline-runs` o `python -m app.reporting`.
-- **Aplicar la migración en Supabase** la hace el desarrollador en el SQL Editor (como la de telemetría).
+- **Programación del `cron`** en el VPS: aplazada (2026-11-13) hasta desplegar el backend con imágenes nuevas y
+  `DATABASE_URL` de producción; hoy calcularía reportes vacíos. Hasta entonces el pipeline se ejecuta con
+  `POST /reporting/pipeline-runs` o `python -m app.reporting`.
+- **Migración en Supabase:** aplicada por el desarrollador el 2026-11-13 (SQL Editor).
 - **Vista para Thomas** en el backoffice: siguiente paso natural, fuera del alcance del BRIEFING.
 - **Mismo `DATABASE_URL` para varios entornos**: la tabla de destino no distingue entorno (§4.2).
-- **Canal de alertas**: los avisos (`no_events_in_window`, `silent_days`, `capture_gap`) quedan en el registro y en el
-  log; avisar a alguien (email, Slack) está por decidir (§17.2).
+- **Canal de alertas**: decidido email (Resend, remitente del dominio verificado, destinatario por variable de
+  entorno), sin implementar todavía; los avisos quedan en el registro y en el log (§17.2).
 
 ## 17. Preguntas de diseño: idempotencia, observabilidad, recuperabilidad y concurrencia
 
@@ -357,8 +358,8 @@ eliminadas, y cada fila guarda el `run_id` de la corrida que la escribió. La co
 | Captura caída | El subflow `observe` cuenta eventos de **cualquier** tipo por día: si no hay ninguno, aviso `no_events_in_window`; días sueltos sin eventos, `silent_days` |
 
 Si hay logins y navegación pero ninguna orden, la captura funciona y el cero es real. El *heartbeat* es la propia
-corrida semanal (`pipeline-runs/latest`); la alerta de silencio, sus `warnings`. El canal de alertas (email, Slack…)
-queda pendiente de decidir.
+corrida semanal (`pipeline-runs/latest`); la alerta de silencio, sus `warnings`. Canal decidido: email al
+desarrollador (pendiente de implementar, §16).
 
 **Trazabilidad de la recolección** *(revisión)*. El camino evento → reporte se reconstruye con:
 `X-Request-Id` de la petición que lanzó la corrida (`pipeline_runs.request_id`, el mismo de la respuesta y de los

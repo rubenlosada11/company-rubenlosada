@@ -50,8 +50,12 @@ la anterior, para recoger eventos tardíos y rellenar la semana de una ejecució
 
 En el SQL Editor de Supabase, pegar y ejecutar el contenido de
 `services/api/migrations/20261113120000_reporting_weekly_performance.sql` (idempotente; necesita la migración de
-telemetría aplicada antes). **Pendiente del desarrollador:** hasta entonces, con `DATABASE_URL` apuntando a Supabase,
-`POST /reporting/pipeline-runs` responde 503 y el resto de la API funciona igual.
+telemetría aplicada antes). Sin ella, con `DATABASE_URL` apuntando a Supabase, `POST /reporting/pipeline-runs`
+responde 503 y el resto de la API funciona igual.
+
+**Hecho el 2026-11-13** por el desarrollador, con una primera ejecución por línea de comandos: `succeeded`, fase
+`loaded`, ventana 26-oct → 8-nov, 0 eventos y 0 filas, avisos `no_events_in_window` y `capture_gap` (esas semanas son
+anteriores a la captura y el inventario sí tiene órdenes). Es el resultado esperado.
 
 En SQLite (sin `DATABASE_URL`) no hace falta nada: las tablas se crean al primer uso.
 
@@ -71,7 +75,7 @@ uv run --env-file .env python -m app.reporting --dry-run
 - Códigos de salida: 0 bien, 1 la ejecución falló, 2 parámetros no válidos o ejecución ya en curso.
 - Entorno de los eventos: `TELEMETRY_ENVIRONMENT` (por defecto `development`).
 
-### 3.3. Programación semanal (pendiente de confirmar: infraestructura)
+### 3.3. Programación semanal (aplazada: no forma parte de la entrega)
 
 Lunes a las 06:00 UTC, en el `crontab` del VPS, con el contenedor de la API levantado:
 
@@ -79,9 +83,15 @@ Lunes a las 06:00 UTC, en el `crontab` del VPS, con el contenedor de la API leva
 0 6 * * 1  cd /opt/company-rubenlosada && docker compose -f docker-compose.prod.yml exec -T backend python -m app.reporting
 ```
 
-No se ha instalado: tocar el VPS requiere la confirmación del desarrollador (AGENTS.md §4) y los entornos están
-parados. Mientras tanto, la misma ejecución se lanza a mano con `POST /reporting/pipeline-runs` o con la línea de
-comandos; como la ventana es de 2 semanas, una semana olvidada se recupera en la siguiente ejecución.
+**Decisión (2026-11-13): no se instala ahora.** La entrega del BRIEFING es diseñar, construir y probar el pipeline;
+la programación queda diseñada y lista (la línea de arriba). Instalarla hoy no aportaría datos: el stack del VPS está
+parado, sus imágenes (`infra40-rc1`) son anteriores a la telemetría y a este pipeline, su API no apunta a Supabase y
+nadie usa esa instancia, así que calcularía cada lunes un reporte vacío. Se instalará cuando el backend se despliegue
+de verdad con las imágenes nuevas y `DATABASE_URL` de producción (o desde un futuro workflow de `workflows/`, que
+puede llamar a `POST /reporting/pipeline-runs`).
+
+Mientras tanto, la ejecución se lanza a mano con `POST /reporting/pipeline-runs` o con la línea de comandos. Como la
+ventana es de 2 semanas, una semana olvidada se recupera en la siguiente ejecución.
 
 ## 4. Endpoints
 
@@ -167,14 +177,17 @@ uv run pytest tests/reporting/test_postgres.py
 
 ## 7. Limitaciones y pendientes
 
-- **Aplicar la migración en Supabase** (desarrollador, SQL Editor) y, después, una primera ejecución real.
-- **Instalar el `cron`** del lunes en el VPS (infraestructura, requiere confirmación).
+- **Programación automática** del lunes: aplazada hasta que el backend se despliegue con las imágenes nuevas (§3.3).
+  Hasta entonces, «fresco el lunes» depende de lanzarlo a mano.
 - Dos KPIs sin datos hasta que negocio defina mínimos por cliente y un proceso de conteo.
 - Vista del reporte en el backoffice para Thomas y Ana: fuera del alcance del BRIEFING; es el siguiente paso natural.
 - La tabla del reporte no distingue entorno: cada entorno debe usar su propia base.
 - Ejecución síncrona y una a la vez: suficiente para el volumen actual (milisegundos con decenas de eventos); con
   mucho más volumen, el mismo flow pasaría a una cola.
-- Los avisos quedan en el registro y en el log: falta decidir un canal de alertas (email, Slack).
+- **Alertas por email (decidido, sin implementar):** cuando una corrida falle o tenga avisos, un email al
+  desarrollador con el servicio de email que ya usa la API (Resend). El remitente tiene que ser del dominio verificado
+  `rubenlosada.com` (Resend no puede enviar desde una dirección de Gmail); el destinatario, una variable de entorno
+  nueva del `.env`. Hasta entonces los avisos quedan en el registro y en el log.
 - `capture_gap` en Supabase: hay órdenes sin evento (semana del 26-oct, anterior a la captura, y una entrada de Los
   Ángeles en la semana del 9-nov). Conviene revisar si esa orden se creó sin `TELEMETRY_PSEUDONYM_KEY` (los eventos
   de órdenes la exigen).

@@ -21,8 +21,10 @@
   con las preguntas de diseño del BRIEFING** (PIPELINE_DESIGN §17): subflow `observe` (eventos y sesiones por día,
   órdenes del inventario frente a eventos, avisos), checkpoint `phase`, `request_id` y `run_id` (trazabilidad),
   cambios por semana en `stats.changes`, 404 para semanas no calculadas y candado entre procesos (índice único
-  parcial). API 1659 tests (+6 opcionales de PostgreSQL); PostgreSQL 6/6. Pendiente: aplicar la migración en Supabase (desarrollador), instalar el
-  `cron` (infraestructura), canal de alertas, PR y Notion.
+  parcial). API 1659 tests (+6 opcionales de PostgreSQL); PostgreSQL 6/6. **Migración aplicada en Supabase** por el
+  desarrollador y primera ejecución real correcta (2026-11-13: 0 filas, avisos esperados). `cron` del VPS aplazado
+  (no forma parte de la entrega; el stack del VPS está parado y desactualizado). Alertas: decidido email (Resend),
+  sin implementar. Pendiente: PR (fusiona el desarrollador) y Notion.
 - **Telemetría de la compañía — Reporte técnico** (práctica sin número de hito; fase 4 y última de la serie de
   telemetría): pipeline de análisis con Pandas (`services/api/app/telemetry/analysis.py`, 5 métricas independientes:
   SQL con el periodo `[from, to)` y `event_type IN (…)` en la consulta, dimensiones de `tags` y agregación en Pandas) y
@@ -1645,10 +1647,9 @@ después el código.
     Recomendado: un rol de base de datos de solo inserción para la telemetría (§10). Decisiones de `docs/telemetry/telemetry-plan.md` §18.2: mínimos de stock por cliente, proceso
     de conteo físico, destino de los eventos, custodia de `TELEMETRY_PSEUDONYM_KEY` y si el alta de SKUs rechaza
     `current_stock` con 422.
-14. Pipeline de desempeño semanal (`feature/weekly-performance-pipeline`): aplicar
-    `services/api/migrations/20261113120000_reporting_weekly_performance.sql` en el SQL Editor de Supabase y lanzar
-    una primera ejecución; decidir si se instala el `cron` del lunes en el VPS
-    (`docs/reporting/weekly-performance-pipeline.md` §3.3); canal para los avisos (`capture_gap`,
-    `no_events_in_window`); revisar la orden de entrada de Los Ángeles sin evento (¿creada sin
-    `TELEMETRY_PSEUDONYM_KEY`?); PR y ficha de Notion. Siguiente paso natural: vista del reporte en el backoffice
-    para Thomas y Ana.
+14. Pipeline de desempeño semanal (`feature/weekly-performance-pipeline`): migración aplicada en Supabase y primera
+    ejecución hecha (2026-11-13). Pendiente: fusionar la PR y la ficha de Notion; implementar las alertas por email
+    (Resend, remitente de `rubenlosada.com`, destinatario en una variable nueva del `.env`); instalar el `cron` del
+    lunes cuando se redespliegue el backend (`docs/reporting/weekly-performance-pipeline.md` §3.3); revisar la orden
+    de entrada de Los Ángeles sin evento (¿creada sin `TELEMETRY_PSEUDONYM_KEY`?). Siguiente paso natural: vista del
+    reporte en el backoffice para Thomas y Ana.
