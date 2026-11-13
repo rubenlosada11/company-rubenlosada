@@ -143,6 +143,8 @@ navegador se hacen fuera del repo (Edge + `playwright-core` en el scratchpad).
 | Cargar los SKUs y movimientos de ejemplo del inventario (idempotente; necesita un usuario en TinyDB: por defecto el primer admin) | `uv run seed-inventory` · `uv run seed-inventory <email>` |
 | Solo los tests del inventario (Hito 5) | `uv run pytest tests/test_inventory.py tests/test_seed_inventory.py tests/test_inventory_database.py` |
 | Cargar el CSV histórico en el gestor de incidencias (idempotente; **desde la raíz del repo**, con la API parada) | `uv run --project services/api python scripts/seed_incidents.py` |
+| Pipeline de desempeño semanal: 2 últimas semanas completas · otra ventana · sin escribir nada | `uv run --env-file .env python -m app.reporting` · `… --week-start 2026-11-02 --weeks 4` · `… --dry-run` |
+| Tests del pipeline · contra un PostgreSQL local desechable con las dos migraciones | `uv run pytest tests/reporting` · `$env:REPORTING_TEST_DATABASE_URL = "postgresql+psycopg://…@127.0.0.1:…"` y `uv run pytest tests/reporting/test_postgres.py` |
 | Regenerar `services/requirements.txt` (Docker) tras cambiar dependencias | `uv export --frozen --format requirements.txt --no-dev --no-emit-project --no-emit-package analisis-incidencias --output-file ../requirements.txt` |
 
 Docker (desde la **raíz** del repo; detalle en `docs/docker.md`). Website `:3000`, backoffice `:3001`, API `:8000`
@@ -546,6 +548,29 @@ Práctica sin hito, rama `feature/telemetry-report` (2026-11-11). Detalle en `do
 | `TTLCache` de `app/cache.py` (60 s) + candado por clave; clave `(DATABASE_URL, from, to)` en UTC; «ahora» redondeado al minuto siguiente | Reutilizar la caché existente; sin cálculos duplicados; las peticiones sin fechas comparten entrada |
 | `pandas` como dependencia de la API | Exigida por el ejercicio; el analizador de incidencias sigue sin pandas |
 | Vista como sección `#telemetria` del panel de inicio, sin librería de gráficos | El enum `section` del catálogo es cerrado; no cambiar el contrato por una vista opcional |
+
+## Decisiones técnicas del pipeline de desempeño semanal
+
+Práctica sin hito, rama `feature/weekly-performance-pipeline` (2026-11-13). Diseño en `docs/reporting/PIPELINE_DESIGN.md`;
+operación y verificación en `docs/reporting/weekly-performance-pipeline.md`.
+
+| Decisión | Motivo |
+| --- | --- |
+| `services/api/app/reporting/` + router `/reporting` (el `services/reporting/` del BRIEFING); no importa `app/telemetry/analysis.py` ni `report.py` | Misma API y conexión que la telemetría; el reporte técnico queda fuera de alcance |
+| Flow `run_weekly_performance` con subflows como funciones (`extract` → `validate` → `aggregate` → `load`), sin Prefect/Airflow | Un pipeline semanal pequeño; sin servidor ni dependencias nuevas; cada subflow se prueba solo |
+| Extract en transacción `READ ONLY` (`execution_options(postgresql_readonly=True)`), filtros de tipo, entorno y ventana en SQL | Garantía en la base de que nunca escribe en `telemetry_events` |
+| Semana ISO en UTC; solo semanas completas; ventana por defecto 2 semanas | Eventos tardíos y autorreparación si falla un lunes; la semana en curso nunca aparece como «la más reciente» |
+| Esquema `reporting` (migración `20261113120000`): tabla del BRIEFING + checks con nombre y `pipeline_runs` genérica; RLS sin políticas, solo `service_role` lee | No se escribe en `public.telemetry_events`; mismo modelo de seguridad que la telemetría |
+| SQLite: `schema_translate_map={"reporting": None}` y `create_all` al primer uso | SQLite no tiene esquemas; los tests y el desarrollo local no necesitan migraciones |
+| Load: `DELETE … tuple NOT IN` de las semanas recalculadas + `INSERT … ON CONFLICT DO UPDATE`, una transacción | Idempotente y exacto (cubre una purga futura del origen); todo o nada |
+| Filtro `environment` = `TELEMETRY_ENVIRONMENT` | Los eventos de pruebas no llegan al reporte del CEO; la tabla no tiene columna de entorno |
+| `POST` síncrono, solo `admin`/`manager`, candado por proceso (409); ejecuciones `running` de más de 30 min → `abandoned` | Segundos de cálculo; registro auditable incluso si el proceso cae |
+| Programación por `cron` del host (`python -m app.reporting`, lunes 06:00 UTC), no dentro de la API | Varios workers o reinicios no duplican ni pierden ejecuciones; instalarlo requiere confirmación (infra) |
+| Candado entre procesos = índice único parcial `pipeline_runs (pipeline) where status = 'running'` (+ `threading.Lock`) | El cron y un `POST` no se solapan (409) sin advisory locks ni tablas de bloqueo; funciona igual en SQLite |
+| `phase` como checkpoint de diagnóstico; una corrida fallida no se retoma, se recalcula la ventana | Recalcular es barato e idempotente; guardar resultados intermedios costaría más |
+| Subflow `observe` no bloqueante: eventos/sesiones por día y órdenes del inventario (`stock_entries`, `stock_exits` `dispatch`) frente a eventos | Distinguir actividad cero, captura caída y mediciones perdidas o duplicadas |
+| Trazabilidad: `request_id` (X-Request-Id) en `pipeline_runs`, `run_id` en cada fila, `stats.changes` por semana | Reconstruir petición → corrida → filas y saber qué semanas publicadas corrigió cada corrida |
+| `GET` del reporte: 404 si ninguna corrida correcta cubre la semana; 200 con `entries: []` si se calculó sin actividad | No confundir «sin actividad» con «sin calcular» |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 

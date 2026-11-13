@@ -29,6 +29,10 @@ Esta carpeta contiene la **documentación transversal** del monorepo: guías de 
 - [`telemetry/telemetry-report.md`](./telemetry/telemetry-report.md) — reporte técnico de telemetría: pipeline con
   Pandas sobre `telemetry_events` (periodo y tipos filtrados en SQL), `GET /telemetry/report` con caché de 60 s,
   definición de las métricas, clasificación de incidencias, verificación en Supabase y sección del backoffice.
+- [`reporting/PIPELINE_DESIGN.md`](./reporting/PIPELINE_DESIGN.md) y
+  [`reporting/weekly-performance-pipeline.md`](./reporting/weekly-performance-pipeline.md) — pipeline del Reporte
+  Semanal de Desempeño por Almacén y Cliente: diseño (trazabilidad KPI → evento, subflows, semana ISO, idempotencia,
+  registro de ejecuciones) y operación (comandos, `cron`, endpoints `/reporting`, verificación).
 - [`docker.md`](./docker.md) — Docker del monorepo: contenedores `interfaces` (website + backoffice) y `backend`
   (API), Compose de desarrollo con hot reload y de producción, variables, despliegue en el VPS sin acceso público,
   actualización, vuelta atrás y problemas habituales.

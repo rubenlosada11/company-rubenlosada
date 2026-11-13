@@ -466,6 +466,29 @@ ISO 8601 (sin zona = UTC), periodo `[from, to)`; sin fechas, los últimos 7 día
 `app/telemetry/analysis.py` (SQL + Pandas) y se guarda 60 s en caché por periodo. Detalle:
 [`docs/telemetry/telemetry-report.md`](../../docs/telemetry/telemetry-report.md).
 
+## Reporte semanal de desempeño (pipeline)
+
+Pipeline que consolida cada semana ISO (UTC), por almacén y cliente, el volumen de entrada, el throughput de salida,
+los quiebres de stock y la tasa de discrepancia a partir de `telemetry_events` (solo lectura) en la tabla
+`reporting.weekly_warehouse_client_performance`. Flow con cuatro subflows en [`app/reporting/`](./app/reporting/)
+(extract → validate → aggregate → observe → load), idempotente (upsert + reconciliación) y con registro de cada
+ejecución en `reporting.pipeline_runs`: fase completada (checkpoint), `X-Request-Id`, cambios por semana y avisos de
+observabilidad (captura en silencio, órdenes del inventario sin evento). Cada fila del reporte guarda el `run_id` de la
+ejecución que la escribió, y nunca hay dos ejecuciones a la vez (índice único parcial: 409).
+
+- `GET /reporting/weekly-warehouse-client-performance?week_start=…` (autenticado): filas de la semana; por defecto, la
+  calculada más reciente.
+- `GET /reporting/pipeline-runs/latest` (autenticado): estado y metadata de la última ejecución.
+- `POST /reporting/pipeline-runs` (`admin` o `manager`): ejecución manual de las 2 últimas semanas completas, o de
+  `{"week_start": "2026-11-02", "weeks": 4}`.
+- Línea de comandos (la del `cron` de los lunes): `uv run --env-file .env python -m app.reporting` (`--week-start`,
+  `--weeks`, `--dry-run`).
+- Con `DATABASE_URL` (Supabase), aplica antes la migración
+  [`migrations/20261113120000_reporting_weekly_performance.sql`](./migrations/20261113120000_reporting_weekly_performance.sql);
+  en SQLite las tablas se crean solas.
+- Diseño: [`docs/reporting/PIPELINE_DESIGN.md`](../../docs/reporting/PIPELINE_DESIGN.md). Operación y verificación:
+  [`docs/reporting/weekly-performance-pipeline.md`](../../docs/reporting/weekly-performance-pipeline.md).
+
 ## Tests
 
 ```powershell
@@ -503,6 +526,7 @@ funcionando con un token válido.
 | [`tests/test_inventory_database.py`](./tests/test_inventory_database.py) | Inventario: `DATABASE_URL`, creación de tablas, cambio de motor y claves foráneas en SQLite |
 | [`tests/auth/`](./tests/auth/) | AUTH-088: un módulo por endpoint de autenticación y autorización (registro, login, `/auth/token`, validación del token, `/me`, recuperación, reset, cambio de contraseña y los cuatro de `/users`), con reloj congelado y red bloqueada |
 | [`tests/backoffice/`](./tests/backoffice/) | API-042: un módulo por endpoint de proveedores (6) y del gestor de incidencias (5), llamando a las funciones del router |
+| [`tests/reporting/`](./tests/reporting/) | Pipeline de desempeño semanal: semanas ISO, cada subflow por separado (extract, validate, aggregate, load), flow (idempotencia, autorreparación, ejecuciones fallidas y abandonadas, concurrencia, origen sin cambios), línea de comandos y endpoints; `test_postgres.py`, opcional, contra un PostgreSQL local (`REPORTING_TEST_DATABASE_URL`) |
 
 ## Gestión de errores
 
@@ -589,6 +613,8 @@ services/api/
 │   ├── seed.py           # `uv run seed`
 │   ├── create_admin.py   # `uv run create-admin <email>`
 │   ├── seed_inventory.py # `uv run seed-inventory [email]`
+│   ├── telemetry/        # captura, almacenamiento y reporte técnico de la telemetría
+│   ├── reporting/        # pipeline de desempeño semanal: weeks, extract, validate, aggregate, load, runs, flow, CLI
 │   ├── services/         # users.py, profiles.py (CRUD en TinyDB), password_reset.py (enlaces), email.py (Resend),
 │   │                     # incidents.py (gestor de incidencias), inventory.py (stock y reglas del inventario)
 │   └── routes/
@@ -598,7 +624,10 @@ services/api/
 │       ├── suppliers.py  # /suppliers
 │       ├── incidents.py  # /api/incidents (analizador: /analyze y /results/export)
 │       ├── incident_manager.py  # /api/incidents (gestor: alta, listado, detalle, estado y resumen)
-│       └── inventory.py  # /inventory (SKUs y movimientos de stock)
+│       ├── inventory.py  # /inventory (SKUs y movimientos de stock)
+│       ├── telemetry.py  # /telemetry (recepción de eventos y reporte técnico)
+│       └── reporting.py  # /reporting (reporte semanal y ejecuciones del pipeline)
+├── migrations/           # SQL versionado para PostgreSQL/Supabase (telemetría y reporting)
 ├── tests/
 └── db/                   # base local (ignorada en git)
 ```
