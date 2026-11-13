@@ -24,7 +24,9 @@
   parcial). API 1659 tests (+6 opcionales de PostgreSQL); PostgreSQL 6/6. **Migración aplicada en Supabase** por el
   desarrollador y primera ejecución real correcta (2026-11-13: 0 filas, avisos esperados). `cron` del VPS aplazado
   (no forma parte de la entrega; el stack del VPS está parado y desactualizado). Alertas: decidido email (Resend),
-  sin implementar. Pendiente: PR (fusiona el desarrollador) y Notion.
+  sin implementar. **PR #30 abierta**; capturas del desarrollador (Swagger, logs y `--dry-run` contra Supabase)
+  enlazadas en `docs/reporting/weekly-performance-pipeline.md` §6.1. Pendiente: fusionar la PR (desarrollador) y
+  Notion.
 - **Telemetría de la compañía — Reporte técnico** (práctica sin número de hito; fase 4 y última de la serie de
   telemetría): pipeline de análisis con Pandas (`services/api/app/telemetry/analysis.py`, 5 métricas independientes:
   SQL con el periodo `[from, to)` y `event_type IN (…)` en la consulta, dimensiones de `tags` y agregación en Pandas) y
@@ -137,7 +139,7 @@
 | Telemetría: captura en el frontend | ✅ Implementada y validada: API 1413 tests (144 nuevos), Jest 255 (107 nuevos), E2E 46/46; PR #27 fusionada |
 | Telemetría: almacenamiento | ✅ API 1476 tests, migración en Supabase, E2E con 31 eventos reales; PR #28 fusionada (`8ee2c58`) |
 | Telemetría: reporte técnico | ✅ API 1536 tests, Jest 263; PR #29 fusionada (`eb7f47d`) |
-| Pipeline de desempeño semanal (`/reporting`) | ✅ Implementado y verificado en `feature/weekly-performance-pipeline` (API 1659 tests (+6 opcionales de PostgreSQL); PostgreSQL 6/6); migración en Supabase y `cron` pendientes; PR pendiente |
+| Pipeline de desempeño semanal (`/reporting`) | ✅ Implementado y verificado en `feature/weekly-performance-pipeline` (API 1659 tests (+6 opcionales de PostgreSQL); PostgreSQL 6/6); migración aplicada en Supabase; `cron` aplazado; PR #30 abierta con capturas |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | Autenticación (AUTH-01) | ✅ API: `User`/`Profile` en TinyDB, JWT, `/auth`, `/users`, `/profiles` y 8 rutas existentes protegidas (269 tests). Backoffice: `/login` y panel protegido (E2E 34/34). Solo local |
 | Autenticación frontend (AUTH-02) | ✅ PR #13 fusionada (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE` |
