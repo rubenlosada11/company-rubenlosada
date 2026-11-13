@@ -10,7 +10,7 @@ Una ejecución que sigue en `running` más de `ABANDON_AFTER` (el proceso cayó 
 - **Candado entre procesos:** el índice único parcial `pipeline_runs_one_running_idx` admite como mucho una fila
   `running` por pipeline. Si el `cron` y un `POST` coinciden, el segundo choca al registrarse (`RunInProgress` → 409)
   y no llega a leer ni a escribir nada.
-- **Checkpoint de fase** (`phase`): último subflow completado (`extracted`, `validated`, `aggregated`, `loaded`). Una
+- **Checkpoint de fase** (`phase`): última etapa completada (`extracted`, `aggregated`, `loaded`). Una
   ejecución fallida dice dónde murió; la siguiente no retoma desde ahí, recalcula la ventana entera (es barato y la
   carga es idempotente), así que no hay estados intermedios que reconciliar.
 """
@@ -23,6 +23,9 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.reporting.tables import pipeline_runs, reporting_engine, storage_error
+
+# Nombre del pipeline semanal en `pipeline_runs.pipeline`: lo usan el flow (data/pipelines/pipeline.py) y la API.
+WEEKLY_PERFORMANCE = "weekly_warehouse_client_performance"
 
 ABANDON_AFTER = timedelta(minutes=30)
 ABANDONED = "abandoned"
@@ -42,12 +45,15 @@ def start_run(
     week_to: date,
     started_at: datetime,
     request_id: uuid.UUID | None = None,
+    run_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
     """Registra una ejecución `running` y devuelve su id. Antes marca como abandonadas las que se quedaron colgadas.
 
-    `RunInProgress` si otra ejecución del mismo pipeline sigue `running` (índice único parcial).
+    `run_id`: id de la ejecución (el flow de Prefect pasa el id de su *flow run*, así el registro y Prefect comparten
+    identificador); por defecto, uno nuevo. `RunInProgress` si otra ejecución del mismo pipeline sigue `running`
+    (índice único parcial).
     """
-    run_id = uuid.uuid4()
+    run_id = run_id or uuid.uuid4()
     table = pipeline_runs
     try:
         with reporting_engine().begin() as connection:

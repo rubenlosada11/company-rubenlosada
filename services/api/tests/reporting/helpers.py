@@ -1,4 +1,4 @@
-"""Datos y utilidades de los tests del pipeline semanal (`app/reporting/`).
+"""Datos y utilidades de los tests del pipeline semanal (`data/pipelines/`, `data/process/`).
 
 Los eventos se insertan directamente en `telemetry_events` de la base SQLite temporal de cada test (sin pasar por
 `TelemetryEvent`), para poder probar también filas que el contrato rechazaría.
@@ -12,7 +12,7 @@ import pandas as pd
 from sqlalchemy import func, select
 
 # Los tipos de evento se reexportan para que los tests los importen desde aquí junto con los datos.
-from app.reporting.extract import COLUMNS, DISCREPANCY, INBOUND, OUTBOUND, STOCKOUT  # noqa: F401
+from data.process.weekly_performance.events import COLUMNS, DISCREPANCY, INBOUND, OUTBOUND, STOCKOUT  # noqa: F401
 from app.telemetry.storage import telemetry_engine, telemetry_events
 
 # Semanas de referencia (lunes). «Ahora» = miércoles de la semana siguiente a W2: W1 y W2 son las 2 últimas

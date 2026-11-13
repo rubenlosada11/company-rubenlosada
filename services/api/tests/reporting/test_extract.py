@@ -1,4 +1,4 @@
-"""Subflow extract: filtros en SQL y solo lectura (`app/reporting/extract.py`, PIPELINE_DESIGN.md §6.1).
+"""extract: filtros en SQL y solo lectura (`data/pipelines/weekly_performance/extract.py`, PIPELINE_DESIGN.md §6.1).
 
 Ejecutar desde services/api: uv run pytest tests/reporting/test_extract.py
 """
@@ -8,10 +8,11 @@ from datetime import timedelta
 import pytest
 from sqlalchemy.exc import OperationalError
 
-from app.reporting import extract
-from app.reporting.extract import COLUMNS, SOURCE_EVENT_TYPES, extract_events
 from app.reporting.tables import ReportingStorageError
 from app.reporting.weeks import WeekWindow
+from data.pipelines.weekly_performance import extract
+from data.pipelines.weekly_performance.extract import extract_events
+from data.process.weekly_performance.events import COLUMNS, SOURCE_EVENT_TYPES
 from tests.reporting.helpers import CURRENT, INBOUND, OUTBOUND, W0, W1, W2, at, event, insert, telemetry_count
 
 WINDOW = WeekWindow(first=W1, last=W2)

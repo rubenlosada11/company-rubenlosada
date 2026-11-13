@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from app.reporting.weeks import DEFAULT_WEEKS, MAX_WEEKS
 
@@ -66,7 +66,7 @@ class PipelineRun(BaseModel):
     week_from: date = Field(description="Primera semana (lunes) de la ventana.")
     week_to: date = Field(description="Última semana (lunes) de la ventana.")
     phase: Literal["started", "extracted", "validated", "aggregated", "loaded"] = Field(
-        description="Último subflow completado (checkpoint): en una ejecución fallida, dónde se paró."
+        description="Última etapa completada (checkpoint): en una ejecución fallida, dónde se paró."
     )
     started_at: datetime
     finished_at: datetime | None
@@ -78,10 +78,23 @@ class PipelineRun(BaseModel):
     stats: dict[str, Any] | None = Field(
         description=(
             "Semanas, eventos leídos y rechazados, avisos (`warnings`), salud del origen por día, cobertura de la "
-            "captura frente al inventario y cambios por semana (`changes`)."
+            "captura frente al inventario, cambios por semana (`changes`), `outcome`, etapas opcionales fallidas "
+            "(`degraded`), snapshot de evaluación y datos de Prefect (flow run, caché de la transformación)."
         )
     )
     error: str | None = Field(description="Tipo de error si ha fallado (nunca datos ni credenciales).")
+
+    @computed_field(
+        description=(
+            "Resultado legible: `running`, `succeeded` (todas las etapas), `partial` (reporte cargado, pero falló una "
+            "etapa opcional: ver `stats.degraded`) o `failed` (no se cargó nada)."
+        )
+    )
+    @property
+    def outcome(self) -> Literal["running", "succeeded", "partial", "failed"]:
+        if self.status == "succeeded" and (self.stats or {}).get("outcome") == "partial":
+            return "partial"
+        return self.status
 
     @field_validator("started_at", "finished_at")
     @classmethod

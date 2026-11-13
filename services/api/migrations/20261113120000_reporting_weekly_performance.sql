@@ -1,6 +1,6 @@
 -- Migración 20261113120000 — Pipeline de desempeño semanal: esquema `reporting` (PostgreSQL / Supabase).
 --
--- Diseño: docs/reporting/PIPELINE_DESIGN.md. Se aplica una vez sobre la base de `DATABASE_URL`, desde el SQL Editor de
+-- Diseño: data/pipelines/PIPELINE_DESIGN.md. Se aplica una vez sobre la base de `DATABASE_URL`, desde el SQL Editor de
 -- Supabase o con psql, **después** de la migración de telemetría (20261110120000):
 --
 --     psql "<cadena de conexión de Supabase>" -v ON_ERROR_STOP=1 -f migrations/20261113120000_reporting_weekly_performance.sql

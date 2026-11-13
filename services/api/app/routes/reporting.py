@@ -1,12 +1,13 @@
 """Reporte Semanal de Desempeño por Almacén y Cliente: resultado y ejecuciones del pipeline (`/reporting`).
 
-Módulo separado de `/telemetry` (BRIEFING de pipelines §6). El cálculo está en `app/reporting/` (flow con subflows);
-este router solo valida parámetros, lee las tablas de `reporting` y lanza ejecuciones. Diseño:
-`docs/reporting/PIPELINE_DESIGN.md`.
+Módulo separado de `/telemetry` (BRIEFING de pipelines §6). El cálculo es el flow de Prefect de
+`data/pipelines/pipeline.py`, que este router importa (`app/reporting/runner.py`) sin duplicar su lógica: aquí solo se
+validan parámetros, se leen las tablas de `reporting` y se lanzan ejecuciones. Diseño:
+`data/pipelines/PIPELINE_DESIGN.md`.
 
 - `GET /reporting/weekly-warehouse-client-performance`: filas de una semana (por defecto, la calculada más reciente).
 - `GET /reporting/pipeline-runs/latest`: última ejecución del pipeline y su metadata.
-- `POST /reporting/pipeline-runs`: ejecución manual síncrona (solo `admin` o `manager`).
+- `POST /reporting/pipeline-runs`: ejecución manual síncrona del flow (solo `admin` o `manager`).
 
 Las lecturas exigen un usuario autenticado. Un fallo de la base es un 503 sin detalles (nunca la cadena de conexión).
 """
@@ -20,14 +21,15 @@ from fastapi.exceptions import RequestValidationError
 
 from app.auth_models import Role
 from app.dependencies import CurrentUser, get_current_user
-from app.reporting import queries, runs
-from app.reporting.flow import PIPELINE_NAME, PipelineAlreadyRunning, PipelineRunFailed, run_weekly_performance
+from app.reporting import queries, runner, runs
 from app.reporting.models import PipelineRun, PipelineRunRequest, WeeklyPerformanceEntry, WeeklyPerformanceReport
 from app.reporting.tables import ReportingStorageError
 from app.reporting.weeks import WindowError, is_monday
 from app.telemetry.context import current_context
 
 router = APIRouter(prefix="/reporting", tags=["reporting"])
+
+PIPELINE_NAME = runs.WEEKLY_PERFORMANCE
 
 RUNNER_ROLES = {Role.ADMIN, Role.MANAGER}
 REPORTING_UNAVAILABLE = "No se ha podido leer el reporte semanal. Inténtalo de nuevo más tarde."
@@ -36,6 +38,7 @@ WEEK_NOT_COMPUTED = "Esa semana no la ha calculado ninguna ejecución correcta d
 NO_RUNS_YET = "El pipeline semanal todavía no se ha ejecutado nunca."
 RUN_FORBIDDEN = "Solo un administrador o un manager puede ejecutar el pipeline."
 RUN_IN_PROGRESS = "Ya hay una ejecución del pipeline semanal en curso. Espera a que termine."
+PIPELINE_UNAVAILABLE = "El pipeline no está disponible en este despliegue (falta data/pipelines o Prefect)."
 RUN_FAILED = (
     "La ejecución del pipeline ha fallado y ha quedado registrada (GET /reporting/pipeline-runs/latest). "
     "El reporte no ha cambiado."
@@ -115,16 +118,23 @@ def latest_pipeline_run() -> PipelineRun:
     status_code=status.HTTP_201_CREATED,
     summary="Ejecuta el pipeline semanal (manual)",
     description=(
-        "Recalcula de forma síncrona e idempotente las `weeks` semanas que terminan en `week_start` (por defecto, las "
-        "2 últimas semanas completas) y devuelve la ejecución. Solo `admin` o `manager`. La semana en curso no se "
-        "puede calcular."
+        "Ejecuta de forma síncrona el flow de Prefect `weekly-warehouse-client-performance` "
+        "(data/pipelines/pipeline.py): "
+        "recalcula de forma idempotente las `weeks` semanas que terminan en `week_start` (por defecto, las 2 últimas "
+        "semanas completas) y devuelve la ejecución. `outcome` = `partial` si falló una etapa opcional (el reporte se "
+        "cargó igual). Solo `admin` o `manager`. La semana en curso no se puede calcular."
     ),
     responses={
         401: {"description": "Sin token o token no válido"},
         403: {"description": "El usuario no es administrador ni manager"},
         409: {"description": "Ya hay una ejecución en curso"},
         422: {"description": "`week_start` no es un lunes, su semana no ha terminado o `weeks` fuera de 1–53"},
-        503: {"description": "La ejecución ha fallado (queda registrada como `failed`) o la base no está disponible"},
+        503: {
+            "description": (
+                "La ejecución ha fallado (queda registrada como `failed`), la base no está disponible o el pipeline no "
+                "está en este despliegue"
+            )
+        },
     },
 )
 def create_pipeline_run(
@@ -136,7 +146,11 @@ def create_pipeline_run(
     params = request or PipelineRunRequest()
     context = current_context()
     try:
-        run = run_weekly_performance(
+        pipeline = runner.load_pipeline()
+    except runner.PipelineUnavailable:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=PIPELINE_UNAVAILABLE) from None
+    try:
+        run = pipeline.run_weekly_performance(
             week_start=params.week_start,
             weeks=params.weeks,
             trigger="api",
@@ -148,9 +162,9 @@ def create_pipeline_run(
         raise RequestValidationError(
             [{"type": "value_error", "loc": ("body", error.field), "msg": str(error)}]
         ) from None
-    except PipelineAlreadyRunning:
+    except pipeline.PipelineAlreadyRunning:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=RUN_IN_PROGRESS) from None
-    except PipelineRunFailed:
+    except pipeline.PipelineRunFailed:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=RUN_FAILED) from None
     except ReportingStorageError:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=REPORTING_UNAVAILABLE) from None

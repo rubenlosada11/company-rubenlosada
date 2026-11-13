@@ -1,44 +1,51 @@
 # Pipeline de desempeño semanal — Implementación, operación y verificación
 
 > Reporte Semanal de Desempeño por Almacén y Cliente (práctica sin número de hito). El diseño, escrito antes del
-> código, está en [`PIPELINE_DESIGN.md`](./PIPELINE_DESIGN.md); este documento cuenta cómo quedó, cómo se ejecuta y
-> cómo se ha comprobado. BRIEFING: [`CONTEXT-datapipelines.es.md`](../../CONTEXT-datapipelines.es.md).
+> código, está en [`data/pipelines/PIPELINE_DESIGN.md`](../../data/pipelines/PIPELINE_DESIGN.md); este documento cuenta
+> cómo quedó, cómo se ejecuta y cómo se ha comprobado. BRIEFING:
+> [`CONTEXT-datapipelines.es.md`](../../CONTEXT-datapipelines.es.md).
+>
+> **Parte 2 (2026-11-13):** el pipeline se orquesta con **Prefect 3** y su código se movió a `data/` (PIPELINE_DESIGN
+> §18). Las secciones 1–3 describen el estado actual; las de verificación (§5 y siguientes) recogen también lo que se
+> comprobó en la Parte 1, con el código de entonces.
 
 ## 1. Qué hay y dónde
 
 | Pieza | Fichero |
 | --- | --- |
 | Migración del esquema `reporting` (tabla del reporte + registro de ejecuciones) | [`services/api/migrations/20261113120000_reporting_weekly_performance.sql`](../../services/api/migrations/20261113120000_reporting_weekly_performance.sql) |
+| **Flows y tasks de Prefect + línea de comandos** (`python data/pipelines/pipeline.py`) | [`data/pipelines/pipeline.py`](../../data/pipelines/pipeline.py) |
+| extract (`telemetry_events`, `READ ONLY`) | [`data/pipelines/weekly_performance/extract.py`](../../data/pipelines/weekly_performance/extract.py) |
+| observe (salud del origen y cobertura frente al inventario) | [`data/pipelines/weekly_performance/observe.py`](../../data/pipelines/weekly_performance/observe.py) |
+| load (upsert + reconciliación, `run_id`, cambios por semana) | [`data/pipelines/weekly_performance/load.py`](../../data/pipelines/weekly_performance/load.py) |
+| Snapshot de evaluación (`data/eval/weekly_performance/`) | [`data/pipelines/weekly_performance/evaluation.py`](../../data/pipelines/weekly_performance/evaluation.py) |
+| Transformaciones puras: eventos, validate, aggregate, transform (coherencia, huella, versión) | [`data/process/weekly_performance/`](../../data/process/weekly_performance/) |
 | Semanas ISO en UTC y ventana | [`app/reporting/weeks.py`](../../services/api/app/reporting/weeks.py) |
-| Subflow 1 · extract (`telemetry_events`, `READ ONLY`) | [`app/reporting/extract.py`](../../services/api/app/reporting/extract.py) |
-| Subflow 2 · validate (reglas de calidad) | [`app/reporting/validate.py`](../../services/api/app/reporting/validate.py) |
-| Subflow 3 · aggregate (Pandas) | [`app/reporting/aggregate.py`](../../services/api/app/reporting/aggregate.py) |
-| Subflow observe (salud del origen y cobertura frente al inventario) | [`app/reporting/observe.py`](../../services/api/app/reporting/observe.py) |
-| Subflow 4 · load (upsert + reconciliación, `run_id`, cambios por semana) | [`app/reporting/load.py`](../../services/api/app/reporting/load.py) |
+| Tablas de `reporting` y errores transitorios | [`app/reporting/tables.py`](../../services/api/app/reporting/tables.py) |
 | Registro de ejecuciones | [`app/reporting/runs.py`](../../services/api/app/reporting/runs.py) |
-| Flow (`run_weekly_performance`) | [`app/reporting/flow.py`](../../services/api/app/reporting/flow.py) |
-| Línea de comandos (`python -m app.reporting`) | [`app/reporting/__main__.py`](../../services/api/app/reporting/__main__.py) |
+| Puente API → flow (importación perezosa) | [`app/reporting/runner.py`](../../services/api/app/reporting/runner.py) |
 | Endpoints `/reporting` | [`app/routes/reporting.py`](../../services/api/app/routes/reporting.py) |
 | Tests | [`services/api/tests/reporting/`](../../services/api/tests/reporting/) |
 
 `services/reporting/` del BRIEFING = `services/api/app/reporting/` en este repo (misma API que la telemetría; ver
-PIPELINE_DESIGN §5). No se ha tocado `app/telemetry/analysis.py` ni `GET /telemetry/report`, y no se ha añadido
-ninguna dependencia (Pandas ya estaba).
+PIPELINE_DESIGN §5): solo HTTP, lecturas y registro. El ETL está en `data/` y la API lo **importa**. No se ha tocado
+`app/telemetry/analysis.py` ni `GET /telemetry/report`. Dependencia nueva: `prefect` (Parte 2).
 
 ## 2. Cómo funciona una ejecución
 
 ```text
-POST /reporting/pipeline-runs   ─┐
-python -m app.reporting (cron)  ─┴─► run_weekly_performance
-    1. resolve_window: semanas completas (por defecto, las 2 últimas)       → 422 / código 2 si no es válida
-    2. start_run: fila `running` en reporting.pipeline_runs (+ marca las abandonadas)
-                  → 409 si ya hay otra `running` (índice único parcial: también entre cron y API)
-    3. extract   SELECT 4 event_type, environment, [inicio, fin)  (READ ONLY)            phase = extracted
-    4. validate  rechaza y cuenta por event_type y motivo                                 phase = validated
-    5. aggregate (warehouse, client_id, week_start) → 4 KPIs + tasa                       phase = aggregated
-    6. observe   eventos/sesiones por día y órdenes del inventario vs. eventos (avisos; nunca falla)
-    7. load      DELETE de combinaciones desaparecidas + INSERT … ON CONFLICT DO UPDATE, con run_id (una transacción)
-    8. finish_run: `succeeded`, phase = loaded, recuentos y stats  |  `failed` con el tipo de error y la última fase
+POST /reporting/pipeline-runs        ─┐
+python data/pipelines/pipeline.py    ─┴─► run_weekly_performance → flow de Prefect weekly-warehouse-client-performance
+    1. resolve_window: semanas completas (por defecto, las 2 últimas)   → 422 / código 2 (sin crear flow run)
+    2. register-run   fila `running` (id = id del flow run de Prefect)   → 409 si ya hay otra (también entre procesos)
+    3. extract-telemetry-events  SELECT 4 event_type, entorno, [inicio, fin) (READ ONLY) + huella  phase = extracted
+                                 reintentos: 3 (2/10/30 s) solo ante fallos transitorios
+    4. transform-weekly-kpis     validate → aggregate → coherencia; CACHEADA                       phase = aggregated
+    5. observe-source            OPCIONAL (return_state): si falla → aviso + ejecución parcial
+    6. load-weekly-kpis          CRÍTICA (return_state): upsert + reconciliación en una transacción;
+                                 reintentos: 2 (5/15 s) transitorios; si falla → `failed`, nada escrito
+    7. write-eval-snapshot       OPCIONAL (return_state): JSON en data/eval/weekly_performance/
+    8. close-run      `succeeded` (stats.outcome = succeeded | partial), phase = loaded, recuentos y stats
 ```
 
 Un `POST` sin cuerpo, o el `cron` del lunes, recalcula las **2 últimas semanas completas**: la de la semana pasada y
@@ -59,19 +66,25 @@ anteriores a la captura y el inventario sí tiene órdenes). Es el resultado esp
 
 En SQLite (sin `DATABASE_URL`) no hace falta nada: las tablas se crean al primer uso.
 
-### 3.2. Comandos (Windows PowerShell 5.1, desde `services\api`)
+### 3.2. Comandos (Windows PowerShell 5.1, desde la raíz del monorepo)
 
 ```powershell
-cd services\api
-uv run --env-file .env python -m app.reporting
-uv run --env-file .env python -m app.reporting --week-start 2026-11-02 --weeks 4
-uv run --env-file .env python -m app.reporting --dry-run
+uv run --project services/api --env-file services/api/.env python data/pipelines/pipeline.py
+uv run --project services/api --env-file services/api/.env python data/pipelines/pipeline.py --week-start 2026-11-02 --weeks 4
+uv run --project services/api --env-file services/api/.env python data/pipelines/pipeline.py --dry-run
 ```
+
+O con el entorno virtual de la API activado (`services\api\.venv\Scripts\Activate.ps1`) y `DATABASE_URL` en el
+entorno: `python data/pipelines/pipeline.py`. Sin `DATABASE_URL`, el pipeline usa la base SQLite local de la API; la
+primera línea de la salida dice qué base usa (sin credenciales). Prefect no necesita ningún servidor: arranca uno
+temporal (~10–20 s) y lo para al terminar. Las ejecuciones parciales terminan con código 0 y el aviso
+«Etapas opcionales con fallo».
 
 - Sin parámetros: las 2 últimas semanas completas. `--week-start` es la semana más reciente (un lunes ya terminado);
   `--weeks`, cuántas hacia atrás (1–53).
-- `--dry-run` hace extract → validate → aggregate y muestra las filas en JSON **sin escribir nada** ni registrar la
-  ejecución: sirve para revisar datos reales antes de cargarlos.
+- `--dry-run` ejecuta el flow `weekly-warehouse-client-performance-preview` (extract → transform → observe) y
+  muestra las filas en JSON **sin escribir nada** ni registrar la ejecución: sirve para revisar datos reales antes de
+  cargarlos.
 - Códigos de salida: 0 bien, 1 la ejecución falló, 2 parámetros no válidos o ejecución ya en curso.
 - Entorno de los eventos: `TELEMETRY_ENVIRONMENT` (por defecto `development`).
 
@@ -80,8 +93,11 @@ uv run --env-file .env python -m app.reporting --dry-run
 Lunes a las 06:00 UTC, en el `crontab` del VPS, con el contenedor de la API levantado:
 
 ```text
-0 6 * * 1  cd /opt/company-rubenlosada && docker compose -f docker-compose.prod.yml exec -T backend python -m app.reporting
+0 6 * * 1  cd /opt/company-rubenlosada && docker compose -f docker-compose.prod.yml exec -T backend python data/pipelines/pipeline.py
 ```
+
+(Con Prefect, la imagen del backend tendrá que incluir `data/` y la ruta del comando, ajustarse al `WORKDIR`; hoy la
+imagen solo copia `services/api/`: ver PIPELINE_DESIGN §18.10.)
 
 **Decisión (2026-11-13): no se instala ahora.** La entrega del BRIEFING es diseñar, construir y probar el pipeline;
 la programación queda diseñada y lista (la línea de arriba). Instalarla hoy no aportaría datos: el stack del VPS está

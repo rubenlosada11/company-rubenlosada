@@ -470,9 +470,12 @@ ISO 8601 (sin zona = UTC), periodo `[from, to)`; sin fechas, los últimos 7 día
 
 Pipeline que consolida cada semana ISO (UTC), por almacén y cliente, el volumen de entrada, el throughput de salida,
 los quiebres de stock y la tasa de discrepancia a partir de `telemetry_events` (solo lectura) en la tabla
-`reporting.weekly_warehouse_client_performance`. Flow con cuatro subflows en [`app/reporting/`](./app/reporting/)
-(extract → validate → aggregate → observe → load), idempotente (upsert + reconciliación) y con registro de cada
-ejecución en `reporting.pipeline_runs`: fase completada (checkpoint), `X-Request-Id`, cambios por semana y avisos de
+`reporting.weekly_warehouse_client_performance`. Es un flow de **Prefect 3** que vive fuera de la API, en
+[`data/pipelines/pipeline.py`](../../data/pipelines/pipeline.py) (tasks extract → transform → observe → load →
+snapshot; transformaciones puras en [`data/process/`](../../data/process/)); la API solo lo importa para el `POST`
+([`app/reporting/runner.py`](./app/reporting/runner.py)) y sirve las lecturas. Idempotente (upsert + reconciliación),
+con reintentos ante fallos transitorios, caché de la transformación y registro de cada ejecución en
+`reporting.pipeline_runs`: fase completada (checkpoint), `X-Request-Id`, cambios por semana y avisos de
 observabilidad (captura en silencio, órdenes del inventario sin evento). Cada fila del reporte guarda el `run_id` de la
 ejecución que la escribió, y nunca hay dos ejecuciones a la vez (índice único parcial: 409).
 
@@ -481,12 +484,15 @@ ejecución que la escribió, y nunca hay dos ejecuciones a la vez (índice únic
 - `GET /reporting/pipeline-runs/latest` (autenticado): estado y metadata de la última ejecución.
 - `POST /reporting/pipeline-runs` (`admin` o `manager`): ejecución manual de las 2 últimas semanas completas, o de
   `{"week_start": "2026-11-02", "weeks": 4}`.
-- Línea de comandos (la del `cron` de los lunes): `uv run --env-file .env python -m app.reporting` (`--week-start`,
-  `--weeks`, `--dry-run`).
+- Línea de comandos (la del `cron` de los lunes), desde la raíz del monorepo:
+  `uv run --project services/api --env-file services/api/.env python data/pipelines/pipeline.py` (`--week-start`,
+  `--weeks`, `--dry-run`). `outcome` = `partial` si falló una etapa opcional (el reporte se cargó igual).
+- Los tests del pipeline (`tests/reporting/`) importan el paquete `data` de la raíz (`pythonpath` en `pyproject.toml`)
+  y arrancan un servidor de pruebas de Prefect para toda la sesión.
 - Con `DATABASE_URL` (Supabase), aplica antes la migración
   [`migrations/20261113120000_reporting_weekly_performance.sql`](./migrations/20261113120000_reporting_weekly_performance.sql);
   en SQLite las tablas se crean solas.
-- Diseño: [`docs/reporting/PIPELINE_DESIGN.md`](../../docs/reporting/PIPELINE_DESIGN.md). Operación y verificación:
+- Diseño: [`data/pipelines/PIPELINE_DESIGN.md`](../../data/pipelines/PIPELINE_DESIGN.md). Operación y verificación:
   [`docs/reporting/weekly-performance-pipeline.md`](../../docs/reporting/weekly-performance-pipeline.md).
 
 ## Tests

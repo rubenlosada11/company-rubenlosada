@@ -20,9 +20,9 @@ from sqlalchemy.exc import DBAPIError
 
 from app.auth_models import Role
 from app.main import app
-from app.reporting import flow
-from app.reporting.extract import extract_events
-from app.reporting.flow import run_weekly_performance
+from data.pipelines import pipeline as flow
+from data.pipelines.pipeline import run_weekly_performance
+from data.pipelines.weekly_performance.extract import extract_events
 from app.reporting.tables import reporting_engine, weekly_performance
 from app.reporting.weeks import WeekWindow
 from app.telemetry.storage import telemetry_engine
@@ -127,7 +127,7 @@ def test_endpoints_on_postgres(make_user, monkeypatch):
 
 
 def test_partial_unique_index_blocks_a_second_running_run():
-    from app.reporting.flow import PipelineAlreadyRunning
+    from data.pipelines.pipeline import PipelineAlreadyRunning
     from app.reporting.tables import pipeline_runs
 
     other = uuid.uuid4()
