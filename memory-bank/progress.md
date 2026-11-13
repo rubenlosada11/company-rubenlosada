@@ -17,8 +17,12 @@
   dependencias nuevas. Documentación: [`docs/reporting/PIPELINE_DESIGN.md`](../docs/reporting/PIPELINE_DESIGN.md)
   (diseño) y [`docs/reporting/weekly-performance-pipeline.md`](../docs/reporting/weekly-performance-pipeline.md).
   **Implementado y verificado** (2026-11-13): API 1647 tests (+4 opcionales de PostgreSQL), migración y flow en
-  PostgreSQL 16 local, Supabase en solo lectura (coincide con SQL independiente), API y CLI arrancadas. Pendiente:
-  aplicar la migración en Supabase (desarrollador), instalar el `cron` (infraestructura), PR y Notion.
+  PostgreSQL 16 local, Supabase en solo lectura (coincide con SQL independiente), API y CLI arrancadas. **Revisión
+  con las preguntas de diseño del BRIEFING** (PIPELINE_DESIGN §17): subflow `observe` (eventos y sesiones por día,
+  órdenes del inventario frente a eventos, avisos), checkpoint `phase`, `request_id` y `run_id` (trazabilidad),
+  cambios por semana en `stats.changes`, 404 para semanas no calculadas y candado entre procesos (índice único
+  parcial). API 1659 tests (+6 opcionales de PostgreSQL); PostgreSQL 6/6. Pendiente: aplicar la migración en Supabase (desarrollador), instalar el
+  `cron` (infraestructura), canal de alertas, PR y Notion.
 - **Telemetría de la compañía — Reporte técnico** (práctica sin número de hito; fase 4 y última de la serie de
   telemetría): pipeline de análisis con Pandas (`services/api/app/telemetry/analysis.py`, 5 métricas independientes:
   SQL con el periodo `[from, to)` y `event_type IN (…)` en la consulta, dimensiones de `tags` y agregación en Pandas) y
@@ -131,7 +135,7 @@
 | Telemetría: captura en el frontend | ✅ Implementada y validada: API 1413 tests (144 nuevos), Jest 255 (107 nuevos), E2E 46/46; PR #27 fusionada |
 | Telemetría: almacenamiento | ✅ API 1476 tests, migración en Supabase, E2E con 31 eventos reales; PR #28 fusionada (`8ee2c58`) |
 | Telemetría: reporte técnico | ✅ API 1536 tests, Jest 263; PR #29 fusionada (`eb7f47d`) |
-| Pipeline de desempeño semanal (`/reporting`) | ✅ Implementado y verificado en `feature/weekly-performance-pipeline` (API 1647 + 4 de PostgreSQL); migración en Supabase y `cron` pendientes; PR pendiente |
+| Pipeline de desempeño semanal (`/reporting`) | ✅ Implementado y verificado en `feature/weekly-performance-pipeline` (API 1659 tests (+6 opcionales de PostgreSQL); PostgreSQL 6/6); migración en Supabase y `cron` pendientes; PR pendiente |
 | `services/api/` | ✅ Directorio de proveedores: API completa (6 endpoints) + seeder, 118 tests OK; solo local |
 | Autenticación (AUTH-01) | ✅ API: `User`/`Profile` en TinyDB, JWT, `/auth`, `/users`, `/profiles` y 8 rutas existentes protegidas (269 tests). Backoffice: `/login` y panel protegido (E2E 34/34). Solo local |
 | Autenticación frontend (AUTH-02) | ✅ PR #13 fusionada (API 287 tests; E2E por fases): `/register`, `/account/profile`, `localStorage` y, como mejora adicional, `REGISTRATION_CODE` |
@@ -1535,6 +1539,13 @@ después el código.
   422, 201, 200) y CLI (códigos 0 y 2, `--dry-run`).
 - **No hecho (requiere confirmación o al desarrollador):** migración en Supabase, `cron` en el VPS, vista en el
   backoffice.
+- **Revisión (mismo día):** el desarrollador pasó las preguntas guía del BRIEFING (idempotencia, observabilidad,
+  recuperabilidad, concurrencia). Respondidas en PIPELINE_DESIGN §17. Aplicado: subflow `observe` (no hace fallar
+  la corrida), `phase` como checkpoint, `request_id` en `pipeline_runs` y `run_id` en las filas, `stats.changes` por
+  semana, 404 para semanas que ninguna corrida correcta cubre (antes `entries: []`) y el índice único parcial
+  `pipeline_runs_one_running_idx` (409 también entre cron y API). La migración se modificó en lugar de añadir otra
+  porque no se había aplicado en Supabase. En Supabase, `observe` ya detecta datos reales: semana del 26-oct con 9
+  órdenes y 0 eventos (antes de la captura) y una entrada de Los Ángeles sin evento en la del 9-nov. API 1659 tests (+6 opcionales de PostgreSQL).
 
 ## Trabajo pendiente
 
@@ -1637,5 +1648,7 @@ después el código.
 14. Pipeline de desempeño semanal (`feature/weekly-performance-pipeline`): aplicar
     `services/api/migrations/20261113120000_reporting_weekly_performance.sql` en el SQL Editor de Supabase y lanzar
     una primera ejecución; decidir si se instala el `cron` del lunes en el VPS
-    (`docs/reporting/weekly-performance-pipeline.md` §3.3); PR y ficha de Notion. Siguiente paso natural: vista del
-    reporte en el backoffice para Thomas y Ana.
+    (`docs/reporting/weekly-performance-pipeline.md` §3.3); canal para los avisos (`capture_gap`,
+    `no_events_in_window`); revisar la orden de entrada de Los Ángeles sin evento (¿creada sin
+    `TELEMETRY_PSEUDONYM_KEY`?); PR y ficha de Notion. Siguiente paso natural: vista del reporte en el backoffice
+    para Thomas y Ana.

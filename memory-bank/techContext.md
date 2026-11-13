@@ -566,6 +566,11 @@ operación y verificación en `docs/reporting/weekly-performance-pipeline.md`.
 | Filtro `environment` = `TELEMETRY_ENVIRONMENT` | Los eventos de pruebas no llegan al reporte del CEO; la tabla no tiene columna de entorno |
 | `POST` síncrono, solo `admin`/`manager`, candado por proceso (409); ejecuciones `running` de más de 30 min → `abandoned` | Segundos de cálculo; registro auditable incluso si el proceso cae |
 | Programación por `cron` del host (`python -m app.reporting`, lunes 06:00 UTC), no dentro de la API | Varios workers o reinicios no duplican ni pierden ejecuciones; instalarlo requiere confirmación (infra) |
+| Candado entre procesos = índice único parcial `pipeline_runs (pipeline) where status = 'running'` (+ `threading.Lock`) | El cron y un `POST` no se solapan (409) sin advisory locks ni tablas de bloqueo; funciona igual en SQLite |
+| `phase` como checkpoint de diagnóstico; una corrida fallida no se retoma, se recalcula la ventana | Recalcular es barato e idempotente; guardar resultados intermedios costaría más |
+| Subflow `observe` no bloqueante: eventos/sesiones por día y órdenes del inventario (`stock_entries`, `stock_exits` `dispatch`) frente a eventos | Distinguir actividad cero, captura caída y mediciones perdidas o duplicadas |
+| Trazabilidad: `request_id` (X-Request-Id) en `pipeline_runs`, `run_id` en cada fila, `stats.changes` por semana | Reconstruir petición → corrida → filas y saber qué semanas publicadas corrigió cada corrida |
+| `GET` del reporte: 404 si ninguna corrida correcta cubre la semana; 200 con `entries: []` si se calculó sin actividad | No confundir «sin actividad» con «sin calcular» |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 

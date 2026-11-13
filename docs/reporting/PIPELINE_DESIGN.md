@@ -5,8 +5,10 @@
 > BRIEFING de telemetría ([`CONTEXT-telemetria.es.md`](../../CONTEXT-telemetria.es.md)) y sobre la tabla
 > `telemetry_events` ([`docs/telemetry/telemetry-storage.md`](../telemetry/telemetry-storage.md)).
 >
-> Este documento se escribió **antes** del código y es el contrato que sigue la implementación. El funcionamiento,
-> la operación y la verificación están en [`weekly-performance-pipeline.md`](./weekly-performance-pipeline.md).
+> Este documento se escribió **antes** del código y es el contrato que sigue la implementación. La §17 (preguntas de
+> idempotencia, observabilidad, recuperabilidad y concurrencia) se añadió después, en una revisión que también
+> amplió §5, §9–§12 y §14. El funcionamiento, la operación y la verificación están en
+> [`weekly-performance-pipeline.md`](./weekly-performance-pipeline.md).
 
 ## 1. Para qué existe este pipeline
 
@@ -92,7 +94,8 @@ flowchart LR
   T[(public.telemetry_events<br/>solo lectura)] -->|SELECT 4 event_type,<br/>ventana y entorno| E[1 · extract]
   E --> V[2 · validate<br/>reglas de calidad]
   V --> A[3 · aggregate<br/>Pandas: semana ISO,<br/>sumas y conteos]
-  A --> L[4 · load<br/>upsert + reconciliación<br/>en una transacción]
+  A --> O[observe<br/>salud del origen y<br/>cobertura vs. inventario]
+  O --> L[4 · load<br/>upsert + reconciliación<br/>en una transacción]
   L --> R[(reporting.weekly_warehouse_<br/>client_performance)]
   F{{flow run_weekly_performance}} -.registra.-> P[(reporting.pipeline_runs)]
   F -.orquesta.-> E
@@ -108,7 +111,8 @@ Cada subflow es una función pura o casi pura con una entrada y una salida tipad
 | `extract` | ventana de semanas + entorno → DataFrame de eventos crudos | Lee `telemetry_events` (transacción `READ ONLY`) |
 | `validate` | eventos crudos → eventos válidos + rechazos contados por tipo y motivo | No |
 | `aggregate` | eventos válidos + semanas → filas del reporte | No |
-| `load` | filas + semanas → filas escritas y eliminadas | Escribe solo en `reporting` |
+| `observe` | ventana + eventos crudos → señales y avisos (§17.2); nunca hace fallar la corrida | Lee `telemetry_events` y las tablas del inventario (`READ ONLY`) |
+| `load` | filas + semanas + `run_id` → filas escritas y eliminadas, cambios por semana | Escribe solo en `reporting` |
 
 El **flow** (`run_weekly_performance`) resuelve la ventana, abre el registro de la ejecución, encadena los subflows y
 cierra el registro con su resultado (éxito o fallo). Así una ejecución fallida también deja rastro auditable.
@@ -204,8 +208,8 @@ Ejecutar el pipeline N veces sobre la misma ventana deja exactamente el mismo re
 4. **Valores deterministas**: el resultado depende solo de los eventos de la ventana (no de la hora de ejecución).
    `computed_at` es la única columna que cambia al repetir, y dice cuándo se recalculó la fila por última vez.
 
-Dos ejecuciones simultáneas en el mismo proceso no se permiten (`409`); entre procesos distintos (API y `cron`), el
-resultado sigue siendo correcto porque las dos escriben los mismos valores de forma idempotente.
+Dos ejecuciones simultáneas no se permiten (`409`), ni en el mismo proceso ni entre procesos distintos (API y
+`cron`): un índice único parcial de `pipeline_runs` admite una sola corrida `running` por pipeline (§17.4).
 
 ## 9. Auditoría: registro de ejecuciones
 
@@ -215,13 +219,14 @@ Tabla `reporting.pipeline_runs`, genérica para cualquier pipeline futuro (colum
 | --- | --- |
 | `id`, `pipeline` | Identificador de la ejecución y nombre del pipeline (`weekly_warehouse_client_performance`) |
 | `status` | `running` → `succeeded` / `failed` |
-| `trigger`, `triggered_by` | `api` (con el id del usuario) o `cli` (manual o `cron`) |
+| `trigger`, `triggered_by`, `request_id` | `api` (con el id del usuario y el `X-Request-Id` de la petición) o `cli` (manual o `cron`) |
+| `phase` | Checkpoint: último subflow completado (`started` … `loaded`); en una corrida fallida, dónde murió |
 | `environment` | Entorno de los eventos leídos |
 | `week_from`, `week_to` | Primera y última semana (`week_start`) de la ventana |
 | `started_at`, `finished_at`, `duration_ms` | Tiempos |
 | `events_read`, `events_rejected` | Filas leídas de `telemetry_events` y rechazadas por calidad |
 | `rows_upserted`, `rows_deleted` | Filas escritas y eliminadas en la tabla de destino |
-| `stats` (JSON) | Eventos leídos por `event_type` y rechazos por `event_type` y motivo |
+| `stats` (JSON) | Eventos leídos por `event_type`, rechazos por `event_type` y motivo, `warnings`, `source_health` (eventos y sesiones por día, días en silencio), `capture_coverage` (órdenes del inventario vs. eventos) y `changes` (por semana: insertadas, actualizadas, sin cambios, eliminadas) |
 | `error` | Tipo de error si falla (nunca la cadena de conexión ni datos) |
 
 Una ejecución que se queda en `running` más de 30 minutos (proceso caído a mitad) se marca `failed` con el motivo
@@ -233,10 +238,10 @@ Migración versionada `services/api/migrations/<timestamp>_reporting_weekly_perf
 el SQL Editor de Supabase (como la de telemetría):
 
 - `create schema if not exists reporting` — nunca se escribe en `public.telemetry_events`.
-- `reporting.weekly_warehouse_client_performance` con **las columnas exactas del BRIEFING** (§5), incluido
-  `unique (warehouse, client_id, week_start)`, más restricciones `check` que no cambian el contrato: almacén válido,
-  `week_start` en lunes, contadores ≥ 0 y tasa ≥ 0.
-- `reporting.pipeline_runs` (§9).
+- `reporting.weekly_warehouse_client_performance` con **las columnas del BRIEFING** (§5), incluido
+  `unique (warehouse, client_id, week_start)`, más `run_id` (qué corrida escribió la fila; trazabilidad, §17.2) y
+  restricciones `check` que no cambian el contrato: almacén válido, `week_start` en lunes, contadores ≥ 0 y tasa ≥ 0.
+- `reporting.pipeline_runs` (§9), con el índice único parcial que hace de candado entre procesos (§17.4).
 - Acceso: RLS activado sin políticas y privilegios revocados a `anon` y `authenticated` (la API REST de Supabase no ve
   nada), `usage` del esquema y lectura para `service_role`. La API se conecta como propietaria con `DATABASE_URL`.
 
@@ -247,13 +252,13 @@ con el mismo `MetaData` traducido (`schema_translate_map`).
 
 | Endpoint | Acceso | Comportamiento |
 | --- | --- | --- |
-| `GET /reporting/weekly-warehouse-client-performance?week_start=` | Usuario autenticado | Filas de la semana pedida (un lunes; 422 si no lo es). Sin parámetro: la semana calculada más reciente. 404 si aún no hay ninguna semana calculada. Orden: almacén, cliente |
+| `GET /reporting/weekly-warehouse-client-performance?week_start=` | Usuario autenticado | Filas de la semana pedida (un lunes; 422 si no lo es). Sin parámetro: la semana más reciente calculada por una corrida correcta. 200 con `entries: []` si se calculó sin actividad; 404 si ninguna corrida correcta la ha calculado. Orden: almacén, cliente |
 | `GET /reporting/pipeline-runs/latest` | Usuario autenticado | Última ejecución (cualquier estado) con su metadata. 404 si nunca se ha ejecutado |
-| `POST /reporting/pipeline-runs` | `admin` o `manager` | Ejecuta el pipeline de forma síncrona (`{week_start?, weeks?}`) y devuelve la ejecución: 201 si termina bien; 503 si falla (queda registrada como `failed`); 409 si ya hay una en curso; 422 si la semana no es un lunes o aún no ha terminado |
+| `POST /reporting/pipeline-runs` | `admin` o `manager` | Ejecuta el pipeline de forma síncrona (`{week_start?, weeks?}`) y devuelve la ejecución: 201 si termina bien; 503 si falla (queda registrada como `failed`); 409 si ya hay una en curso (en cualquier proceso); 422 si la semana no es un lunes o aún no ha terminado |
 
 La respuesta del primero sigue el JSON del BRIEFING (`week_start` + `entries` con los cinco campos calculados, más
-`warehouse` y `client_id`); añade `computed_at` (cuándo se recalculó la semana) para que el lector sepa lo fresco que
-está el dato. Ejecución síncrona: con el volumen actual (miles de eventos por semana) tarda segundos; si creciera,
+`warehouse` y `client_id`); añade `computed_at` (cuándo terminó la corrida que calculó la semana) y `run_id` (cuál
+fue), para que el lector sepa lo fresco que está el dato y se pueda seguir su rastro. Ejecución síncrona: con el volumen actual (miles de eventos por semana) tarda segundos; si creciera,
 el mismo flow pasaría a una cola sin cambiar el contrato salvo el código de estado.
 
 ## 12. Errores y recuperación
@@ -262,7 +267,9 @@ el mismo flow pasaría a una cola sin cambiar el contrato salvo el código de es
 | --- | --- |
 | Base caída o tabla de origen inexistente | La ejecución termina `failed` (si el registro se puede escribir); `POST` responde 503; nada escrito |
 | Migración de `reporting` sin aplicar (PostgreSQL) | `failed`/503 con el tipo de error; la API sigue funcionando para todo lo demás |
-| Fallo a mitad de la carga | Rollback de la transacción: la tabla queda como antes |
+| Fallo a mitad de la carga | Rollback de la transacción: la tabla queda como antes; la corrida, `failed` con `phase = aggregated` |
+| Fallo de las señales de `observe` | Aviso `observability_unavailable`; el reporte se carga igual |
+| Eventos de órdenes que no cuadran con el inventario | Aviso `capture_gap` con el detalle por semana y almacén |
 | Eventos con datos no válidos | Se excluyen y se cuentan; la ejecución termina bien |
 | Ejecución semanal fallida | La siguiente recalcula las 2 últimas semanas y rellena el hueco (§7) |
 | Proceso caído durante una ejecución | Registro `running` marcado `abandoned` por la siguiente (§9) |
@@ -280,8 +287,11 @@ el mismo flow pasaría a una cola sin cambiar el contrato salvo el código de es
 - **Unitarias por subflow** (SQLite, sin red): `validate` (cada regla), `aggregate` (fórmulas, semana ISO en los bordes,
   tasa con 0 pedidos y > 1, una fila por cliente), `extract` (ventana `[desde, hasta)`, entorno, tipos), `load`
   (upsert, reconciliación, rollback).
-- **Del flow:** idempotencia (dos ejecuciones = mismo resultado), autorreparación, registro de ejecuciones en éxito y
-  en fallo, ejecución abandonada, que `telemetry_events` no cambia.
+- **Del flow:** idempotencia (dos ejecuciones = mismo resultado), autorreparación, cambios por semana con eventos
+  tardíos, `run_id` en las filas, checkpoint de fase en los fallos, registro de ejecuciones en éxito y en fallo,
+  ejecución abandonada, candado entre procesos y que `telemetry_events` no cambia.
+- **De `observe`:** actividad cero frente a captura caída, días en silencio, mediciones perdidas y duplicadas frente
+  al inventario, y que un fallo de las señales no rompe la corrida.
 - **De los endpoints:** contrato JSON, valores por defecto, 401/403/404/409/422/503.
 - **PostgreSQL real:** la migración y el flow completo contra un PostgreSQL 16 local (upsert `ON CONFLICT DO UPDATE`,
   transacción `READ ONLY`, esquema `reporting`), y una comprobación de solo lectura contra Supabase.
@@ -305,3 +315,97 @@ el mismo flow pasaría a una cola sin cambiar el contrato salvo el código de es
 - **Aplicar la migración en Supabase** la hace el desarrollador en el SQL Editor (como la de telemetría).
 - **Vista para Thomas** en el backoffice: siguiente paso natural, fuera del alcance del BRIEFING.
 - **Mismo `DATABASE_URL` para varios entornos**: la tabla de destino no distingue entorno (§4.2).
+- **Canal de alertas**: los avisos (`no_events_in_window`, `silent_days`, `capture_gap`) quedan en el registro y en el
+  log; avisar a alguien (email, Slack) está por decidir (§17.2).
+
+## 17. Preguntas de diseño: idempotencia, observabilidad, recuperabilidad y concurrencia
+
+> Añadido el 2026-11-13, tras repasar las preguntas guía del BRIEFING de pipelines. Cada respuesta dice **dónde** se
+> resuelve. Las marcadas *(revisión)* se implementaron en esa revisión; el resto ya estaba.
+
+### 17.1. Idempotencia
+
+**Duplicados en el origen.** La clave de deduplicación es el **`eventId`** del envelope, en **dos capas**:
+
+1. **Ingesta** (práctica de almacenamiento): `eventId` es la clave primaria de `telemetry_events` y el `INSERT` lleva
+   `ON CONFLICT (id) DO NOTHING`. Dos envíos del mismo evento (300 ms de diferencia o un reintento) dejan una fila;
+   la tabla no tiene columna de recepción, así que el segundo envío no deja ningún rastro que contar. Los eventos de
+   órdenes del backend usan un `eventId` determinista (UUID v5 de `event_type` + id de la orden + fecha): reconstruir
+   el mismo evento da el mismo id.
+2. **Pipeline** (`validate`): además, una orden repetida con **otro** `eventId` (`event_type` + `warehouse` +
+   `order_id`) cuenta una sola vez y se registra como `duplicate_order`. Un operador que confirma dos veces crea dos
+   órdenes reales en el inventario (dos `order_id`): eso no es un duplicado, son dos pedidos.
+
+**Reintento después de un fallo.** La carga es **una sola transacción** (reconciliación + upsert sobre
+`unique (warehouse, client_id, week_start)`, la «clave de partición» semanal). Si muere a mitad (847 de 1.412 filas),
+PostgreSQL deshace todo: no hay datos parciales. Repetirla da exactamente lo mismo que una corrida limpia porque el
+resultado solo depende de los eventos de la ventana.
+
+**Eventos tardíos.** Cada corrida recalcula la ventana completa (2 semanas) y deja rastro de **qué semanas publicadas
+ha cambiado**: *(revisión)* `stats.changes` cuenta por semana las filas insertadas, actualizadas, sin cambios y
+eliminadas, y cada fila guarda el `run_id` de la corrida que la escribió. La corrida anterior sigue en
+`pipeline_runs` con sus cifras: se puede ver qué publicó cada una. No se infla nada: es un recálculo, no una suma.
+
+### 17.2. Observabilidad
+
+**Silencio vs. ausencia real** *(revisión)*. Tres casos distintos, tres señales:
+
+| Situación | Cómo se ve |
+| --- | --- |
+| El pipeline nunca calculó esa semana | `GET …?week_start=` → **404** (ninguna corrida `succeeded` la cubre); antes daba `entries: []` |
+| Semana calculada sin actividad | **200** con `entries: []` y el `run_id` que la calculó |
+| Captura caída | El subflow `observe` cuenta eventos de **cualquier** tipo por día: si no hay ninguno, aviso `no_events_in_window`; días sueltos sin eventos, `silent_days` |
+
+Si hay logins y navegación pero ninguna orden, la captura funciona y el cero es real. El *heartbeat* es la propia
+corrida semanal (`pipeline-runs/latest`); la alerta de silencio, sus `warnings`. El canal de alertas (email, Slack…)
+queda pendiente de decidir.
+
+**Trazabilidad de la recolección** *(revisión)*. El camino evento → reporte se reconstruye con:
+`X-Request-Id` de la petición que lanzó la corrida (`pipeline_runs.request_id`, el mismo de la respuesta y de los
+logs) → `run_id` → filas con ese `run_id`. La ventana de cada corrida (`week_from`, `week_to`) dice si procesó una o
+varias semanas a la vez (la ráfaga de las 09:00 de la pregunta), y `source_health.events_by_day` muestra huecos y
+ráfagas día a día. Cada evento conserva su `request_id` en `telemetry_events`.
+
+**Crecimiento vs. pérdida de datos** *(revisión)*. Dos comparaciones en cada corrida:
+
+- **Contra la fuente de verdad:** `capture_coverage` compara, por semana y almacén, las órdenes guardadas en el
+  inventario (`stock_entries`, `stock_exits` de tipo `dispatch`) con los eventos capturados. Menos eventos que
+  órdenes = mediciones perdidas; más = duplicadas. Aviso `capture_gap`.
+- **Contra la actividad:** `sessions_by_day` (sesiones distintas por día). Si los eventos caen y las sesiones no,
+  algo se pierde; si caen las dos, bajó la actividad (domingo).
+
+En Supabase (2026-11-13) esto ya encuentra dos cosas reales: la semana del 26 de octubre tiene 9 órdenes en el
+inventario y 0 eventos (la captura aún no existía), y en la semana en curso una orden de entrada de Los Ángeles no
+tiene evento.
+
+### 17.3. Recuperabilidad
+
+**Caída de la base a mitad del pipeline** *(revisión)*. `pipeline_runs.phase` es el **checkpoint**: último subflow
+completado (`started` → `extracted` → `validated` → `aggregated` → `loaded`). Si Supabase falla en el `INSERT`
+después de agrupar, la corrida queda `failed` con `phase = aggregated` y la tabla del reporte sin cambios. No se
+retoma desde la fase: la siguiente corrida recalcula la ventana entera, porque es barato (segundos) y no deja estados
+intermedios que reconciliar. Guardar el DataFrame agregado para retomar costaría más de lo que ahorra.
+
+**Buffer en el frontend.** Decidido en la práctica de captura: **no** se guardan eventos en `localStorage`. La cola
+vive en memoria (lotes de 10 s o 20 eventos) y al ocultar la página sale con `sendBeacon`. Un buffer persistente en
+el navegador aumenta los duplicados al reconectar, guarda datos en un dispositivo compartido de almacén y puede
+reenviar eventos muy tardíos; si algún día se añade, el riesgo lo asume el **servidor** con la deduplicación por
+`eventId` (ya está) y el pipeline con el recálculo de la ventana (ya está).
+
+**Reintento de transmisión.** El `eventId` de cada evento **es** la clave de idempotencia (no hace falta un
+`Idempotency-Key` aparte): si el primer `POST /telemetry/events` llegó a guardarse y el cliente reintenta tras un
+timeout, el `ON CONFLICT DO NOTHING` lo ignora y el servidor responde **200**. El cliente reintenta (3 veces, 1/2/4 s)
+solo con red caída, 408, 429 o 5xx (503 = no se guardó nada); un 4xx distinto o un 200 no se reintentan.
+
+### 17.4. Concurrencia
+
+**Corridas solapadas** *(revisión)*. El cron empieza a las 06:00 y alguien pulsa «Ejecutar ahora» a las 06:05:
+
+- **Candado entre procesos:** índice único parcial `pipeline_runs_one_running_idx` (`unique (pipeline) where
+  status = 'running'`). La segunda corrida choca al registrarse y recibe **409** sin leer ni escribir nada. Es más
+  estricto que un candado por ventana: las dos escriben en la misma tabla, así que no se permite ninguna superposición.
+- **Dentro del proceso:** un `threading.Lock` responde 409 antes de tocar la base.
+- **`run_id` único** por corrida (UUID); una corrida muerta en `running` no bloquea para siempre: pasados 30 minutos
+  la siguiente la marca `abandoned` y ocupa su lugar.
+- Aunque dos corridas llegaran a cargar (p. ej. una base sin la migración), el resultado sería el mismo: la carga es
+  idempotente.

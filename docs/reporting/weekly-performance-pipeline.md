@@ -13,7 +13,8 @@
 | Subflow 1 · extract (`telemetry_events`, `READ ONLY`) | [`app/reporting/extract.py`](../../services/api/app/reporting/extract.py) |
 | Subflow 2 · validate (reglas de calidad) | [`app/reporting/validate.py`](../../services/api/app/reporting/validate.py) |
 | Subflow 3 · aggregate (Pandas) | [`app/reporting/aggregate.py`](../../services/api/app/reporting/aggregate.py) |
-| Subflow 4 · load (upsert + reconciliación) | [`app/reporting/load.py`](../../services/api/app/reporting/load.py) |
+| Subflow observe (salud del origen y cobertura frente al inventario) | [`app/reporting/observe.py`](../../services/api/app/reporting/observe.py) |
+| Subflow 4 · load (upsert + reconciliación, `run_id`, cambios por semana) | [`app/reporting/load.py`](../../services/api/app/reporting/load.py) |
 | Registro de ejecuciones | [`app/reporting/runs.py`](../../services/api/app/reporting/runs.py) |
 | Flow (`run_weekly_performance`) | [`app/reporting/flow.py`](../../services/api/app/reporting/flow.py) |
 | Línea de comandos (`python -m app.reporting`) | [`app/reporting/__main__.py`](../../services/api/app/reporting/__main__.py) |
@@ -31,11 +32,13 @@ POST /reporting/pipeline-runs   ─┐
 python -m app.reporting (cron)  ─┴─► run_weekly_performance
     1. resolve_window: semanas completas (por defecto, las 2 últimas)       → 422 / código 2 si no es válida
     2. start_run: fila `running` en reporting.pipeline_runs (+ marca las abandonadas)
-    3. extract   SELECT 4 event_type, environment, [inicio, fin)  (READ ONLY)
-    4. validate  rechaza y cuenta por event_type y motivo
-    5. aggregate (warehouse, client_id, week_start) → 4 KPIs + tasa
-    6. load      DELETE de combinaciones desaparecidas + INSERT … ON CONFLICT DO UPDATE  (una transacción)
-    7. finish_run: `succeeded` con recuentos y stats  |  `failed` con el tipo de error (la tabla no cambia)
+                  → 409 si ya hay otra `running` (índice único parcial: también entre cron y API)
+    3. extract   SELECT 4 event_type, environment, [inicio, fin)  (READ ONLY)            phase = extracted
+    4. validate  rechaza y cuenta por event_type y motivo                                 phase = validated
+    5. aggregate (warehouse, client_id, week_start) → 4 KPIs + tasa                       phase = aggregated
+    6. observe   eventos/sesiones por día y órdenes del inventario vs. eventos (avisos; nunca falla)
+    7. load      DELETE de combinaciones desaparecidas + INSERT … ON CONFLICT DO UPDATE, con run_id (una transacción)
+    8. finish_run: `succeeded`, phase = loaded, recuentos y stats  |  `failed` con el tipo de error y la última fase
 ```
 
 Un `POST` sin cuerpo, o el `cron` del lunes, recalcula las **2 últimas semanas completas**: la de la semana pasada y
@@ -84,11 +87,12 @@ comandos; como la ventana es de 2 semanas, una semana olvidada se recupera en la
 
 | Endpoint | Acceso | Respuestas |
 | --- | --- | --- |
-| `GET /reporting/weekly-warehouse-client-performance?week_start=YYYY-MM-DD` | Autenticado | 200 · 401 · 404 (ninguna semana calculada, solo sin `week_start`) · 422 (no es un lunes) · 503 |
+| `GET /reporting/weekly-warehouse-client-performance?week_start=YYYY-MM-DD` | Autenticado | 200 (también con `entries: []` si la semana se calculó sin actividad) · 401 · 404 (semana que ninguna corrida correcta ha calculado) · 422 (no es un lunes) · 503 |
 | `GET /reporting/pipeline-runs/latest` | Autenticado | 200 · 401 · 404 (nunca ejecutado) · 503 |
-| `POST /reporting/pipeline-runs` con `{"week_start"?, "weeks"?}` o sin cuerpo | `admin` o `manager` | 201 · 401 · 403 · 409 (otra en curso) · 422 · 503 (falló; queda `failed`) |
+| `POST /reporting/pipeline-runs` con `{"week_start"?, "weeks"?}` o sin cuerpo | `admin` o `manager` | 201 · 401 · 403 · 409 (otra en curso, de cualquier proceso) · 422 · 503 (falló; queda `failed`) |
 
-Respuesta real del reporte (API local con una base desechable, 2026-11-13):
+Respuesta real del reporte (API local con una base desechable, 2026-11-13; desde la revisión lleva también `run_id`,
+el de la corrida que calculó la semana):
 
 ```json
 {
@@ -103,10 +107,17 @@ Respuesta real del reporte (API local con una base desechable, 2026-11-13):
 }
 ```
 
-Es el JSON del BRIEFING más `computed_at`. `discrepancy_rate` lleva 4 decimales (2 / 980 → `0.002`, como en el
-ejemplo del BRIEFING). La respuesta de `pipeline-runs/latest` incluye la ventana (`week_from`, `week_to`), tiempos,
-`events_read`, `events_rejected`, `rows_upserted`, `rows_deleted`, `stats` (eventos leídos por tipo y rechazos por
-tipo y motivo) y `error`.
+Es el JSON del BRIEFING más `computed_at` y `run_id`. `discrepancy_rate` lleva 4 decimales (2 / 980 → `0.002`, como en el
+ejemplo del BRIEFING). La respuesta de `pipeline-runs/latest` incluye la ventana (`week_from`, `week_to`), `phase`, `request_id`, tiempos,
+`events_read`, `events_rejected`, `rows_upserted`, `rows_deleted`, `error` y `stats`:
+
+| Clave de `stats` | Para qué sirve |
+| --- | --- |
+| `events_read`, `events_rejected` | Cuántos eventos de cada tipo se leyeron y cuáles se descartaron y por qué |
+| `changes` | Por semana: filas insertadas, actualizadas, sin cambios y eliminadas (qué semanas publicadas corrigió) |
+| `warnings` | `no_events_in_window` (probable captura caída), `silent_days`, `capture_gap`, `observability_unavailable` |
+| `source_health` | Eventos de cualquier tipo y sesiones distintas por día; días sin ningún evento |
+| `capture_coverage` | Por semana y almacén: órdenes del inventario frente a eventos capturados (entrada y salida) |
 
 ## 5. Cómo leer el reporte (para Thomas y Ana)
 
@@ -118,6 +129,10 @@ tipo y motivo) y `error`.
 - **Hoy `stockout_events_count` y `discrepancy_events_count` siempre valen 0 porque no se miden**: no hay mínimos de
   stock por cliente ni proceso de conteo físico (PIPELINE_DESIGN §4.1). `stats.events_read` de la última ejecución lo
   confirma (0 eventos de esos tipos leídos). El día que se emitan, el reporte los recoge sin cambiar el pipeline.
+- **Antes de fiarse de una semana, mirar los `warnings` de su corrida.** `capture_gap` significa que el inventario
+  tiene órdenes que la telemetría no capturó (o al revés): las cifras de esa semana se quedan cortas (o se pasan).
+  `no_events_in_window` significa que no llegó ningún evento de ningún tipo: un reporte vacío no es «semana sin
+  actividad», es «no sabemos».
 
 ## 6. Verificación (2026-11-13)
 
@@ -130,6 +145,15 @@ tipo y motivo) y `error`.
 | API arrancada (`uvicorn`, puerto 8010, base SQLite desechable) | `/health` 200; sin token 401; antes de ejecutar 404 y 404; `POST` como `user` 403; semana en curso 422; `POST` como `manager` 201 (13 eventos, 2 filas, 46 ms) y repetido 201 (mismas filas); reporte 200 (JSON de arriba); martes 422; `latest` 200; las 3 rutas en OpenAPI; sin errores en el log |
 | Línea de comandos sobre la misma base | Ejecución `succeeded` (código 0), martes → código 2, `--dry-run --weeks 1` muestra las filas sin escribir |
 | `ruff check` / `ruff format` (líneas de 120) sobre los ficheros nuevos | Sin avisos |
+
+**Revisión (preguntas de diseño, PIPELINE_DESIGN §17), 2026-11-13:**
+
+| Comprobación | Resultado |
+| --- | --- |
+| Tests de la API | **1659 passed, 6 skipped** (+12 de `tests/reporting/`: 8 de `observe`, 2 del flow y 2 de endpoints; los 6 saltados son los de PostgreSQL) |
+| Migración modificada en un PostgreSQL 16 nuevo | Aplicada dos veces; `run_id` en la tabla del reporte, `request_id` y `phase` (con su check) en `pipeline_runs` e índice `pipeline_runs_one_running_idx`; mismas restricciones y permisos que antes |
+| `test_postgres.py` | **6 passed** (dos veces): además de lo anterior, el índice parcial bloquea una segunda corrida `running` y las filas guardan su `run_id` |
+| Supabase, solo lectura (`observe` sobre datos reales) | Ventana por defecto (26-oct → 8-nov): **0 eventos de telemetría pero 9 órdenes en el inventario** (7 de entrada y 2 despachos en la semana del 26-oct) → `no_events_in_window` + `capture_gap`: la captura aún no existía y un reporte vacío habría parecido una semana sin actividad. Semana en curso (solo contraste): 83 eventos en 2 días con 4 y 3 sesiones; Los Ángeles tiene 2 órdenes de entrada y 1 evento → `capture_gap` (una medición perdida) |
 
 Los scripts de esta verificación (servidor PostgreSQL desechable, comprobación de la migración y lectura de Supabase)
 quedaron fuera del repositorio; el test de PostgreSQL sí está versionado y se puede repetir:
@@ -148,5 +172,9 @@ uv run pytest tests/reporting/test_postgres.py
 - Dos KPIs sin datos hasta que negocio defina mínimos por cliente y un proceso de conteo.
 - Vista del reporte en el backoffice para Thomas y Ana: fuera del alcance del BRIEFING; es el siguiente paso natural.
 - La tabla del reporte no distingue entorno: cada entorno debe usar su propia base.
-- Ejecución síncrona y una a la vez por proceso: suficiente para el volumen actual (milisegundos con decenas de
-  eventos); con mucho más volumen, el mismo flow pasaría a una cola.
+- Ejecución síncrona y una a la vez: suficiente para el volumen actual (milisegundos con decenas de eventos); con
+  mucho más volumen, el mismo flow pasaría a una cola.
+- Los avisos quedan en el registro y en el log: falta decidir un canal de alertas (email, Slack).
+- `capture_gap` en Supabase: hay órdenes sin evento (semana del 26-oct, anterior a la captura, y una entrada de Los
+  Ángeles en la semana del 9-nov). Conviene revisar si esa orden se creó sin `TELEMETRY_PSEUDONYM_KEY` (los eventos
+  de órdenes la exigen).

@@ -471,8 +471,10 @@ ISO 8601 (sin zona = UTC), periodo `[from, to)`; sin fechas, los últimos 7 día
 Pipeline que consolida cada semana ISO (UTC), por almacén y cliente, el volumen de entrada, el throughput de salida,
 los quiebres de stock y la tasa de discrepancia a partir de `telemetry_events` (solo lectura) en la tabla
 `reporting.weekly_warehouse_client_performance`. Flow con cuatro subflows en [`app/reporting/`](./app/reporting/)
-(extract → validate → aggregate → load), idempotente (upsert + reconciliación) y con registro de cada ejecución en
-`reporting.pipeline_runs`.
+(extract → validate → aggregate → observe → load), idempotente (upsert + reconciliación) y con registro de cada
+ejecución en `reporting.pipeline_runs`: fase completada (checkpoint), `X-Request-Id`, cambios por semana y avisos de
+observabilidad (captura en silencio, órdenes del inventario sin evento). Cada fila del reporte guarda el `run_id` de la
+ejecución que la escribió, y nunca hay dos ejecuciones a la vez (índice único parcial: 409).
 
 - `GET /reporting/weekly-warehouse-client-performance?week_start=…` (autenticado): filas de la semana; por defecto, la
   calculada más reciente.
