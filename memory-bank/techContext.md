@@ -22,6 +22,7 @@ JS es autónomo, con su propio `package.json` y `package-lock.json`, y se opera 
 | `scripts/` | `analyze.py`: CLI del analizador de incidencias (+ `incidents-trackflow.csv` de prueba y `tests/`). `seed_incidents.py`: carga ese CSV en el gestor de incidencias (necesita el entorno de la API). |
 | `agents/`, `skills/`, `mcps/`, `workflows/`, `infra/`, `internal/`, `shared/` | Solo README/plantillas (`agents/_template`, `skills/_template`). |
 | `data/` | Pipelines de datos con Prefect 3: `data/pipelines/pipeline.py` (punto de entrada) y `weekly_performance/`; transformaciones puras en `data/process/`; `data/raw/` y `data/eval/` solo con salidas de ejecución ignoradas en git. |
+| `tests/` | Tests transversales de la raíz: hoy solo `tests/pipelines/test_pipeline.py` (unitarios de las tasks de KPI del Hito 6; se ejecutan con el entorno de `services/api`). Sin `__init__.py`. |
 | `docs/` | `hitos.md` (registro de hitos), `ARCHITECTURE_PROPOSAL.md` (propuesta de backend; no es un hito) + READMEs. |
 | `memory-bank/`, `AGENTS.md`, `.agents/` | Infraestructura para agentes (Hito 4). |
 
@@ -145,6 +146,7 @@ navegador se hacen fuera del repo (Edge + `playwright-core` en el scratchpad).
 | Solo los tests del inventario (Hito 5) | `uv run pytest tests/test_inventory.py tests/test_seed_inventory.py tests/test_inventory_database.py` |
 | Cargar el CSV histórico en el gestor de incidencias (idempotente; **desde la raíz del repo**, con la API parada) | `uv run --project services/api python scripts/seed_incidents.py` |
 | Pipeline de desempeño semanal (Prefect 3), **desde la raíz**: 2 últimas semanas completas · otra ventana · sin escribir nada | `uv run --project services/api --env-file services/api/.env python data/pipelines/pipeline.py` · `… --week-start 2026-11-02 --weeks 4` · `… --dry-run` (o `python data/pipelines/pipeline.py` con el venv de la API activado) |
+| Tests unitarios de las tasks de KPI (Hito 6), **desde la raíz** | `uv run --project services/api python -m pytest tests/pipelines/test_pipeline.py -v` (o `python -m pytest …` con el venv de la API activado) |
 | Tests del pipeline · contra un PostgreSQL local desechable con las dos migraciones | `uv run pytest tests/reporting` · `$env:REPORTING_TEST_DATABASE_URL = "postgresql+psycopg://…@127.0.0.1:…"` y `uv run pytest tests/reporting/test_postgres.py` |
 | Regenerar `services/requirements.txt` (Docker) tras cambiar dependencias | `uv export --frozen --format requirements.txt --no-dev --no-emit-project --no-emit-package analisis-incidencias --output-file ../requirements.txt` |
 
@@ -587,6 +589,19 @@ Práctica sin hito, rama `feature/weekly-performance-pipeline` (2026-11-13). Dis
 | Id de la ejecución = id del flow run de Prefect | Un solo identificador en Prefect, registro, filas y snapshot |
 | Snapshots de evaluación en `data/eval/weekly_performance/` y caché en `data/raw/prefect-results/`, ignorados en git | Son salidas de ejecución, no código |
 | Docker sin tocar: la imagen de la API no incluye `data/` | Cambio de infraestructura pendiente de confirmación (PIPELINE_DESIGN §18.10) |
+
+### Hito 6 — subflows, tests unitarios y dashboard de negocio (rama `feature/hito-6-pipeline-subflows`)
+
+| Decisión | Motivo |
+| --- | --- |
+| Flow principal `weekly-warehouse-client-performance` (mismo nombre) que solo coordina subflows: `extract-weekly-inventory-events`, `compute-weekly-warehouse-client-kpis`, `load-weekly-warehouse-client-performance` + opcionales `observe-source-health` y `export-eval-snapshot` (`return_state=True`); `register-run`/`close-run` siguen en el principal | Observabilidad por etapa y ejecución independiente; CLI, API y registro sin cambios |
+| Una task por KPI sobre funciones puras de `data/process/weekly_performance/kpis.py` (`KpiInputError` si la entrada incumple el contrato); `aggregate_rows`/`transform_events` se conservan como composición equivalente | Cada KPI se prueba solo; equivalencia con la Parte 2 comprobada |
+| Caché movida a `prepare-weekly-events` (misma clave y caducidad) | Es la etapa costosa; Prefect 3 no cachea flows |
+| Lo que pasa entre subflows son modelos Pydantic (`Extraction`, `WeeklyKpis`) con `model_serializer` que devuelve un **resumen** | Prefect guarda los parámetros de cada flow run como JSON y rechaza > 512 KB: con un DataFrame fallaba a partir de ~2.000 eventos |
+| Coste aceptado: con el servidor temporal (SQLite) cada subflow puede añadir ~2 s (503 «database is locked» + reintento del cliente); la suite de reporting pasa de ~1,5 a ~6 min | Limitación del servidor SQLite de Prefect; no se toca su configuración. Con servidor dedicado PostgreSQL no ocurre |
+| Tests unitarios en `tests/pipelines/test_pipeline.py` (raíz, **sin** `__init__.py` ni `conftest.py`): llaman a `task.fn`, datos en memoria, fixture que bloquea red y E/S | Lo exige el enunciado; sin paquete `tests` en la raíz para no chocar con `services/api/tests` |
+| Dashboard `/reporting` en el backoffice (grupo `(panel)`): solo consume `GET /reporting/weekly-warehouse-client-performance` (+ `week_start`) y `GET /reporting/pipeline-runs/latest`; 404 = «sin calcular»; sin sumar KPIs entre clientes; evolución = una petición por semana; tarjetas por cliente en móvil | Contrato de la API sin cambios; el navegador no calcula KPIs |
+| Aviso de frescura (`weeksBehind`) en el dashboard; alerta por email solo como propuesta | Único riesgo nuevo del hito (cron aplazado); el email necesita servicio externo y secretos (confirmación) |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 

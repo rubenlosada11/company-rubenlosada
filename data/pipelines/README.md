@@ -11,10 +11,11 @@ Each subfolder or file under `data/pipelines/` should represent **one pipeline o
 
 ## Current pipelines
 
-- **Weekly warehouse/client performance report (Prefect 3)** — entry point [`pipeline.py`](./pipeline.py) (flows and
-  tasks), I/O stages in [`weekly_performance/`](./weekly_performance/), pure transformations in
+- **Weekly warehouse/client performance report (Prefect 3)** — entry point [`pipeline.py`](./pipeline.py): a main
+  flow that coordinates extraction, transformation (one task per KPI) and load subflows (Milestone 6), I/O stages in [`weekly_performance/`](./weekly_performance/), pure transformations in
   [`../process/weekly_performance/`](../process/weekly_performance/). `telemetry_events` (read only) →
   `reporting.weekly_warehouse_client_performance` + `reporting.pipeline_runs`. Design (in Spanish):
   [`PIPELINE_DESIGN.md`](./PIPELINE_DESIGN.md). Run from the repo root:
   `uv run --project services/api --env-file services/api/.env python data/pipelines/pipeline.py` (or
-  `python data/pipelines/pipeline.py` with the `services/api` virtual environment active).
+  `python data/pipelines/pipeline.py` with the `services/api` virtual environment active). Unit tests of the KPI
+  tasks: `uv run --project services/api python -m pytest tests/pipelines/test_pipeline.py -v`.

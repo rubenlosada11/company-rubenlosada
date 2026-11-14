@@ -53,6 +53,7 @@ en el esquema `reporting`; registro de ejecuciones; tres endpoints en un módulo
 - `services/api/app/telemetry/analysis.py` y `GET /telemetry/report` (BRIEFING §7): no se tocan.
 - Escribir en `telemetry_events`: el pipeline la lee en modo solo lectura (§6.1).
 - Una vista en el backoffice para Thomas: el BRIEFING pide el endpoint; la vista es el siguiente paso natural (§14).
+  *(Hito 6: hecha, ruta `/reporting` del backoffice, §19.7.)*
 - Instrumentar `stock_threshold_triggered` e `inventory_discrepancy_detected`: siguen bloqueados por decisiones de
   negocio (§4.1).
 
@@ -326,7 +327,8 @@ el mismo flow pasaría a una cola sin cambiar el contrato salvo el código de es
   `POST /reporting/pipeline-runs` o `python data/pipelines/pipeline.py`. Con Prefect, además, la imagen Docker de la
   API tendría que incluir `data/` (§18.10).
 - **Migración en Supabase:** aplicada por el desarrollador el 2026-11-13 (SQL Editor).
-- **Vista para Thomas** en el backoffice: siguiente paso natural, fuera del alcance del BRIEFING.
+- **Vista para Thomas** en el backoffice: ~~siguiente paso natural, fuera del alcance del BRIEFING~~ hecha en el
+  Hito 6 (`/reporting`, §19.7).
 - **Mismo `DATABASE_URL` para varios entornos**: la tabla de destino no distingue entorno (§4.2).
 - **Canal de alertas**: decidido email (Resend, remitente del dominio verificado, destinatario por variable de
   entorno), sin implementar todavía; los avisos quedan en el registro y en el log (§17.2).
@@ -459,6 +461,10 @@ services/api/app/
   usan `pythonpath = ["../.."]` en `services/api/pyproject.toml`.
 
 ### 18.2. Flows y tasks
+
+> **Hito 6:** esta tabla describe la Parte 2. Desde el Hito 6 `transform-weekly-kpis` se sustituye por el subflow
+> `compute-weekly-warehouse-client-kpis` (una task por KPI; la caché pasa a `prepare-weekly-events`) y extract, load,
+> observe y el snapshot se ejecutan dentro de sus subflows (§19). Reintentos, criticidad y estados no cambian.
 
 | Elemento | Tipo | Qué hace | Crítica | Reintentos | Caché |
 | --- | --- | --- | --- | --- | --- |
@@ -602,3 +608,229 @@ responde 503 sin afectar a los `GET`.
 | `data/raw/`, `data/process/`, `data/eval/` | Carpetas de la raíz `data/` | Se usan esas: caché, transformaciones y snapshots |
 | Estado «parcial» | `pipeline_runs.status` solo admite `running/succeeded/failed` | `stats.outcome` + `outcome` en la API, sin migración |
 | Mensaje de commit `feat: …` | Convención del repo: `<Proyecto> — <cambio>`, commits escalonados | Se sigue la convención del repo |
+
+## 19. Hito 6 — Subflows, tests unitarios y dashboard de negocio
+
+> Añadido el 2026-11-14 con el **Hito 6 — Mejora del Pipeline: Subflows, Tests y Dashboard de Negocio** (Parte 3 de 3
+> del proyecto de data pipelines). Se escribió antes del código, como el resto del documento. Las reglas de negocio
+> (§2–§4, §6–§8), la tabla de destino (§10) y el contrato de la API (§11) **no cambian**.
+
+### 19.1. Qué cambia y por qué
+
+Hasta la Parte 2 el flow `weekly-warehouse-client-performance` llamaba directamente a siete tasks y la transformación
+era **una sola** task que calculaba los cuatro KPIs a la vez. Dos problemas:
+
+- **Observabilidad:** en Prefect solo se veía «el flow»; no había un estado propio de «la extracción», «el cálculo» o
+  «la carga».
+- **Pruebas:** no había una función por KPI; un error en la fórmula de un KPI solo se detectaba probando la
+  agregación completa.
+
+El Hito 6 divide el ETL en **subflows** (cada etapa es un `@flow` con su propio estado, ejecutable por separado) y la
+transformación en **una task por KPI**, cada una apoyada en una función pura de `data/process/`.
+
+### 19.2. Arquitectura
+
+```mermaid
+flowchart TB
+  M{{"@flow weekly-warehouse-client-performance<br/>(principal: coordina y registra)"}}
+  M -->|1| R[task register-run]
+  M -->|2| E["@flow extract-weekly-inventory-events"]
+  E --> E1[task extract-telemetry-events<br/>reintentos ante fallos transitorios]
+  M -->|3| T["@flow compute-weekly-warehouse-client-kpis"]
+  T --> T0[task prepare-weekly-events<br/>validate + semana ISO · CACHÉ]
+  T0 --> K1[task compute-inbound-volume]
+  T0 --> K2[task compute-outbound-throughput]
+  T0 --> K3[task compute-stockout-frequency]
+  T0 --> K4[task count-inventory-discrepancies]
+  K2 --> K5[task compute-discrepancy-rate]
+  K4 --> K5
+  K1 & K2 & K3 & K4 & K5 --> T9[task assemble-weekly-report-rows<br/>filas + controles de coherencia]
+  M -.->|4 opcional, return_state=True| O["@flow observe-source-health"]
+  M -->|5 crítico, return_state=True| L["@flow load-weekly-warehouse-client-performance"]
+  L --> L1[task load-weekly-kpis<br/>upsert + reconciliación, una transacción]
+  M -.->|6 opcional, return_state=True| S["@flow export-eval-snapshot"]
+  M -->|7| C[task close-run]
+  L1 --> D[(reporting.weekly_warehouse_client_performance)]
+  R --> P[(reporting.pipeline_runs)]
+  C --> P
+```
+
+- **Subflows obligatorios (3):** extracción, transformación y carga. El flow principal los encadena en secuencia; no
+  contiene lógica de extracción, cálculo ni escritura.
+- **Subflows opcionales (2):** `observe-source-health` (salud del origen, §17.2) y `export-eval-snapshot` (snapshot de
+  evaluación, §18.6). Se invocan con `return_state=True`: si fallan, la ejecución termina `partial` y el reporte se
+  carga igual. Antes eran tasks del flow principal; pasan a subflows para que el flow principal solo coordine.
+- **Tareas del registro** (`register-run`, `close-run`): siguen en el flow principal, porque el registro de la
+  ejecución es responsabilidad de quien coordina, no de una etapa del ETL.
+- **`--dry-run`** (`weekly-warehouse-client-performance-preview`) reutiliza los mismos subflows de extracción,
+  transformación y observación, sin carga ni registro.
+
+### 19.3. Nombres
+
+Los nombres siguen el dominio (eventos de inventario, KPIs semanales por almacén y cliente), no `extract_data` /
+`transform_data` / `load_data`:
+
+| Elemento | Función Python | Nombre en Prefect |
+| --- | --- | --- |
+| Subflow de extracción | `extract_weekly_inventory_events` | `extract-weekly-inventory-events` |
+| Subflow de transformación | `compute_weekly_kpis` | `compute-weekly-warehouse-client-kpis` |
+| Subflow de carga | `load_weekly_performance` | `load-weekly-warehouse-client-performance` |
+| Subflow opcional | `observe_source_health` | `observe-source-health` |
+| Subflow opcional | `export_eval_snapshot` | `export-eval-snapshot` |
+| Task (preparación, cacheada) | `prepare_task` → `prepare_events()` | `prepare-weekly-events` |
+| Task (Volumen de entrada) | `inbound_volume_task` → `inbound_volume()` | `compute-inbound-volume` |
+| Task (Throughput de salida) | `outbound_throughput_task` → `outbound_throughput()` | `compute-outbound-throughput` |
+| Task (Frecuencia de quiebre de stock) | `stockout_frequency_task` → `stockout_frequency()` | `compute-stockout-frequency` |
+| Task (apoyo de la Tasa de discrepancia) | `discrepancy_count_task` → `discrepancy_count()` | `count-inventory-discrepancies` |
+| Task (Tasa de discrepancia) | `discrepancy_rate_task` → `discrepancy_rate()` | `compute-discrepancy-rate` |
+| Task (filas y coherencia) | `assemble_rows_task` → `build_rows()` + `check_consistency()` | `assemble-weekly-report-rows` |
+
+El flow principal conserva su nombre (`weekly-warehouse-client-performance`): la API, la línea de comandos y el
+historial de Prefect siguen igual.
+
+### 19.4. Contratos entre subflows
+
+| Subflow | Entrada | Salida | Errores |
+| --- | --- | --- | --- |
+| Extracción | `week_from`, `week_to` (lunes, `week_from ≤ week_to`), `environment` | `Extraction`: DataFrame con `id`, `event_type`, `timestamp`, `tags` (orden cronológico, también vacío) + entorno + huella SHA-256 | `ValueError` si la ventana no es válida; `ReportingStorageError` tras agotar los reintentos |
+| Transformación | `Extraction` + `weeks` (lista de lunes) | `WeeklyKpis`: `rows` (una por `warehouse, client_id, week_start`, con los 5 campos del BRIEFING), `events_read`, `rejected`, `transform_cache` (`hit`/`miss`) | `SourceSchemaError` (faltan columnas o hay tipos de evento ajenos), `KpiInputError` (entrada de un KPI mal formada), `InconsistentResultError` (las filas no cuadran con los eventos) |
+| Carga | `rows`, `week_from`, `week_to`, `run_id` | `LoadResult`: `rows_upserted`, `rows_deleted`, `changes` por semana | `ReportingStorageError` (transitorio → reintento; si no, falla sin escribir nada) |
+| Observación (opcional) | `Extraction`, `week_from`, `week_to` | `dict` con `warnings`, `source_health`, `capture_coverage` | Cualquiera → la ejecución sigue como `partial` |
+| Snapshot (opcional) | `run_id`, `payload` | Ruta del JSON | Cualquiera → `partial` |
+
+**Contrato de cada task de KPI** (funciones puras de `data/process/weekly_performance/kpis.py`):
+
+- Entrada: los eventos **válidos** de la ventana ya preparados (`prepare_events`): columnas `event_type`,
+  `warehouse`, `client_id`, `week_start` y, para el volumen de entrada, `quantity` (entero ≥ 1).
+- Salida: una `pd.Series` de enteros indexada por `(warehouse, client_id, week_start)`, solo con las combinaciones
+  que tienen eventos de ese tipo. La tasa recibe las dos series (discrepancias y pedidos) y devuelve floats a 4
+  decimales, **0 si no hubo pedidos** (BRIEFING §4).
+- Nulos y eventos mal formados: no llegan a los KPIs. `validate` los **rechaza y cuenta** (§6.3: `invalid_timestamp`,
+  `invalid_warehouse`, `invalid_client_id`, `invalid_quantity`, `duplicate_order`); la ejecución sigue con el resto.
+- Entrada estructuralmente inválida (faltan columnas, cantidades no enteras o < 1, almacenes fuera de los dos
+  válidos, valores nulos): `KpiInputError`. Es una barrera contra errores de código, no de datos: la ejecución falla
+  y no se carga nada.
+
+**Contrato de la tabla de destino:** sin cambios (§10). Misma tabla, mismas columnas, mismo upsert sobre
+`unique (warehouse, client_id, week_start)`. No hay tabla nueva.
+
+### 19.5. Caché
+
+La caché de la Parte 2 (§18.5) pasa de la antigua task `transform-weekly-kpis` a **`prepare-weekly-events`**, con la
+misma clave (huella de los eventos + semanas + entorno + versión del código) y la misma caducidad (1 día). Es la etapa
+costosa (reglas fila a fila); las tasks de KPI son agregaciones vectorizadas de milisegundos y se recalculan siempre.
+`stats.prefect.transform_cache` sigue diciendo `hit`/`miss`. Los flows no se cachean (Prefect 3 solo cachea tasks).
+
+### 19.6. Tests unitarios (`tests/pipelines/test_pipeline.py`)
+
+Llaman a las tasks con `.fn(...)` (el cuerpo de la task, sin motor ni servidor de Prefect), con DataFrames en memoria
+con la forma real de `telemetry_events`. Un fixture bloquea cualquier conexión de red y las funciones de E/S del
+pipeline: si un test intentara usar la base, Supabase o HTTP, fallaría.
+
+| Test | Qué demuestra |
+| --- | --- |
+| Volumen de entrada | Suma de `quantity` por almacén, cliente y semana, calculada a mano |
+| Throughput de salida | Conteo de pedidos (no unidades) por combinación |
+| Frecuencia de quiebre de stock | Conteo de `stock_threshold_triggered`; semana ISO en el borde domingo/lunes |
+| Tasa de discrepancia | `discrepancias / pedidos` a 4 decimales; 0 sin pedidos; puede superar 1 |
+| Defensivo (datos) | Eventos con `timestamp` inválido, almacén nulo y cantidad de texto se **excluyen y se cuentan** por motivo; el KPI se calcula con el resto |
+| Defensivo (estructura) | Una entrada sin columna obligatoria o con una cantidad no válida → `KpiInputError` concreto |
+| Equivalencia | El subflow de transformación da exactamente las mismas filas que la transformación de la Parte 2 |
+
+Comando: `python -m pytest tests/pipelines/test_pipeline.py -v` desde la raíz, con el entorno de `services/api`
+(donde están Prefect y Pandas): `uv run --project services/api python -m pytest tests/pipelines/test_pipeline.py -v`.
+
+### 19.7. Dashboard de negocio (`uis/backoffice`, ruta `/reporting`)
+
+- **Integración:** página del grupo `(panel)` (detrás de `AuthGate`, como el resto), enlace «Desempeño semanal» en el
+  menú, cliente HTTP y hook de peticiones existentes (`lib/http.ts`, `useApiRequest`), componentes y estilos del
+  backoffice. Sin librerías nuevas.
+- **Datos:** solo `GET /reporting/weekly-warehouse-client-performance` (con `week_start` para navegar) y
+  `GET /reporting/pipeline-runs/latest` (estado de la última actualización). **Contrato sin cambios**. El navegador no
+  calcula KPIs ni consulta la base: muestra lo que devuelve la API.
+- **Contenido:** los cuatro KPIs con su nombre de negocio exacto (Volumen de entrada, Throughput de salida, Frecuencia
+  de quiebre de stock, Tasa de discrepancia), su unidad (unidades, pedidos, veces, %) y el conteo de discrepancias de
+  apoyo; una tabla por almacén con una fila por cliente (cada fila es de un único cliente, BRIEFING §7); período
+  «semana del lunes … al domingo … (UTC)», separado de la fecha de cálculo (`computed_at`).
+- **Evolución:** una tabla de las últimas semanas por combinación y KPI, construida con el mismo endpoint
+  (`week_start` de cada semana). Las semanas sin calcular se muestran como «sin calcular», nunca como 0.
+- **Estados:** carga, error legible (sin trazas, tablas ni códigos), «aún no hay semanas calculadas» (404) y «semana
+  calculada sin actividad» (`entries: []`).
+- **Honestidad del dato:** si en la semana nadie registró quiebres o discrepancias, la vista lo dice y recuerda que hoy
+  esos eventos no se emiten (§4.1): un 0 puede significar «sin medir».
+
+### 19.8. Implementación: dos hallazgos
+
+**1. Los parámetros de un subflow se guardan en Prefect.** Al crear un flow run, Prefect convierte sus parámetros a
+JSON (con el `jsonable_encoder` de FastAPI) y los guarda en su base para mostrarlos en la interfaz; el servidor rechaza
+más de 512 KB. La primera versión pasaba el DataFrame de eventos como parámetro: con 3.000 eventos (≈ 700 KB) la
+ejecución fallaba con un 422 de Prefect, y en producción habría fallado con el volumen real. Solución: lo que viaja
+entre subflows son modelos Pydantic (`Extraction`, `WeeklyKpis`) cuyo serializador devuelve un **resumen**
+(`{"events": 3000, "environment": …, "fingerprint": …}`, `{"rows": 16, "events_read": …}`). Los datos pasan en
+memoria; Prefect guarda una descripción legible. La carga y el snapshot reciben `WeeklyKpis`, no la lista de filas,
+para que un backfill de 53 semanas tampoco supere el límite. Test de regresión en
+`services/api/tests/reporting/test_pipeline_prefect.py`.
+
+**2. Cada subflow cuesta una ida y vuelta al servidor de Prefect.** Al crear un subflow, Prefect registra con un
+`POST /task_runs` la «task padre» que lo enlaza al flow principal. Con el servidor temporal (SQLite) esa escritura choca
+a veces con el registro de eventos del subflow anterior («database is locked»): el servidor responde 503 y el cliente
+reintenta a los ~2 s. No se pierde nada, pero una ejecución pasa de < 1 s a ~4–6 s y la batería de integración de
+~1,5 a ~6 min. No se toca la configuración interna de Prefect: con un servidor dedicado sobre PostgreSQL (lo
+recomendado en producción, §18.10) no ocurre. Es el coste de la observabilidad por etapas.
+
+### 19.9. Revisión de resiliencia y observabilidad (Hito 6)
+
+Se repasaron las preguntas de diseño del BRIEFING (§17) y los pendientes (§16, §18.10) buscando riesgos **aún
+abiertos**; no se añade nada que no responda a uno.
+
+| Mejora | Pregunta de diseño | Estado |
+| --- | --- | --- |
+| Idempotencia en reintentos | §17.1 | Ya resuelta (upsert + una transacción) |
+| Identificación de ejecuciones (`run_id`, `request_id`) | §17.2 | Ya resuelta |
+| Lock de concurrencia | §17.4 | Ya resuelto (índice único parcial + candado del proceso) |
+| Registro de errores (`error`, `phase`) y ejecuciones abandonadas | §17.3, §17.4 | Ya resuelto |
+| Anomalías de volumen (`no_events_in_window`, `silent_days`, `capture_gap`) | §17.2 | Ya resuelto |
+| **Frescura del dato visible para dirección** | §17.2 (silencio vs. ausencia real) | **Implementada en el Hito 6** |
+| Alerta por email ante ausencia prolongada de ejecuciones | §17.2 | **Propuesta** (sin implementar) |
+
+**Implementada: aviso de frescura en el dashboard.** *Riesgo:* el dashboard (§19.7) muestra «la semana calculada más
+reciente»; con el `cron` aplazado (§16), si nadie lanza el pipeline esa semana puede quedarse atrás y Thomas la vería
+como el dato actual. *Solución:* el dashboard compara la semana más reciente calculada con la última semana completa
+según el reloj (UTC); si hay semanas terminadas sin calcular, muestra «El reporte no está al día: … hay N semanas
+completas posteriores sin calcular». Es una comparación de fechas, no un cálculo de KPIs, y no cambia la API ni la
+arquitectura. *Por qué se prioriza:* es el único riesgo nuevo que introduce el Hito 6 y afecta directamente a
+decisiones del CEO. *Coste y límites:* depende del reloj del navegador; solo avisa a quien abre el dashboard (no
+sustituye a una alerta activa). Verificado: Jest (`lastCompleteWeek`, `weeksBehind`, bordes domingo/lunes UTC) y en
+Chrome (sin aviso con el dato al día; aviso de 2 semanas simulando que la última calculada es la del 19-oct).
+
+**Propuesta, no implementada: alerta por email.** Responde a la misma pregunta desde el lado activo (avisar aunque
+nadie mire). Exige un servicio externo (Resend), un remitente verificado del dominio y una variable con el
+destinatario, cambios que requieren la confirmación del desarrollador (AGENTS.md §4); además, sin `cron` no hay
+ejecuciones periódicas que vigilar. Queda para cuando se programe el pipeline.
+
+### 19.10. Verificación y limitaciones (2026-11-14)
+
+| Comprobación | Resultado |
+| --- | --- |
+| Tests unitarios de las tasks de KPI (`tests/pipelines/test_pipeline.py`) | 15/15; con mutaciones de la lógica fallan entre 3 y 13; en orden inverso, 15/15 |
+| Integración del pipeline (`services/api/tests/reporting`) | 170 + 6 omitidos (PostgreSQL opcional), incluidos 4 de subflows |
+| Suite completa de la API | 1708 + 6 omitidos; 1 fallo intermitente previo de telemetría (abajo) |
+| Equivalencia con la Parte 2 | 3.000 eventos aleatorios con 70 mal formados: mismas filas y mismos rechazos |
+| CLI contra Supabase | `succeeded`, 5 subflows `Completed`, 0 filas (no hay eventos en semanas completas), avisos esperados |
+| CLI con datos (SQLite de verificación, 150 eventos de prueba) | 16 filas = SQL independiente; segunda ejecución: 16 «sin cambios», caché `hit` |
+| Endpoint | Mismos valores que la tabla; 401 sin token, 404 semana sin calcular, 422 si no es lunes |
+| Dashboard (Chrome + `playwright-core`) | 26 comprobaciones: valores = API, 4 KPIs con unidad, período y cálculo, navegación, evolución, carga/error/vacío, móvil, otras páginas; aviso de frescura |
+| Backoffice | lint, typecheck, Jest 278/278, build |
+
+**Limitaciones conocidas**
+
+- **Sin datos reales todavía:** en Supabase los únicos eventos de negocio son de la semana en curso; el reporte real
+  tendrá filas cuando termine esa semana y se ejecute el pipeline (`cron` aplazado, §16).
+- **Dos KPIs sin instrumentar** (§4.1): quiebres y discrepancias aparecen a 0; el dashboard lo avisa.
+- **~2 s por subflow** con el servidor temporal de Prefect (§19.8).
+- **Fallo intermitente previo** (no del Hito 6): `test_telemetry_report.py::test_different_periods_are_computed_in_parallel`
+  falla a veces con `OperationalError` porque dos hilos crean a la vez la tabla SQLite de telemetría
+  (`app/telemetry/storage.py`, creación perezosa). Se reproduce con el código de la Parte 2 (2 de 33) y no en `main`
+  (0 de 100). Arreglo propuesto: un candado alrededor de `create_all`; queda fuera del alcance (sistema de telemetría).
+- **Docker:** la imagen de la API sigue sin incluir `data/` (§18.10).
+
