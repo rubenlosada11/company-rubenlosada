@@ -48,7 +48,7 @@ def isolated_transform_cache(monkeypatch):
     """Cada test con su propia «versión del código» de la transformación y, por tanto, su propia caché.
 
     La clave de caché incluye la huella de los datos: dos tests con la misma extracción (p. ej. vacía) compartirían el
-    resultado cacheado aunque uno sustituya `transform_events` por una función que falla. Sustituir la función es
+    resultado cacheado aunque uno sustituya `prepare_events` por una función que falla. Sustituir la función es
     cambiar el código, y en producción eso cambia `CODE_VERSION`: aquí se simula igual. `test_pipeline_prefect.py`
     prueba la caché entre ejecuciones dentro de un mismo test.
     """

@@ -6,7 +6,18 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/prefect-performance-pipeline` (desde `main` @ `18c6fcf`, que incluye las PR #3–#30).
+- **Rama de trabajo:** `feature/hito-6-pipeline-subflows` (desde `feature/prefect-performance-pipeline` @ `240eb47`,
+  PR #31 de la Parte 2 aún abierta: hay que fusionarla antes que la del Hito 6).
+- **Hito 6 — Mejora del Pipeline: Subflows, Tests y Dashboard de Negocio** (Parte 3 de 3 de data pipelines): el flow
+  `weekly-warehouse-client-performance` coordina subflows de extracción, transformación (una task por KPI sobre
+  `data/process/weekly_performance/kpis.py`) y carga, más `observe-source-health` y `export-eval-snapshot` opcionales
+  (`return_state=True`); entre subflows viajan modelos Pydantic con un resumen serializable (Prefect rechaza
+  parámetros > 512 KB). Tests unitarios en `tests/pipelines/test_pipeline.py` (15, sin base/red/Prefect Server).
+  Dashboard `/reporting` en el backoffice sobre el endpoint existente (contrato sin cambios), con evolución semanal y
+  aviso de frescura. Diseño y verificación: `data/pipelines/PIPELINE_DESIGN.md` §19. **Verificado** (2026-11-14): API
+  1708 + 6 omitidos (1 fallo intermitente previo, ver «Trabajo pendiente»), reporting 170 + 6, `tests/pipelines` 15,
+  scripts + analisis-incidencias 196, Jest 278, lint/typecheck/build; CLI contra Supabase (`succeeded`, 0 filas) y
+  con datos de verificación (tabla = SQL independiente, idempotente); dashboard en Chrome (26 comprobaciones).
 - **Pipeline de Desempeño de Negocio Resiliente (Parte 2 de 3 de data pipelines, práctica sin número de hito):** el
   pipeline semanal se orquesta con **Prefect 3** (3.9.3). ETL movido a `data/`: flows y tasks en
   [`data/pipelines/pipeline.py`](../data/pipelines/pipeline.py) (punto de entrada `python data/pipelines/pipeline.py`),
@@ -1589,6 +1600,38 @@ recomendaciones. Rama desde `main` @ `18c6fcf` (PR #30 fusionada).
   (el `:8000` estaba ocupado por otro proceso del desarrollador; no se tocó). Supabase: `--dry-run` y una ejecución
   real (`succeeded`, 0 filas, avisos `no_events_in_window` y `capture_gap`); `telemetry_events` sigue en 84 filas.
 
+### 2026-11-14 — Hito 6: Mejora del Pipeline: Subflows, Tests y Dashboard de Negocio (rama `feature/hito-6-pipeline-subflows`)
+
+Parte 3 de 3 de data pipelines. El desarrollador pidió ejecutar todas las fases seguidas con mis recomendaciones y
+parar antes de crear la PR. Rama desde `feature/prefect-performance-pipeline` @ `240eb47` (PR #31 abierta).
+
+- **Discrepancias del prompt:** `company-BRIEFING.md` no existe (el BRIEFING es `CONTEXT-datapipelines.es.md`);
+  `services/reporting/` = `services/api/app/reporting/`; `python -m pytest` necesita el entorno de `services/api`
+  (Prefect); commits con la convención del repo (`Hito 6 — …`, escalonados) en vez del `feat: …` único.
+- **Subflows** (PIPELINE_DESIGN §19): `extract-weekly-inventory-events`, `compute-weekly-warehouse-client-kpis`
+  (`prepare-weekly-events` cacheada + 5 tasks de KPI + `assemble-weekly-report-rows`),
+  `load-weekly-warehouse-client-performance`; opcionales `observe-source-health`, `export-eval-snapshot`. Mismo
+  nombre de flow principal, misma CLI, misma API. Equivalencia con la Parte 2 comprobada con 3.000 eventos aleatorios.
+- **Hallazgos:** (1) Prefect guarda los parámetros de los flow runs como JSON y rechaza > 512 KB → `Extraction` y
+  `WeeklyKpis` son modelos Pydantic con `model_serializer` de resumen (test de regresión); (2) con el servidor
+  temporal SQLite cada subflow puede costar ~2 s (503 + reintento del cliente): suite de reporting ~6 min.
+- **Tests:** `tests/pipelines/test_pipeline.py` (15: 4 KPIs con cálculo manual, redondeo, datos mal formados
+  rechazados y contados, `KpiInputError` por contrato, esquema, filas = Parte 2, semana vacía); comprobados con
+  mutaciones (fallan 3–13) y en orden inverso. En `services/api/tests/reporting` se adaptaron los tests que
+  sustituían `transform_events` y se añadieron 4 de subflows.
+- **Dashboard** `/reporting` (`components/reporting/`, `lib/weeklyPerformance.ts` + 15 tests Jest, `types/`): KPIs con
+  nombre del BRIEFING y unidad, tabla por almacén (tarjetas en móvil), período ISO separado de `computed_at`,
+  navegación por semanas, evolución de 6 semanas (404 = «sin calcular»), estado del último cálculo, avisos de KPIs sin
+  medir y de frescura (Fase 7). Hito 6 añadido a `docs/hitos.md` y `lib/data/milestones.ts`.
+- **Verificación real:** CLI contra Supabase (`succeeded`, 0 filas: los únicos eventos de negocio son de la semana
+  en curso, del 11-nov; avisos `no_events_in_window` y `capture_gap`). Instancia local de verificación en el
+  scratchpad (SQLite, 150 eventos de prueba de 4 semanas pasadas, admin de prueba): CLI ×2 → 16 filas = SQL
+  independiente, 2.ª «sin cambios» y caché `hit`; API en `:8010` (el `:8000` es de otro proceso del desarrollador)
+  con 401/200/404/422; backoffice en `:3002` + `playwright-core` y Chrome: 26 comprobaciones y aviso de frescura.
+- **Fallo intermitente previo** detectado en la suite: `test_telemetry_report.py::test_different_periods_are_computed_in_parallel`
+  (`OperationalError` por la creación perezosa concurrente de la tabla SQLite de telemetría). Se reproduce en la
+  Parte 2 (2/33) y no en `main` (0/100); no se toca (sistema de telemetría, fuera de alcance).
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -1693,5 +1736,10 @@ recomendaciones. Rama desde `main` @ `18c6fcf` (PR #30 fusionada).
     Pendiente heredado: la ficha de Notion de la Parte 1; implementar las alertas por email
     (Resend, remitente de `rubenlosada.com`, destinatario en una variable nueva del `.env`); instalar el `cron` del
     lunes cuando se redespliegue el backend (`docs/reporting/weekly-performance-pipeline.md` §3.3); revisar la orden
-    de entrada de Los Ángeles sin evento (¿creada sin `TELEMETRY_PSEUDONYM_KEY`?). Siguiente paso natural: vista del
-    reporte en el backoffice para Thomas y Ana.
+    de entrada de Los Ángeles sin evento (¿creada sin `TELEMETRY_PSEUDONYM_KEY`?). La vista del reporte para Thomas y Ana se hizo en el
+    Hito 6 (`/reporting`).
+15. Hito 6: PR pendiente (después de fusionar la #31), entrega y ficha de Notion. Pendientes que nacen del hito:
+    candado alrededor del `create_all` perezoso de `app/telemetry/storage.py` (fallo intermitente de
+    `test_different_periods_are_computed_in_parallel`, requiere confirmación: sistema de telemetría); alerta por
+    email de ausencia de ejecuciones (PIPELINE_DESIGN §19.9); servidor de Prefect dedicado si los ~2 s por subflow
+    molestan.

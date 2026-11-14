@@ -47,3 +47,13 @@ negocio completo en [`CONTEXT.es.md`](../CONTEXT.es.md) y [`CONTEXT-trackflow.es
 | Descripción | API de inventario unificada de los almacenes de Los Ángeles y Zaragoza (ticket TRK-0341): SKUs, recepciones de mercancía (`StockEntry`) y salidas por despacho o pérdida (`StockExit`) con **SQLModel** (SQLite en local, preparada para PostgreSQL/Supabase con `DATABASE_URL`). El stock nunca se guarda: se calcula como entradas menos salidas y **por almacén**; ninguna salida puede dejarlo en negativo. Autenticación JWT existente (usuarios en TinyDB) y datos semilla con `uv run seed-inventory`. Interfaz de operaciones en el backoffice: productos con indicadores de stock, registro de entradas y de salidas (con stock reactivo y aviso de stock insuficiente) e historial de movimientos de solo lectura. |
 | Demo pública | — (API solo en local) |
 | Detalle | [`docs/inventario.md`](./inventario.md), [`services/api/README.md`](../services/api/README.md#inventario-hito-5) |
+
+## Hito 6 — Mejora del Pipeline: Subflows, Tests y Dashboard de Negocio
+
+| | |
+| --- | --- |
+| Carpeta | [`data/pipelines/`](../data/pipelines/), [`data/process/weekly_performance/`](../data/process/weekly_performance/), [`tests/pipelines/`](../tests/pipelines/) y [`uis/backoffice/`](../uis/backoffice/) (`/reporting`) |
+| Descripción | Parte 3 de 3 del proyecto de data pipelines (Reporte Semanal de Desempeño por Almacén y Cliente, BRIEFING [`CONTEXT-datapipelines.es.md`](../CONTEXT-datapipelines.es.md)). El flow de Prefect 3 pasa a coordinar **subflows** de extracción, transformación y carga (más dos opcionales con `return_state=True`); la transformación tiene una task por KPI (Volumen de entrada, Throughput de salida, Frecuencia de quiebre de stock, Tasa de discrepancia) sobre funciones puras; tests unitarios de esas tasks sin base, red ni servidor de Prefect; la línea de comandos `python data/pipelines/pipeline.py` se conserva. Dashboard de negocio para dirección en el backoffice (`/reporting`) que consume el endpoint existente `GET /reporting/weekly-warehouse-client-performance`, con evolución semanal y aviso de frescura del dato. |
+| Demo pública | — (API solo en local) |
+| Detalle | [`data/pipelines/PIPELINE_DESIGN.md`](../data/pipelines/PIPELINE_DESIGN.md#19-hito-6--subflows-tests-unitarios-y-dashboard-de-negocio) (§19), [`docs/reporting/weekly-performance-pipeline.md`](./reporting/weekly-performance-pipeline.md) y [`uis/backoffice/README.md`](../uis/backoffice/README.md#qué-muestra-la-ruta-reporting) |
+

@@ -8,6 +8,9 @@
 > **Parte 2 (2026-11-13):** el pipeline se orquesta con **Prefect 3** y su código se movió a `data/` (PIPELINE_DESIGN
 > §18). Las secciones 1–3 describen el estado actual; las de verificación (§5 y siguientes) recogen también lo que se
 > comprobó en la Parte 1, con el código de entonces.
+>
+> **Hito 6 (2026-11-14):** subflows de extracción, transformación y carga, una task por KPI, tests unitarios en
+> `tests/pipelines/` y dashboard de negocio en el backoffice (`/reporting`). Diseño y verificación: PIPELINE_DESIGN §19.
 
 ## 1. Qué hay y dónde
 
@@ -19,7 +22,8 @@
 | observe (salud del origen y cobertura frente al inventario) | [`data/pipelines/weekly_performance/observe.py`](../../data/pipelines/weekly_performance/observe.py) |
 | load (upsert + reconciliación, `run_id`, cambios por semana) | [`data/pipelines/weekly_performance/load.py`](../../data/pipelines/weekly_performance/load.py) |
 | Snapshot de evaluación (`data/eval/weekly_performance/`) | [`data/pipelines/weekly_performance/evaluation.py`](../../data/pipelines/weekly_performance/evaluation.py) |
-| Transformaciones puras: eventos, validate, aggregate, transform (coherencia, huella, versión) | [`data/process/weekly_performance/`](../../data/process/weekly_performance/) |
+| Transformaciones puras: eventos, validate, **kpis** (una función por KPI), aggregate, transform (coherencia, huella, versión) | [`data/process/weekly_performance/`](../../data/process/weekly_performance/) |
+| Tests unitarios de las tasks de KPI (Hito 6) | [`tests/pipelines/test_pipeline.py`](../../tests/pipelines/test_pipeline.py) |
 | Semanas ISO en UTC y ventana | [`app/reporting/weeks.py`](../../services/api/app/reporting/weeks.py) |
 | Tablas de `reporting` y errores transitorios | [`app/reporting/tables.py`](../../services/api/app/reporting/tables.py) |
 | Registro de ejecuciones | [`app/reporting/runs.py`](../../services/api/app/reporting/runs.py) |
@@ -33,20 +37,31 @@ PIPELINE_DESIGN §5): solo HTTP, lecturas y registro. El ETL está en `data/` y 
 
 ## 2. Cómo funciona una ejecución
 
+Desde el **Hito 6** (PIPELINE_DESIGN §19) el flow principal coordina **subflows** (cada uno, un `@flow` con su propio
+estado en Prefect) y la transformación tiene una task por KPI:
+
 ```text
 POST /reporting/pipeline-runs        ─┐
-python data/pipelines/pipeline.py    ─┴─► run_weekly_performance → flow de Prefect weekly-warehouse-client-performance
+python data/pipelines/pipeline.py    ─┴─► run_weekly_performance → @flow weekly-warehouse-client-performance
     1. resolve_window: semanas completas (por defecto, las 2 últimas)   → 422 / código 2 (sin crear flow run)
     2. register-run   fila `running` (id = id del flow run de Prefect)   → 409 si ya hay otra (también entre procesos)
-    3. extract-telemetry-events  SELECT 4 event_type, entorno, [inicio, fin) (READ ONLY) + huella  phase = extracted
-                                 reintentos: 3 (2/10/30 s) solo ante fallos transitorios
-    4. transform-weekly-kpis     validate → aggregate → coherencia; CACHEADA                       phase = aggregated
-    5. observe-source            OPCIONAL (return_state): si falla → aviso + ejecución parcial
-    6. load-weekly-kpis          CRÍTICA (return_state): upsert + reconciliación en una transacción;
-                                 reintentos: 2 (5/15 s) transitorios; si falla → `failed`, nada escrito
-    7. write-eval-snapshot       OPCIONAL (return_state): JSON en data/eval/weekly_performance/
+    3. @flow extract-weekly-inventory-events                                                           phase = extracted
+         extract-telemetry-events  SELECT 4 event_type, entorno, [inicio, fin) (READ ONLY) + huella
+                                   reintentos: 3 (2/10/30 s) solo ante fallos transitorios
+    4. @flow compute-weekly-warehouse-client-kpis                                                     phase = aggregated
+         prepare-weekly-events     validate + semana ISO; CACHEADA
+         compute-inbound-volume · compute-outbound-throughput · compute-stockout-frequency
+         count-inventory-discrepancies → compute-discrepancy-rate
+         assemble-weekly-report-rows  filas + controles de coherencia
+    5. @flow observe-source-health            OPCIONAL (return_state): si falla → aviso + ejecución parcial
+    6. @flow load-weekly-warehouse-client-performance   CRÍTICO (return_state): load-weekly-kpis, upsert +
+                                   reconciliación en una transacción; reintentos: 2 (5/15 s); si falla → `failed`
+    7. @flow export-eval-snapshot             OPCIONAL (return_state): JSON en data/eval/weekly_performance/
     8. close-run      `succeeded` (stats.outcome = succeeded | partial), phase = loaded, recuentos y stats
 ```
+
+Tests unitarios de las tasks de KPI (sin base, red ni servidor de Prefect), desde la raíz:
+`uv run --project services/api python -m pytest tests/pipelines/test_pipeline.py -v`.
 
 Un `POST` sin cuerpo, o el `cron` del lunes, recalcula las **2 últimas semanas completas**: la de la semana pasada y
 la anterior, para recoger eventos tardíos y rellenar la semana de una ejecución que hubiera fallado.
@@ -77,8 +92,9 @@ uv run --project services/api --env-file services/api/.env python data/pipelines
 O con el entorno virtual de la API activado (`services\api\.venv\Scripts\Activate.ps1`) y `DATABASE_URL` en el
 entorno: `python data/pipelines/pipeline.py`. Sin `DATABASE_URL`, el pipeline usa la base SQLite local de la API; la
 primera línea de la salida dice qué base usa (sin credenciales). Prefect no necesita ningún servidor: arranca uno
-temporal (~10–20 s) y lo para al terminar. Las ejecuciones parciales terminan con código 0 y el aviso
-«Etapas opcionales con fallo».
+temporal (~10–20 s) y lo para al terminar. Con ese servidor temporal (SQLite) cada subflow puede añadir ~2 s
+(PIPELINE_DESIGN §19.8): una ejecución completa tarda ~4–6 s además del arranque. Las ejecuciones parciales terminan
+con código 0 y el aviso «Etapas opcionales con fallo».
 
 - Sin parámetros: las 2 últimas semanas completas. `--week-start` es la semana más reciente (un lunes ya terminado);
   `--weeks`, cuántas hacia atrás (1–53).

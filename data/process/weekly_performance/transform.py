@@ -1,8 +1,11 @@
 """transform: validate → aggregate → controles de coherencia (PIPELINE_DESIGN.md §6 y §18.3).
 
-Es la transformación completa que ejecuta la task `transform-weekly-kpis` de `data/pipelines/pipeline.py` y la que
-cachea Prefect. Función pura: el resultado depende **solo** de los eventos de entrada, de las semanas pedidas y del
-código de este paquete. Por eso la clave de caché se construye con tres piezas que este módulo expone:
+Desde el Hito 6 el subflow `compute-weekly-warehouse-client-kpis` de `data/pipelines/pipeline.py` ejecuta esta
+transformación por pasos: `prepare_events` (validate + semana ISO; la task cacheada `prepare-weekly-events`), una task
+por KPI (`kpis.py`) y `check_consistency` sobre las filas. `transform_events` hace lo mismo en un solo paso (la
+transformación de la Parte 2) y sirve de referencia de equivalencia. Funciones puras: el resultado depende **solo**
+de los eventos de entrada, de las semanas pedidas y del código de este paquete. Por eso la clave de caché se
+construye con tres piezas que este módulo expone:
 
 - `fingerprint_events(raw)`: huella SHA-256 del contenido de los eventos extraídos (id, tipo, fecha y `tags`).
 - las semanas (`weeks`) de la ventana;
@@ -32,7 +35,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from data.process.weekly_performance.aggregate import RATE_DECIMALS, aggregate_rows, week_start_series
+from data.process.weekly_performance.aggregate import RATE_DECIMALS, aggregate_rows, week_start_series, weekly_events
 from data.process.weekly_performance.events import DISCREPANCY, INBOUND, OUTBOUND, STOCKOUT
 from data.process.weekly_performance.validate import WAREHOUSES, validate_events
 
@@ -139,8 +142,36 @@ def check_consistency(rows: list[dict], valid: pd.DataFrame, weeks: Iterable[dat
         raise InconsistentResultError(problems)
 
 
+@dataclass(frozen=True)
+class PreparedEvents:
+    """Entrada común de las tasks de KPI (Hito 6): eventos válidos de la ventana con su `week_start`.
+
+    `events` tiene las columnas de `validate.VALID_COLUMNS` más `week_start`; `events_read` y `rejected` son los
+    recuentos de calidad para el registro de la ejecución.
+    """
+
+    events: pd.DataFrame
+    events_read: dict[str, int] = field(default_factory=dict)
+    rejected: dict[str, dict[str, int]] = field(default_factory=dict)
+
+
+def prepare_events(raw: pd.DataFrame, weeks: Iterable[date]) -> PreparedEvents:
+    """validate → semana ISO de cada evento → solo las semanas de la ventana. Es la etapa que cachea Prefect."""
+    validated = validate_events(raw)
+    return PreparedEvents(
+        events=weekly_events(validated.valid, weeks),
+        events_read=validated.events_read,
+        rejected=validated.rejected,
+    )
+
+
 def transform_events(raw: pd.DataFrame, weeks: Iterable[date]) -> Transformation:
-    """validate → aggregate → check_consistency. Sin efectos secundarios."""
+    """validate → aggregate → check_consistency en un solo paso. Sin efectos secundarios.
+
+    Es la transformación de la Parte 2; desde el Hito 6 el pipeline la ejecuta por pasos (una task por KPI en el
+    subflow `compute-weekly-warehouse-client-kpis`) con el mismo resultado. Se conserva como referencia de
+    equivalencia y para quien necesite el cálculo completo sin Prefect.
+    """
     weeks = list(weeks)
     validated = validate_events(raw)
     rows = aggregate_rows(validated.valid, weeks)

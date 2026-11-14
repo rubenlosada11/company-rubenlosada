@@ -11,8 +11,11 @@ Cada subcarpeta o archivo dentro de `data/pipelines/` debe representar **un pipe
 
 ### Reporte Semanal de Desempeño por Almacén y Cliente (Prefect 3)
 
-- **Punto de entrada:** [`pipeline.py`](./pipeline.py) — flows `weekly-warehouse-client-performance` (ETL completo) y
-  `weekly-warehouse-client-performance-preview` (`--dry-run`), y las tasks de cada etapa.
+- **Punto de entrada:** [`pipeline.py`](./pipeline.py) — flow principal `weekly-warehouse-client-performance`, que
+  coordina los subflows de extracción (`extract-weekly-inventory-events`), transformación
+  (`compute-weekly-warehouse-client-kpis`, una task por KPI) y carga (`load-weekly-warehouse-client-performance`), más
+  dos opcionales (`observe-source-health`, `export-eval-snapshot`); y `weekly-warehouse-client-performance-preview`
+  (`--dry-run`). Hito 6: PIPELINE_DESIGN §19.
 - **Etapas con entrada/salida:** [`weekly_performance/`](./weekly_performance/) (extract, observe, load, snapshot de
   evaluación). **Transformaciones puras:** [`../process/weekly_performance/`](../process/weekly_performance/).
 - **Origen → destino:** `telemetry_events` (solo lectura) → `reporting.weekly_warehouse_client_performance` (upsert
@@ -27,4 +30,9 @@ Cada subcarpeta o archivo dentro de `data/pipelines/` debe representar **un pipe
   ```
 
   Con el entorno virtual de `services/api` activado basta `python data/pipelines/pipeline.py`.
-- **Tests:** `services/api/tests/reporting/` (`uv run pytest tests/reporting` desde `services/api`).
+- **Tests:** unitarios de las tasks de KPI en [`tests/pipelines/test_pipeline.py`](../../tests/pipelines/test_pipeline.py)
+  (`uv run --project services/api python -m pytest tests/pipelines/test_pipeline.py -v` desde la raíz; sin base, red
+  ni servidor de Prefect) e integración en `services/api/tests/reporting/` (`uv run pytest tests/reporting` desde
+  `services/api`).
+- **Dónde quedan los KPIs:** `reporting.weekly_warehouse_client_performance` (los sirve
+  `GET /reporting/weekly-warehouse-client-performance` y los muestra el backoffice en `/reporting`).

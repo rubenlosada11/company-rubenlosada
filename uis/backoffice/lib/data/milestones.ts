@@ -48,4 +48,12 @@ export const MILESTONES: readonly Milestone[] = [
       "API de inventario unificada de Los Ángeles y Zaragoza (/inventory): SKUs, entradas y salidas de stock con SQLModel y stock calculado por almacén, con su interfaz de operaciones en el backoffice.",
     paths: ["services/api/", "uis/backoffice/"],
   },
+  {
+    number: 6,
+    name: "Mejora del Pipeline: Subflows, Tests y Dashboard de Negocio",
+    status: "delivered", // entregado al fusionar su PR en main (2026-11)
+    summary:
+      "Pipeline semanal de desempeño con subflows de Prefect 3 (extracción, transformación con una task por KPI y carga), tests unitarios de los KPIs y dashboard de negocio en el backoffice (/reporting).",
+    paths: ["data/pipelines/", "data/process/", "tests/pipelines/", "uis/backoffice/"],
+  },
 ];
