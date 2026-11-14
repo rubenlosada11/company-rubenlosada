@@ -148,7 +148,7 @@ def test_week_never_computed_is_404_not_an_empty_report(user_api, computed):
 
 
 def test_failed_runs_do_not_count_as_computed(user_api, monkeypatch, frozen_now):
-    monkeypatch.setattr(flow, "transform_events", lambda *a: 1 / 0)
+    monkeypatch.setattr(flow, "prepare_events", lambda *a: 1 / 0)
     with pytest.raises(PipelineRunFailed):
         run_weekly_performance()
     assert user_api.get(REPORT).status_code == 404
@@ -267,7 +267,7 @@ def test_run_in_progress_is_409(manager_api, monkeypatch):
 
 
 def test_failed_run_is_503_and_recorded(manager_api, frozen_now, monkeypatch):
-    monkeypatch.setattr(flow, "transform_events", lambda *a: 1 / 0)
+    monkeypatch.setattr(flow, "prepare_events", lambda *a: 1 / 0)
     response = manager_api.post(RUNS)
     assert response.status_code == 503 and "ZeroDivisionError" not in response.text
     latest = manager_api.get(LATEST_RUN).json()

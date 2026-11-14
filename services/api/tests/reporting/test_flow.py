@@ -168,7 +168,7 @@ def test_failure_is_recorded_and_the_report_is_unchanged(week_of_activity, monke
     def broken(*args, **kwargs):
         raise ValueError("detalle interno que no debe guardarse")
 
-    monkeypatch.setattr(flow, "transform_events", broken)
+    monkeypatch.setattr(flow, "prepare_events", broken)
     with pytest.raises(PipelineRunFailed) as error:
         run_weekly_performance(now=NOW)
     assert error.value.run["status"] == "failed" and error.value.run["error"] == "ValueError"
@@ -276,7 +276,9 @@ def test_only_one_run_at_a_time_in_the_process(monkeypatch):
             run_weekly_performance(now=NOW)
     finally:
         release.set()
-        worker.join(5)
+        # Margen amplio: con subflows (Hito 6) el servidor de Prefect de pruebas (SQLite) puede tardar unos segundos
+        # en crear cada subflow (PIPELINE_DESIGN §19.8). Aquí se prueba el candado, no la velocidad.
+        worker.join(60)
     assert [run["status"] for run in all_runs()] == ["succeeded"]
 
 
@@ -330,6 +332,6 @@ def test_cli_rejects_an_unfinished_week(frozen_now, capsys):
 
 
 def test_cli_reports_a_failed_run(week_of_activity, frozen_now, monkeypatch, capsys):
-    monkeypatch.setattr(flow, "transform_events", lambda *a: 1 / 0)
+    monkeypatch.setattr(flow, "prepare_events", lambda *a: 1 / 0)
     assert cli.main([]) == 1
     assert "ZeroDivisionError" in capsys.readouterr().err

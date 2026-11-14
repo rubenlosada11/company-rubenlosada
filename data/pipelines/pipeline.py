@@ -1,20 +1,24 @@
 """Pipeline de Desempeño de Negocio Resiliente — Reporte Semanal de Desempeño por Almacén y Cliente (Prefect 3).
 
 Punto de entrada y definición de los flows. Diseño: `data/pipelines/PIPELINE_DESIGN.md` (§18, implementación con
-Prefect). Recorrido de los datos:
+Prefect; §19, subflows del Hito 6). El flow principal **coordina** subflows (cada uno, un `@flow` con su propio
+estado en Prefect) y registra la ejecución; no lee, calcula ni escribe datos por sí mismo:
 
-    telemetry_events (solo lectura)
-        │  extract-telemetry-events      reintentos ante fallos transitorios
-        ▼
-    transform-weekly-kpis              validate → aggregate → coherencia; caché (cache_key_fn + cache_expiration)
-        │
-        ├─▶ observe-source               OPCIONAL (return_state=True): si falla, aviso y ejecución «parcial»
-        ▼
-    load-weekly-kpis                   CRÍTICA (return_state=True): si falla, la ejecución es «failed»
-        │                              upsert sobre unique (warehouse, client_id, week_start), una transacción
-        ├─▶ write-eval-snapshot          OPCIONAL (return_state=True): JSON en data/eval/
-        ▼
-    reporting.weekly_warehouse_client_performance  +  reporting.pipeline_runs (registro de la ejecución)
+    @flow weekly-warehouse-client-performance                     (principal)
+      register-run                                                task: fila `running` en reporting.pipeline_runs
+      ├─ @flow extract-weekly-inventory-events                    SUBFLOW 1 · extracción
+      │     extract-telemetry-events                              telemetry_events (solo lectura), reintentos
+      ├─ @flow compute-weekly-warehouse-client-kpis               SUBFLOW 2 · transformación (una task por KPI)
+      │     prepare-weekly-events                                 validate + semana ISO; CACHÉ (cache_key_fn)
+      │     compute-inbound-volume · compute-outbound-throughput · compute-stockout-frequency
+      │     count-inventory-discrepancies → compute-discrepancy-rate
+      │     assemble-weekly-report-rows                           filas + controles de coherencia
+      ├─ @flow observe-source-health                              OPCIONAL (return_state=True): si falla, «parcial»
+      ├─ @flow load-weekly-warehouse-client-performance           SUBFLOW 3 · carga, CRÍTICO (return_state=True)
+      │     load-weekly-kpis                                      upsert + reconciliación, una transacción
+      ├─ @flow export-eval-snapshot                               OPCIONAL (return_state=True): JSON en data/eval/
+      close-run                                                   task: cierra el registro
+    → reporting.weekly_warehouse_client_performance  +  reporting.pipeline_runs
 
 Ejecución desde la raíz del monorepo (con el entorno de `services/api`, que es donde está instalado Prefect):
 
@@ -65,21 +69,33 @@ import pandas as pd  # noqa: E402
 from prefect import flow, get_run_logger, task  # noqa: E402
 from prefect.cache_policies import NO_CACHE  # noqa: E402
 from prefect.runtime import flow_run as current_flow_run  # noqa: E402
+from pydantic import BaseModel, ConfigDict, model_serializer  # noqa: E402
 
 from app.reporting import runs  # noqa: E402
 from app.reporting.tables import ReportingStorageError  # noqa: E402
-from app.reporting.weeks import DEFAULT_WEEKS, WeekWindow, WindowError, resolve_window  # noqa: E402
+from app.reporting.weeks import DEFAULT_WEEKS, WeekWindow, WindowError, is_monday, resolve_window  # noqa: E402
 from app.telemetry.config import get_environment  # noqa: E402
 from data.pipelines.weekly_performance.evaluation import write_snapshot  # noqa: E402
 from data.pipelines.weekly_performance.extract import extract_events  # noqa: E402
 from data.pipelines.weekly_performance.load import LoadResult, load_rows  # noqa: E402
 from data.pipelines.weekly_performance.observe import UNAVAILABLE, observe  # noqa: E402
+from data.process.weekly_performance.events import COLUMNS  # noqa: E402
+from data.process.weekly_performance.kpis import (  # noqa: E402
+    build_rows,
+    discrepancy_count,
+    discrepancy_rate,
+    inbound_volume,
+    outbound_throughput,
+    stockout_frequency,
+)
 from data.process.weekly_performance.transform import (  # noqa: E402
     CODE_VERSION,
-    Transformation,
+    PreparedEvents,
+    check_consistency,
     fingerprint_events,
-    transform_events,
+    prepare_events,
 )
+from data.process.weekly_performance.validate import SourceSchemaError  # noqa: E402
 
 PIPELINE_NAME = runs.WEEKLY_PERFORMANCE
 Trigger = Literal["api", "cli"]
@@ -131,7 +147,9 @@ def retry_if_transient(task, task_run, state) -> bool:
 
 
 # --- Caché de la transformación -------------------------------------------------------------------------------------
-# La clave identifica TODO lo que determina el resultado de `transform-weekly-kpis`, y nada más:
+# Desde el Hito 6 se cachea `prepare-weekly-events` (validate + semana ISO), la etapa costosa de la transformación
+# (reglas fila a fila); las tasks de KPI son agregaciones vectorizadas de milisegundos y se recalculan siempre.
+# La clave identifica TODO lo que determina el resultado de la preparación, y nada más:
 #   1. `source`: huella SHA-256 del contenido de los eventos extraídos (id, tipo, fecha y tags de cada uno). Un evento
 #      tardío, nuevo o distinto cambia la huella → otra clave → se recalcula. Nunca se sirve un KPI obsoleto.
 #   2. `weeks`: las semanas de la ventana (la agregación descarta lo que cae fuera).
@@ -147,9 +165,20 @@ def retry_if_transient(task, task_run, state) -> bool:
 TRANSFORM_CACHE_EXPIRATION = timedelta(days=1)
 
 
-@dataclass(frozen=True)
-class Extraction:
-    """Salida de la extracción: eventos crudos, entorno y huella de su contenido (entrada de la clave de caché)."""
+# --- Datos que viajan entre subflows ---------------------------------------------------------------------------------
+# Prefect guarda en su base los parámetros de cada flow run (lo que se ve en la interfaz) convirtiéndolos a JSON con el
+# `jsonable_encoder` de FastAPI, y su servidor rechaza los que pasan de 512 KB. Un DataFrame de eventos o las filas de
+# un backfill superan ese límite enseguida (3.000 eventos ≈ 700 KB), y además no deben quedar copiados en Prefect.
+# Por eso lo que pasa de un subflow a otro son modelos Pydantic cuyo serializador devuelve un RESUMEN (recuentos, entorno
+# y huella): los datos viajan en memoria y Prefect registra una descripción legible de lo que recibió cada subflow.
+
+_DATA_MODEL = ConfigDict(arbitrary_types_allowed=True, frozen=True)
+
+
+class Extraction(BaseModel):
+    """Salida del subflow de extracción: eventos crudos, entorno y huella de su contenido (entrada de la caché)."""
+
+    model_config = _DATA_MODEL
 
     events: pd.DataFrame
     environment: str
@@ -159,9 +188,46 @@ class Extraction:
     def count(self) -> int:
         return len(self.events)
 
+    @model_serializer
+    def _summary(self) -> dict[str, Any]:
+        """Lo que Prefect guarda como parámetro de un subflow: el resumen, nunca los eventos."""
+        return {"events": self.count, "environment": self.environment, "fingerprint": self.fingerprint}
+
+
+class WeeklyKpis(BaseModel):
+    """Salida del subflow de transformación: filas del reporte, recuentos de calidad y uso de la caché.
+
+    Mismos campos que `Transformation` (data/process) más `transform_cache`. Es la entrada del subflow de carga.
+    """
+
+    model_config = _DATA_MODEL
+
+    rows: list[dict]
+    events_read: dict[str, int]
+    rejected: dict[str, dict[str, int]]
+    transform_cache: Literal["hit", "miss"] = "miss"
+
+    @property
+    def total_read(self) -> int:
+        return sum(self.events_read.values())
+
+    @property
+    def total_rejected(self) -> int:
+        return sum(sum(by_reason.values()) for by_reason in self.rejected.values())
+
+    @model_serializer
+    def _summary(self) -> dict[str, Any]:
+        """Lo que Prefect guarda como parámetro de un subflow: recuentos, nunca las filas."""
+        return {
+            "rows": len(self.rows),
+            "events_read": self.total_read,
+            "events_rejected": self.total_rejected,
+            "transform_cache": self.transform_cache,
+        }
+
 
 def transform_cache_key(context, parameters: dict[str, Any]) -> str:
-    """`cache_key_fn` de `transform-weekly-kpis`: ver el comentario de arriba."""
+    """`cache_key_fn` de `prepare-weekly-events`: ver el comentario de arriba."""
     extraction: Extraction = parameters["extraction"]
     material = {
         "source": extraction.fingerprint,
@@ -227,18 +293,63 @@ def extract_task(window: WeekWindow, environment: str) -> Extraction:
 
 
 @task(
-    name="transform-weekly-kpis",
+    name="prepare-weekly-events",
     cache_key_fn=transform_cache_key,
     cache_expiration=TRANSFORM_CACHE_EXPIRATION,
 )
-def transform_task(extraction: Extraction, weeks: list[date]) -> Transformation:
-    """validate → aggregate → controles de coherencia (data/process). Pura: su resultado se puede cachear."""
-    transformation = transform_events(extraction.events, weeks)
-    logger = get_run_logger()
-    if transformation.rejected:
-        logger.warning("Eventos rechazados por calidad: %s", transformation.rejected)
-    logger.info("%d filas del reporte calculadas", len(transformation.rows))
-    return transformation
+def prepare_task(extraction: Extraction, weeks: list[date]) -> PreparedEvents:
+    """validate (rechaza y cuenta los eventos mal formados) → semana ISO → ventana. Pura: se puede cachear."""
+    return prepare_events(extraction.events, weeks)
+
+
+# Tasks de KPI: una por indicador del BRIEFING (§2). Cada una envuelve una función pura de
+# data/process/weekly_performance/kpis.py, sin E/S ni logger de Prefect, para que se pueda probar llamando a `.fn`.
+
+
+@task(name="compute-inbound-volume", cache_policy=NO_CACHE)
+def inbound_volume_task(events: pd.DataFrame) -> pd.Series:
+    """KPI «Volumen de entrada»: unidades recibidas por almacén, cliente y semana."""
+    return inbound_volume(events)
+
+
+@task(name="compute-outbound-throughput", cache_policy=NO_CACHE)
+def outbound_throughput_task(events: pd.DataFrame) -> pd.Series:
+    """KPI «Throughput de salida»: pedidos despachados por almacén, cliente y semana."""
+    return outbound_throughput(events)
+
+
+@task(name="compute-stockout-frequency", cache_policy=NO_CACHE)
+def stockout_frequency_task(events: pd.DataFrame) -> pd.Series:
+    """KPI «Frecuencia de quiebre de stock»: veces bajo el mínimo por almacén, cliente y semana."""
+    return stockout_frequency(events)
+
+
+@task(name="count-inventory-discrepancies", cache_policy=NO_CACHE)
+def discrepancy_count_task(events: pd.DataFrame) -> pd.Series:
+    """Conteo de apoyo de la «Tasa de discrepancia»: discrepancias detectadas por almacén, cliente y semana."""
+    return discrepancy_count(events)
+
+
+@task(name="compute-discrepancy-rate", cache_policy=NO_CACHE)
+def discrepancy_rate_task(discrepancies: pd.Series, outbound_orders: pd.Series) -> pd.Series:
+    """KPI «Tasa de discrepancia»: discrepancias / pedidos (4 decimales; 0 sin pedidos)."""
+    return discrepancy_rate(discrepancies, outbound_orders)
+
+
+@task(name="assemble-weekly-report-rows", cache_policy=NO_CACHE)
+def assemble_rows_task(
+    prepared: PreparedEvents,
+    weeks: list[date],
+    inbound_units: pd.Series,
+    outbound_orders: pd.Series,
+    stockouts: pd.Series,
+    discrepancies: pd.Series,
+    rates: pd.Series,
+) -> list[dict]:
+    """Filas de la tabla de destino + controles de coherencia (`InconsistentResultError` si algo no cuadra)."""
+    rows = build_rows(inbound_units, outbound_orders, stockouts, discrepancies, rates)
+    check_consistency(rows, prepared.events, weeks)
+    return rows
 
 
 @task(
@@ -304,11 +415,115 @@ def _current_run_id() -> uuid.UUID:
 
 
 def _observations(state, logger) -> tuple[dict[str, Any], bool]:
-    """Decisión sobre la etapa opcional `observe-source`: sus señales si terminó bien; si no, el aviso y `degraded`."""
+    """Decisión sobre el subflow opcional `observe-source-health`: sus señales si terminó bien; si no, aviso y
+    `degraded`."""
     if state.is_completed():
         return state.result(), False
-    logger.warning("observe-source no disponible (%s): se continúa sin señales del origen", state.name)
+    logger.warning("observe-source-health no disponible (%s): se continúa sin señales del origen", state.name)
     return {"warnings": [UNAVAILABLE]}, True
+
+
+def _week_window(week_from: date, week_to: date) -> WeekWindow:
+    """Ventana `[week_from, week_to]` de un subflow. `ValueError` si no son lunes o están al revés.
+
+    `run_weekly_performance` ya valida la ventana antes de crear el flow run; esta comprobación protege a los subflows
+    cuando se ejecutan por separado (p. ej. desde un notebook o los tests).
+    """
+    if not (is_monday(week_from) and is_monday(week_to)):
+        raise ValueError("week_from y week_to deben ser lunes (inicio de la semana ISO).")
+    if week_from > week_to:
+        raise ValueError("week_from no puede ser posterior a week_to.")
+    return WeekWindow(first=week_from, last=week_to)
+
+
+# --- Subflows (Hito 6) -----------------------------------------------------------------------------------------------
+# Cada etapa del ETL es un `@flow` con parámetros y resultado explícitos. Llamado desde otro flow, Prefect lo registra
+# como **subflow** (un flow run hijo, enlazado al principal, con su propio estado); llamado directamente, se ejecuta
+# solo. Ninguno depende de variables globales con estado: todo lo que necesitan llega por parámetros.
+
+
+@flow(name="extract-weekly-inventory-events", persist_result=False)
+def extract_weekly_inventory_events(week_from: date, week_to: date, environment: str) -> Extraction:
+    """SUBFLOW 1 · extracción. Eventos de inventario (los 4 `event_type` del BRIEFING) del entorno y las semanas
+    `[week_from, week_to]`, leídos de `telemetry_events` en solo lectura, con la huella de su contenido.
+
+    Errores: `ValueError` (ventana no válida), `ReportingStorageError` (la base no responde tras los reintentos de
+    `extract-telemetry-events`) o `SourceSchemaError` (la extracción no trae las columnas del contrato).
+    """
+    window = _week_window(week_from, week_to)
+    extraction = extract_task(window, environment)
+    missing = [column for column in COLUMNS if column not in extraction.events.columns]
+    if missing:
+        raise SourceSchemaError(f"Faltan columnas en la extracción: {', '.join(missing)}")
+    return extraction
+
+
+@flow(name="compute-weekly-warehouse-client-kpis", persist_result=False)
+def compute_weekly_kpis(extraction: Extraction, weeks: list[date]) -> WeeklyKpis:
+    """SUBFLOW 2 · transformación. Los cuatro KPIs por almacén, cliente y semana, una task por KPI.
+
+    prepare-weekly-events (cacheada) → volumen de entrada, throughput de salida, quiebres de stock y discrepancias →
+    tasa de discrepancia → filas + controles de coherencia. Independiente de la base: solo recibe la extracción.
+
+    Errores: `SourceSchemaError`, `KpiInputError` o `InconsistentResultError` (no se carga nada).
+    """
+    logger = get_run_logger()
+    prepared_state = prepare_task(extraction, weeks, return_state=True)
+    prepared: PreparedEvents = prepared_state.result()  # si falló, relanza su excepción
+    cache: Literal["hit", "miss"] = "hit" if prepared_state.name == "Cached" else "miss"
+    if prepared.rejected:
+        logger.warning("Eventos rechazados por calidad: %s", prepared.rejected)
+
+    events = prepared.events
+    inbound_units = inbound_volume_task(events)
+    outbound_orders = outbound_throughput_task(events)
+    stockouts = stockout_frequency_task(events)
+    discrepancies = discrepancy_count_task(events)
+    rates = discrepancy_rate_task(discrepancies, outbound_orders)
+    rows = assemble_rows_task(prepared, weeks, inbound_units, outbound_orders, stockouts, discrepancies, rates)
+
+    logger.info("%d filas del reporte calculadas (caché de la preparación: %s)", len(rows), cache)
+    return WeeklyKpis(
+        rows=rows, events_read=prepared.events_read, rejected=prepared.rejected, transform_cache=cache
+    )
+
+
+@flow(name="load-weekly-warehouse-client-performance", persist_result=False)
+def load_weekly_performance(kpis: WeeklyKpis, week_from: date, week_to: date, run_id: uuid.UUID) -> LoadResult:
+    """SUBFLOW 3 · carga. Upsert idempotente de las filas (`kpis.rows`) en
+    `reporting.weekly_warehouse_client_performance` y reconciliación de las semanas `[week_from, week_to]`, en una
+    transacción.
+
+    Devuelve un `LoadResult` verificable (filas escritas y eliminadas, cambios por semana). Errores: `ValueError` si
+    alguna fila es de otra semana (la reconciliación borraría datos de semanas que no se han recalculado) y
+    `ReportingStorageError` si la base falla tras los reintentos (nada escrito).
+    """
+    window = _week_window(week_from, week_to)
+    rows = kpis.rows
+    outside = sorted({row["week_start"].isoformat() for row in rows if row["week_start"] not in window.weeks})
+    if outside:
+        raise ValueError(f"Filas fuera de la ventana de carga: {', '.join(outside)}")
+    loaded = load_task(rows, window, run_id)
+    get_run_logger().info("%d filas escritas, %d eliminadas", loaded.rows_upserted, loaded.rows_deleted)
+    return loaded
+
+
+@flow(name="observe-source-health", persist_result=False)
+def observe_source_health(extraction: Extraction, week_from: date, week_to: date) -> dict[str, Any]:
+    """Subflow OPCIONAL: salud del origen y cobertura frente al inventario (§17.2). Solo lectura."""
+    return observe_task(_week_window(week_from, week_to), extraction)
+
+
+@flow(name="export-eval-snapshot", persist_result=False)
+def export_eval_snapshot(run_id: uuid.UUID, summary: dict[str, Any], kpis: WeeklyKpis) -> str:
+    """Subflow OPCIONAL: snapshot JSON de la ejecución (`summary` + filas de `kpis`) en data/eval/ (§18.6).
+
+    Devuelve su ruta. Las filas llegan dentro de `kpis` (no como parámetro suelto) para no copiarlas en Prefect.
+    """
+    return eval_snapshot_task(run_id, {**summary, "rows": kpis.rows})
+
+
+# --- Flow principal --------------------------------------------------------------------------------------------------
 
 
 @flow(name="weekly-warehouse-client-performance", persist_result=False)
@@ -321,7 +536,8 @@ def weekly_performance_flow(
 ) -> dict[str, Any]:
     """ETL completo de las semanas `[week_from, week_to]` (lunes, ya validadas) y registro de la ejecución.
 
-    Devuelve el registro (`status = succeeded`; `stats.outcome` = `succeeded` o `partial`). Lanza
+    Coordina los subflows en secuencia (extracción → transformación → observación opcional → carga → snapshot
+    opcional) y registra la ejecución; no contiene lógica de extracción, cálculo ni escritura. Devuelve el registro (`status = succeeded`; `stats.outcome` = `succeeded` o `partial`). Lanza
     `PipelineAlreadyRunning` o `ReportingStorageError` si no se puede ni registrar, y `PipelineRunFailed` si falla una
     etapa crítica (extract, transform o load): la ejecución queda `failed` con su última fase y el reporte, sin cambios.
     """
@@ -359,29 +575,32 @@ def weekly_performance_flow(
     )
     degraded: list[str] = []
     try:
-        extraction = extract_task(window, environment)
+        # SUBFLOW 1 · extracción. Si falla (tras los reintentos de su task), su excepción llega aquí.
+        extraction = extract_weekly_inventory_events(window.first, window.last, environment)
         runs.set_phase(run_id, "extracted")
-        transform_state = transform_task(extraction, window.weeks, return_state=True)
-        transformation: Transformation = transform_state.result()  # si falló, relanza su excepción
-        cache = "hit" if transform_state.name == "Cached" else "miss"
+
+        # SUBFLOW 2 · transformación: los cuatro KPIs, una task por KPI.
+        transformation = compute_weekly_kpis(extraction, window.weeks)
+        cache = transformation.transform_cache
         runs.set_phase(run_id, "aggregated")
 
-        # Etapa OPCIONAL: su fallo no detiene el flujo; la ejecución sigue y se marcará como parcial.
-        observations, observe_failed = _observations(observe_task(window, extraction, return_state=True), logger)
+        # Subflow OPCIONAL: su fallo no detiene el flujo; la ejecución sigue y se marcará como parcial.
+        observe_state = observe_source_health(extraction, window.first, window.last, return_state=True)
+        observations, observe_failed = _observations(observe_state, logger)
         if observe_failed:
             degraded.append("observe")
 
-        # Etapa CRÍTICA: sin carga correcta no hay éxito. Decisión explícita sobre su estado.
-        load_state = load_task(transformation.rows, window, run_id, return_state=True)
+        # SUBFLOW 3 · carga, CRÍTICO: sin carga correcta no hay éxito. Decisión explícita sobre su estado.
+        load_state = load_weekly_performance(transformation, window.first, window.last, run_id, return_state=True)
         if not load_state.is_completed():
             load_error = load_state.result(raise_on_failure=False)
             if not isinstance(load_error, BaseException):
-                load_error = RuntimeError(f"load-weekly-kpis terminó en estado {load_state.name}")
+                load_error = RuntimeError(f"load-weekly-warehouse-client-performance terminó en estado {load_state.name}")
             raise fail(load_error) from load_error
         loaded: LoadResult = load_state.result()
     except PipelineRunFailed:
         raise
-    except Exception as error:  # extract o transform fallidos (tras sus reintentos) o checkpoint imposible
+    except Exception as error:  # extracción o transformación fallidas (tras sus reintentos) o checkpoint imposible
         raise fail(error) from error
 
     stats: dict[str, Any] = {
@@ -400,8 +619,8 @@ def weekly_performance_flow(
         },
     }
 
-    # Etapa OPCIONAL: snapshot de evaluación. Va antes de cerrar el registro para que el registro diga si se guardó.
-    snapshot_state = eval_snapshot_task(
+    # Subflow OPCIONAL: snapshot de evaluación. Va antes de cerrar el registro para que el registro diga si se guardó.
+    snapshot_state = export_eval_snapshot(
         run_id,
         {
             "pipeline": PIPELINE_NAME,
@@ -409,14 +628,14 @@ def weekly_performance_flow(
             "week_from": window.first,
             "week_to": window.last,
             **stats,
-            "rows": transformation.rows,
         },
+        transformation,
         return_state=True,
     )
     if snapshot_state.is_completed():
         stats["eval_snapshot"] = snapshot_state.result()
     else:
-        logger.warning("write-eval-snapshot no disponible (%s): el reporte ya está cargado", snapshot_state.name)
+        logger.warning("export-eval-snapshot no disponible (%s): el reporte ya está cargado", snapshot_state.name)
         degraded.append("eval_snapshot")
 
     outcome: Outcome = "partial" if degraded else "succeeded"
@@ -480,10 +699,12 @@ class Computation:
 
 @flow(name="weekly-warehouse-client-performance-preview", persist_result=False)
 def compute_weekly_performance(window: WeekWindow, environment: str) -> Computation:
-    """extract → transform (+ observe opcional) sin escribir nada ni registrar la ejecución (`--dry-run`)."""
-    extraction = extract_task(window, environment)
-    transformation = transform_task(extraction, window.weeks)
-    observations, _ = _observations(observe_task(window, extraction, return_state=True), get_run_logger())
+    """Subflows de extracción y transformación (+ observación opcional) sin escribir nada ni registrar la ejecución
+    (`--dry-run`)."""
+    extraction = extract_weekly_inventory_events(window.first, window.last, environment)
+    transformation = compute_weekly_kpis(extraction, window.weeks)
+    observe_state = observe_source_health(extraction, window.first, window.last, return_state=True)
+    observations, _ = _observations(observe_state, get_run_logger())
     return Computation(
         window=window,
         environment=environment,

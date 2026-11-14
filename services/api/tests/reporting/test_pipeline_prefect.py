@@ -8,10 +8,12 @@ Ejecutar desde services/api: uv run pytest tests/reporting/test_pipeline_prefect
 """
 
 import json
+import uuid
 from datetime import timedelta
 
 import pytest
 from prefect.client.orchestration import get_client
+from prefect.client.schemas.filters import FlowRunFilter, FlowRunFilterParentFlowRunId
 from sqlalchemy import select
 
 from app.reporting import runs
@@ -209,14 +211,14 @@ def test_the_run_id_is_the_prefect_flow_run_id(activity):
 
 @pytest.fixture
 def counted_transform(monkeypatch):
-    original = flow.transform_events
+    original = flow.prepare_events
     calls = []
 
     def counting(*args, **kwargs):
         calls.append(args)
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(flow, "transform_events", counting)
+    monkeypatch.setattr(flow, "prepare_events", counting)
     return calls
 
 
@@ -259,8 +261,8 @@ def test_cache_key_covers_every_input_that_determines_the_result(monkeypatch):
     assert key.startswith("weekly-kpis-")
     assert key == transform_cache_key(None, {"extraction": extraction, "weeks": weeks})
     variants = [
-        {"extraction": Extraction(events, "development", "b" * 64), "weeks": weeks},
-        {"extraction": Extraction(events, "production", "a" * 64), "weeks": weeks},
+        {"extraction": Extraction(events=events, environment="development", fingerprint="b" * 64), "weeks": weeks},
+        {"extraction": Extraction(events=events, environment="production", fingerprint="a" * 64), "weeks": weeks},
         {"extraction": extraction, "weeks": weeks[1:]},
     ]
     assert all(transform_cache_key(None, params) != key for params in variants)
@@ -268,7 +270,62 @@ def test_cache_key_covers_every_input_that_determines_the_result(monkeypatch):
     assert transform_cache_key(None, {"extraction": extraction, "weeks": weeks}) != key
 
 
+# --- Subflows (Hito 6) -----------------------------------------------------------------------------------------------
+
+
+def test_subflow_parameters_store_a_summary_not_the_data():
+    """Prefect guarda los parámetros de cada flow run como JSON (máx. 512 KB): los eventos y las filas no viajan ahí."""
+    events = frame(*(event(OUTBOUND, at(W2, 8), order_id=n) for n in range(1, 3001)))
+    extraction = Extraction(events=events, environment="development", fingerprint="f" * 64)
+    serialized = flow.compute_weekly_kpis.serialize_parameters({"extraction": extraction, "weeks": [W2]})
+    assert serialized["extraction"] == {"events": 3000, "environment": "development", "fingerprint": "f" * 64}
+
+    kpis = flow.WeeklyKpis(rows=[{"week_start": W2}] * 5000, events_read={OUTBOUND: 3000}, rejected={})
+    serialized = flow.load_weekly_performance.serialize_parameters({"kpis": kpis, "week_from": W2, "week_to": W2})
+    assert serialized["kpis"] == {"rows": 5000, "events_read": 3000, "events_rejected": 0, "transform_cache": "miss"}
+    assert len(json.dumps(serialized)) < 1_000
+
+
+def test_the_main_flow_runs_the_etl_as_linked_subflows(activity):
+    run = run_weekly_performance(now=NOW)
+    # Filtro en el servidor: en la sesión de tests hay cientos de flow runs y la lectura sin filtro va por páginas.
+    only_children = FlowRunFilter(parent_flow_run_id=FlowRunFilterParentFlowRunId(any_=[run["id"]]))
+    with get_client(sync_client=True) as client:
+        flow_names = {f.id: f.name for f in client.read_flows()}
+        children = list(client.read_flow_runs(flow_run_filter=only_children))
+    children.sort(key=lambda child: child.start_time)
+    assert [flow_names[child.flow_id] for child in children] == [
+        "extract-weekly-inventory-events",
+        "compute-weekly-warehouse-client-kpis",
+        "observe-source-health",
+        "load-weekly-warehouse-client-performance",
+        "export-eval-snapshot",
+    ]
+    assert all(child.state.is_completed() for child in children)
+    assert children[0].parameters == {"week_from": W1.isoformat(), "week_to": W2.isoformat(), "environment": "development"}
+    assert children[1].parameters["extraction"]["events"] == 7  # el resumen, no los eventos
+
+
+def test_each_subflow_runs_on_its_own(activity):
+    extraction = flow.extract_weekly_inventory_events(W1, W2, "development")
+    assert extraction.count == 7
+    kpis = flow.compute_weekly_kpis(extraction, [W1, W2])
+    assert [(r["week_start"], r["inbound_units_count"], r["outbound_orders_count"]) for r in kpis.rows] == [
+        (W1, 500, 0),
+        (W2, 300, 4),
+    ]
+    with pytest.raises(ValueError, match="lunes"):
+        flow.extract_weekly_inventory_events(W1 + timedelta(days=1), W2, "development")
+
+
+def test_the_load_subflow_rejects_rows_outside_its_window():
+    kpis = flow.WeeklyKpis(rows=[{"week_start": W1}], events_read={}, rejected={})
+    with pytest.raises(ValueError, match="fuera de la ventana"):
+        flow.load_weekly_performance(kpis, W2, W2, uuid.uuid4())
+    assert report() == []
+
+
 def test_cache_expiration_is_one_day():
     assert TRANSFORM_CACHE_EXPIRATION == timedelta(days=1)
-    assert flow.transform_task.cache_expiration == TRANSFORM_CACHE_EXPIRATION
-    assert flow.transform_task.cache_key_fn is transform_cache_key
+    assert flow.prepare_task.cache_expiration == TRANSFORM_CACHE_EXPIRATION
+    assert flow.prepare_task.cache_key_fn is transform_cache_key
