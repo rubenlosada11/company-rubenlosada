@@ -4,7 +4,8 @@ Aplicación interna de TrackFlow Tech. Muestra la estructura del negocio, el bac
 Tech y el estado de los hitos del proyecto **a partir del contexto de empresa** (ruta `/`), el **directorio de
 proveedores** (ruta `/proveedores`), el **analizador de incidencias** de CX (ruta `/incidencias`), el **gestor de
 incidencias** (rutas `/gestor-incidencias` y `/gestor-incidencias/nueva`) y la **gestión de inventario** del Hito 5
-(rutas `/inventory/…`, ver [Inventario](#qué-muestran-las-rutas-inventory)), estos cuatro conectados a la API [`services/api`](../../services/api/README.md). **Se entra con login** (ruta `/login`) o creando
+(rutas `/inventory/…`, ver [Inventario](#qué-muestran-las-rutas-inventory)) y el **dashboard de desempeño semanal** del
+Hito 6 (ruta `/reporting`, ver [Desempeño semanal](#qué-muestra-la-ruta-reporting)), estos cinco conectados a la API [`services/api`](../../services/api/README.md). **Se entra con login** (ruta `/login`) o creando
 una cuenta (ruta `/register`), con un token JWT; cada usuario edita sus datos de contacto en `/account/profile`, cambia
 su contraseña en `/account/change-password` y, si la olvida, la recupera por email desde `/forgot-password` (ver
 [Acceso](#acceso-login-registro-perfil-y-contraseña)).
@@ -28,7 +29,7 @@ Next.js (App Router) + React + TypeScript + Tailwind CSS, con las mismas version
 | --- | --- | --- |
 | `/login` | pública | Email y contraseña → `POST /auth/login` → token en `localStorage` → `GET /auth/me` → vuelve a `?next=` (solo rutas internas) o a `/`. Mensajes de la API en español (credenciales incorrectas, cuenta desactivada, API caída, sesión caducada o cerrada). |
 | `/register` | pública | Email, contraseña, nombre, teléfono y dirección (opcionales) y código de invitación → `POST /users` → login automático → `/`. Errores por campo (los de la API, traducidos); 409 con enlace al login; 403 si el código no es válido. |
-| `/`, `/proveedores`, `/incidencias`, `/gestor-incidencias`, `/gestor-incidencias/nueva`, `/inventory/products`, `/inventory/orders/inbound`, `/inventory/orders/outbound`, `/inventory/orders` | **privada** | Panel. Sin sesión → `/login?next=<ruta>`. |
+| `/`, `/proveedores`, `/incidencias`, `/gestor-incidencias`, `/gestor-incidencias/nueva`, `/inventory/products`, `/inventory/orders/inbound`, `/inventory/orders/outbound`, `/inventory/orders`, `/reporting` | **privada** | Panel. Sin sesión → `/login?next=<ruta>`. |
 | `/account/profile` | **privada** | `GET /auth/me`: email y rol (solo lectura) y nombre, teléfono y dirección editables con `PUT /profiles/me`. Tarjeta «Seguridad» con el acceso al cambio de contraseña. |
 | `/forgot-password` | pública | AUTH-03. Email → `POST /auth/forgot-password` → «Revisa tu correo» con un mensaje **fijo** que no revela si el email existe. Se llega desde «¿Olvidaste tu contraseña?» del login. |
 | `/reset-password?token=…` | pública | AUTH-03. Enlace del email (sin `Referer`). Nueva contraseña + confirmación → `POST /auth/reset-password` → `/login?motivo=restablecida`. Sin token o con un enlace no válido, caducado o usado: aviso y «Volver a recuperar contraseña». |
@@ -59,7 +60,7 @@ los datos los protege la API, que valida el token en cada petición.
 | Resumen | Datos de partida del briefing (empleados, almacenes, transportistas, % de devoluciones y de consultas automatizables, facturación) y resumen del backlog calculado a partir de los datos (áreas, iniciativas, por estado). | `CONTEXT.es.md` |
 | Áreas de negocio | Las 7 áreas, con responsable, equipo y situación actual. Cada tarjeta filtra las iniciativas de su área. | `CONTEXT.es.md` |
 | Iniciativas | 33 necesidades de las áreas (“Qué necesitan”) con filtros por área y estado, contador y estado vacío. Estados: *Necesidad identificada* / *Base técnica disponible* (4 iniciativas: 3 con base en `packages/shared`, Hito 2, y la API de inventario unificada, Hito 5). | `CONTEXT.es.md` + `packages/shared` + `services/api` |
-| Hitos del proyecto | Hitos 1–5 con estado, ubicación en el monorepo y demo pública (el 5, sin demo). | `docs/hitos.md` |
+| Hitos del proyecto | Hitos 1–6 con estado, ubicación en el monorepo y demo pública (el 5 y el 6, sin demo). | `docs/hitos.md` |
 
 **No hay métricas en vivo ni datos inventados.** Las cifras son las del briefing, etiquetadas como tal. Como CEO
 figura Thomas Harry (fundador y CEO), por decisión del desarrollador: `CONTEXT.es.md` también cita a Daniel Espinoza
@@ -149,6 +150,28 @@ cada página enlaza además con las otras tres. `/inventory` lleva al listado de
   `warehouse`).
 - Fechas en `es-ES` y en la zona horaria del navegador, como el gestor de incidencias.
 - Capturas en [`screenshots/gestión de inventario/`](./screenshots/gesti%C3%B3n%20de%20inventario/): [listado](./screenshots/gesti%C3%B3n%20de%20inventario/Listado%20de%20productos.jpeg), [entrada](./screenshots/gesti%C3%B3n%20de%20inventario/Registro%20de%20entrada%20producto%20confirmaci%C3%B3n%20y%20stock%20actual.jpeg), [aviso de stock](./screenshots/gesti%C3%B3n%20de%20inventario/Registro%20de%20salida%20con%20aviso%20de%20stock.jpeg), [400 de la API](./screenshots/gesti%C3%B3n%20de%20inventario/Registro%20salida%20pesta%C3%B1a%20A%20enviada%20y%20aviso%20stock.jpeg), [historial](./screenshots/gesti%C3%B3n%20de%20inventario/Historial%20de%20movimientos%20completo.jpeg) y [ruta protegida](./screenshots/gesti%C3%B3n%20de%20inventario/Ruta%20protegida.png); las diez, con qué muestra cada una, en [`docs/inventario.md`](../../docs/inventario.md#interfaz-en-el-backoffice).
+
+## Qué muestra la ruta `/reporting`
+
+**Hito 6.** Dashboard del **Reporte Semanal de Desempeño por Almacén y Cliente** para dirección (Thomas, CEO, y Ana,
+Head of Warehouse Operations; BRIEFING [`CONTEXT-datapipelines.es.md`](../../CONTEXT-datapipelines.es.md)). Muestra lo
+que calcula el pipeline semanal ([`data/pipelines/`](../../data/pipelines/README.es.md)) y sirve la API; el navegador
+no calcula ningún KPI ni consulta la base.
+
+| Función | Llamada a la API |
+| --- | --- |
+| Los cuatro KPIs con su nombre de negocio y unidad (Volumen de entrada, Throughput de salida, Frecuencia de quiebre de stock, Tasa de discrepancia), una tabla por almacén con una fila por cliente (en móvil, una tarjeta por cliente) | `GET /reporting/weekly-warehouse-client-performance` (semana calculada más reciente) |
+| Período («Semana 45 · del lunes 2 nov al domingo 8 nov 2026», UTC) separado de la fecha de cálculo (`computed_at`); semana anterior/siguiente | `GET …?week_start=YYYY-MM-DD` |
+| Evolución de las 6 últimas semanas por almacén, cliente y KPI; las semanas sin calcular (404) se marcan y nunca se muestran como 0 | Una petición por semana al mismo endpoint |
+| Estado del último cálculo (y aviso si el último intento falló) | `GET /reporting/pipeline-runs/latest` |
+| Aviso «El reporte no está al día» si hay semanas completas posteriores a la más reciente calculada (comparación de fechas, PIPELINE_DESIGN §19.9) | — (reloj del navegador, UTC) |
+
+Estados de carga, error (sin detalles técnicos), «aún no hay semanas calculadas» y «semana calculada sin actividad».
+Si ninguna fila de la semana tiene quiebres o discrepancias, un aviso recuerda que hoy esos KPIs pueden estar «sin
+medir» (PIPELINE_DESIGN §4.1). Piezas: [`components/reporting/WeeklyPerformanceDashboard.tsx`](./components/reporting/WeeklyPerformanceDashboard.tsx),
+[`lib/weeklyPerformance.ts`](./lib/weeklyPerformance.ts) (llamadas, semanas ISO, formato; tests en
+`lib/weeklyPerformance.test.ts`) y [`types/weeklyPerformance.ts`](./types/weeklyPerformance.ts). Diseño: PIPELINE_DESIGN
+§19.7.
 
 ## Qué ocurre cuando algo falla
 
@@ -272,7 +295,9 @@ npm run build
 Los tests unitarios de Jest (`jest.config.mjs` con `next/jest`, entorno `node`) cubren las utilidades de `lib/`:
 sesión, reglas y errores de autenticación (AUTH-088), validación y formato de proveedores e incidencias (FE-019) y la
 capa del inventario (`lib/inventory.test.ts`: peticiones con Bearer, URL, cuerpos, 400/401/403/404/422/500, error de
-red, respuestas vacías e inesperadas, umbrales y validaciones; Hito 5). Plan,
+red, respuestas vacías e inesperadas, umbrales y validaciones; Hito 5) y la del dashboard de desempeño
+(`lib/weeklyPerformance.test.ts`: endpoint y `week_start`, 404 = semana sin calcular, errores sin detalles técnicos,
+semanas ISO en UTC, formato y unidades, agrupación por almacén, evolución; Hito 6). Plan,
 casos y resultados en [`TESTING.md`](../../TESTING.md). Las pruebas en navegador se ejecutan fuera del repo (Edge +
 `playwright-core`) y se registran en la documentación de cada función (p. ej.
 [`docs/pruebas-analizador-incidencias.md`](../../docs/pruebas-analizador-incidencias.md),
@@ -298,6 +323,7 @@ node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://local
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/inventory/orders/inbound --expect "Comprobando tu sesión"
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/inventory/orders/outbound --expect "Comprobando tu sesión"
 node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/inventory/orders --expect "Comprobando tu sesión"
+node ../../.agents/skills/validate-delivery/scripts/check-route.mjs http://localhost:3002/reporting --expect "Comprobando tu sesión"
 ```
 
 ## Pendiente / fuera de alcance
