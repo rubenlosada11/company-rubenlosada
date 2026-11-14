@@ -13,6 +13,10 @@ Grano: una fila por `(warehouse, client_id, week_start)` con al menos un evento 
 
 `week_start` es el lunes UTC de `timestamp`. Los eventos fuera de las semanas pedidas (`weeks`) se descartan (la
 extracción ya filtra por fechas: es una segunda barrera). Función pura: sin base de datos ni Prefect.
+
+Desde el Hito 6 cada KPI es una función de `kpis.py` (y una task de Prefect en el subflow de transformación):
+`weekly_events` prepara los eventos y `aggregate_rows` encadena las funciones de los KPIs en un solo paso, con el
+mismo resultado que el subflow.
 """
 
 from collections.abc import Iterable
@@ -20,23 +24,19 @@ from datetime import date
 
 import pandas as pd
 
-from data.process.weekly_performance.events import DISCREPANCY, INBOUND, OUTBOUND, STOCKOUT
+from data.process.weekly_performance.kpis import (
+    KEYS,
+    RATE_DECIMALS,
+    ROW_COLUMNS,
+    build_rows,
+    discrepancy_count,
+    discrepancy_rate,
+    inbound_volume,
+    outbound_throughput,
+    stockout_frequency,
+)
 
-KEYS = ["warehouse", "client_id", "week_start"]
-COUNT_COLUMNS = {
-    OUTBOUND: "outbound_orders_count",
-    STOCKOUT: "stockout_events_count",
-    DISCREPANCY: "discrepancy_events_count",
-}
-RATE_DECIMALS = 4
-ROW_COLUMNS = [
-    *KEYS,
-    "inbound_units_count",
-    "outbound_orders_count",
-    "stockout_events_count",
-    "discrepancy_events_count",
-    "discrepancy_rate",
-]
+__all__ = ["KEYS", "RATE_DECIMALS", "ROW_COLUMNS", "aggregate_rows", "week_start_series", "weekly_events"]
 
 
 def week_start_series(timestamps: pd.Series) -> pd.Series:
@@ -45,38 +45,25 @@ def week_start_series(timestamps: pd.Series) -> pd.Series:
     return (utc.dt.normalize() - pd.to_timedelta(utc.dt.day_of_week, unit="D")).dt.date
 
 
+def weekly_events(valid: pd.DataFrame, weeks: Iterable[date]) -> pd.DataFrame:
+    """Eventos válidos con su `week_start` (lunes UTC), solo los de las semanas `weeks`."""
+    if valid.empty:
+        return valid.assign(week_start=pd.Series([], dtype=object)).reset_index(drop=True)
+    df = valid.assign(week_start=week_start_series(valid["timestamp"]))
+    return df[df["week_start"].isin(list(weeks))].reset_index(drop=True)
+
+
 def aggregate_rows(valid: pd.DataFrame, weeks: Iterable[date]) -> list[dict]:
     """Filas del reporte de las semanas `weeks` (lunes), ordenadas por semana, almacén y cliente, con tipos nativos."""
-    if valid.empty:
+    events = weekly_events(valid, weeks)
+    if events.empty:
         return []
-    df = valid.assign(week_start=week_start_series(valid["timestamp"]))
-    df = df[df["week_start"].isin(list(weeks))]
-    if df.empty:
-        return []
-
-    grouped = df.groupby(KEYS)
-    columns = {"inbound_units_count": df[df["event_type"].eq(INBOUND)].groupby(KEYS)["quantity"].sum()}
-    for event_type, column in COUNT_COLUMNS.items():
-        columns[column] = df[df["event_type"].eq(event_type)].groupby(KEYS).size()
-    table = (
-        pd.DataFrame(columns, index=grouped.size().index).reindex(columns=ROW_COLUMNS[3:-1]).fillna(0).astype("int64")
+    outbound = outbound_throughput(events)
+    discrepancies = discrepancy_count(events)
+    return build_rows(
+        inbound_volume(events),
+        outbound,
+        stockout_frequency(events),
+        discrepancies,
+        discrepancy_rate(discrepancies, outbound),
     )
-
-    outbound = table["outbound_orders_count"]
-    table["discrepancy_rate"] = (
-        (table["discrepancy_events_count"] / outbound.where(outbound > 0)).round(RATE_DECIMALS).fillna(0.0)
-    )
-    table = table.reset_index().sort_values(["week_start", "warehouse", "client_id"], kind="stable")
-    return [
-        {
-            "warehouse": str(row.warehouse),
-            "client_id": str(row.client_id),
-            "week_start": row.week_start,
-            "inbound_units_count": int(row.inbound_units_count),
-            "outbound_orders_count": int(row.outbound_orders_count),
-            "stockout_events_count": int(row.stockout_events_count),
-            "discrepancy_events_count": int(row.discrepancy_events_count),
-            "discrepancy_rate": float(row.discrepancy_rate),
-        }
-        for row in table[ROW_COLUMNS].itertuples(index=False)
-    ]

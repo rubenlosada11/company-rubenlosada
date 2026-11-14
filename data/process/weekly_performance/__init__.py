@@ -2,7 +2,9 @@
 
 - `events`: los cuatro `event_type` de origen y las columnas que entrega la extracción.
 - `validate`: reglas de calidad (rechaza y cuenta, nunca corrige).
-- `aggregate`: KPIs por `(warehouse, client_id, week_start)`.
+- `kpis`: una función por KPI del BRIEFING (Volumen de entrada, Throughput de salida, Frecuencia de quiebre de stock,
+  Tasa de discrepancia) y `build_rows`; son el cuerpo de las tasks de KPI del Hito 6.
+- `aggregate`: semana ISO de cada evento y filas por `(warehouse, client_id, week_start)` (encadena `kpis`).
 - `transform`: validate → aggregate → controles de coherencia, más la huella de los datos de entrada y la versión del
   código que usa la caché de Prefect.
 
