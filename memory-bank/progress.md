@@ -6,7 +6,21 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/weekly-performance-pipeline` (desde `main` @ `eb7f47d`, que incluye las PR #3–#29).
+- **Rama de trabajo:** `feature/prefect-performance-pipeline` (desde `main` @ `18c6fcf`, que incluye las PR #3–#30).
+- **Pipeline de Desempeño de Negocio Resiliente (Parte 2 de 3 de data pipelines, práctica sin número de hito):** el
+  pipeline semanal se orquesta con **Prefect 3** (3.9.3). ETL movido a `data/`: flows y tasks en
+  [`data/pipelines/pipeline.py`](../data/pipelines/pipeline.py) (punto de entrada `python data/pipelines/pipeline.py`),
+  etapas con E/S en `data/pipelines/weekly_performance/`, transformaciones puras en `data/process/weekly_performance/`
+  (controles de coherencia, huella de los datos, versión del código). Reintentos solo ante fallos transitorios
+  (SQLSTATE), caché de la transformación (`cache_key_fn` con huella + semanas + entorno + código, 1 día, en
+  `data/raw/prefect-results/`), tareas opcionales `observe-source` y `write-eval-snapshot` (`return_state=True` →
+  ejecución `partial`) y crítica `load-weekly-kpis` (`return_state=True` → `failed`). La API conserva HTTP, lecturas y
+  registro e importa el flow (`app/reporting/runner.py`); `outcome` en las respuestas. Diseño movido a
+  [`data/pipelines/PIPELINE_DESIGN.md`](../data/pipelines/PIPELINE_DESIGN.md) (§18). **Verificado** (2026-11-13): API
+  1705 tests (+6 de PostgreSQL 16 local), CLI contra PostgreSQL local (KPIs = SQL independiente; 2.ª ejecución
+  idéntica con caché `hit`; fallo opcional → `partial`; base caída → reintentos y `failed`), API real con uvicorn y
+  CLI contra Supabase (0 filas esperadas; `telemetry_events` sin cambios). Docker sin tocar (la imagen no incluye
+  `data/`: pendiente de confirmar).
 - **Pipeline de desempeño semanal** (práctica sin número de hito; BRIEFING
   [`CONTEXT-datapipelines.es.md`](../CONTEXT-datapipelines.es.md)): Reporte Semanal de Desempeño por Almacén y Cliente.
   Flow con 4 subflows en `services/api/app/reporting/` (extract de `telemetry_events` en transacción `READ ONLY` →
@@ -1551,6 +1565,30 @@ después el código.
   porque no se había aplicado en Supabase. En Supabase, `observe` ya detecta datos reales: semana del 26-oct con 9
   órdenes y 0 eventos (antes de la captura) y una entrada de Los Ángeles sin evento en la del 9-nov. API 1659 tests (+6 opcionales de PostgreSQL).
 
+### 2026-11-13 — Pipeline de Desempeño de Negocio Resiliente con Prefect 3 (rama `feature/prefect-performance-pipeline`)
+
+Parte 2 de 3 de data pipelines. El desarrollador pidió ejecutar todas las fases del prompt seguidas siguiendo mis
+recomendaciones. Rama desde `main` @ `18c6fcf` (PR #30 fusionada).
+
+- **Discrepancias resueltas** (PIPELINE_DESIGN §18.11): `services/reporting/` y `services/telemetry/` del enunciado =
+  `services/api/app/reporting/` y `app/telemetry/` (decisión de la Parte 1); el diseño se movió con `git mv` a
+  `data/pipelines/`; el estado «parcial» va en `stats.outcome` (sin migración: el `check` de `status` ya está en
+  Supabase); commits con la convención del repo en vez de `feat: …`.
+- **Prefect 3.9.3** en `services/api` (`uv add "prefect>=3"`; baja `python-dateutil` 4.0 → 2.9; `requirements.txt`
+  regenerado). Prefect 3 no acepta bloques de almacenamiento sin guardar: la caché va en disco local por
+  `PREFECT_RESULTS_LOCAL_STORAGE_PATH` (fijada por el pipeline antes de importar Prefect), con
+  `PREFECT_SERVER_ANALYTICS_ENABLED=false`.
+- **Flow** `weekly-warehouse-client-performance` (id del flow run = id en `pipeline_runs`) y `…-preview` (`--dry-run`);
+  tasks `register-run`, `extract-telemetry-events`, `transform-weekly-kpis`, `observe-source`, `load-weekly-kpis`,
+  `write-eval-snapshot`, `close-run`. `ReportingStorageError.transient` + `retry_if_transient`.
+- **Tests:** `tests/reporting/conftest.py` arranca `prefect_test_harness` por sesión, aísla la caché por test
+  (`CODE_VERSION`) y los snapshots; nuevos `test_pipeline_prefect.py` (reintentos, opcionales/críticas, estados,
+  caché, trazabilidad con Prefect) y `test_transform.py` (coherencia, huella, errores transitorios). API 1705 + 6.
+- **Verificación real:** PostgreSQL 16 desechable (`pgserver`, scripts en el scratchpad de la sesión `02b96fb2`):
+  136 eventos sembrados, CLI dos veces → reporte idéntico y igual al SQL independiente; API con uvicorn en `:8010`
+  (el `:8000` estaba ocupado por otro proceso del desarrollador; no se tocó). Supabase: `--dry-run` y una ejecución
+  real (`succeeded`, 0 filas, avisos `no_events_in_window` y `capture_gap`); `telemetry_events` sigue en 84 filas.
+
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
@@ -1649,8 +1687,10 @@ después el código.
     Recomendado: un rol de base de datos de solo inserción para la telemetría (§10). Decisiones de `docs/telemetry/telemetry-plan.md` §18.2: mínimos de stock por cliente, proceso
     de conteo físico, destino de los eventos, custodia de `TELEMETRY_PSEUDONYM_KEY` y si el alta de SKUs rechaza
     `current_stock` con 422.
-14. Pipeline de desempeño semanal (`feature/weekly-performance-pipeline`): migración aplicada en Supabase y primera
-    ejecución hecha (2026-11-13). Pendiente: fusionar la PR y la ficha de Notion; implementar las alertas por email
+14. Pipeline de desempeño semanal: PR #30 fusionada; Parte 2 con Prefect 3 en `feature/prefect-performance-pipeline`
+    (PR y ficha de Notion propias). Pendiente de confirmar (infra): incluir `data/` en la imagen Docker de la API
+    (`PIPELINE_DESIGN.md` §18.10). Parte 3: dashboard sobre `GET /reporting/weekly-warehouse-client-performance`.
+    Pendiente heredado: la ficha de Notion de la Parte 1; implementar las alertas por email
     (Resend, remitente de `rubenlosada.com`, destinatario en una variable nueva del `.env`); instalar el `cron` del
     lunes cuando se redespliegue el backend (`docs/reporting/weekly-performance-pipeline.md` §3.3); revisar la orden
     de entrada de Los Ángeles sin evento (¿creada sin `TELEMETRY_PSEUDONYM_KEY`?). Siguiente paso natural: vista del

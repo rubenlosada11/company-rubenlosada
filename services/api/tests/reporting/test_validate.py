@@ -1,4 +1,4 @@
-"""Subflow validate: reglas de calidad (`app/reporting/validate.py`, PIPELINE_DESIGN.md §6.3).
+"""validate: reglas de calidad (`data/process/weekly_performance/validate.py`, PIPELINE_DESIGN.md §6.3).
 
 Ejecutar desde services/api: uv run pytest tests/reporting/test_validate.py
 """
@@ -6,7 +6,7 @@ Ejecutar desde services/api: uv run pytest tests/reporting/test_validate.py
 import pandas as pd
 import pytest
 
-from app.reporting.validate import VALID_COLUMNS, validate_events
+from data.process.weekly_performance.validate import VALID_COLUMNS, validate_events
 from tests.reporting.helpers import DISCREPANCY, INBOUND, OUTBOUND, STOCKOUT, W2, at, event, frame
 
 

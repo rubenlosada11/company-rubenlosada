@@ -12,3 +12,8 @@ scripts/results.csv
 .env
 .env.*
 !.env.example
+
+# Pipeline de desempeño (data/pipelines/pipeline.py): resultados cacheados de Prefect y snapshots de evaluación de cada
+# ejecución. Son salidas de ejecución, no código (ver data/pipelines/PIPELINE_DESIGN.md §18).
+data/raw/prefect-results/
+data/eval/weekly_performance/

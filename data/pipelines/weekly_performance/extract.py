@@ -1,4 +1,4 @@
-"""Subflow 1 · extract: eventos de origen de `telemetry_events`, **solo lectura** (PIPELINE_DESIGN.md §6.1).
+"""extract: eventos de origen de `telemetry_events`, **solo lectura** (PIPELINE_DESIGN.md §6.1).
 
 Una única consulta con todos los filtros en SQL —los cuatro `event_type`, el entorno y la ventana `[inicio, fin)`—,
 servida por los índices de `timestamp` y `event_type` de la migración de telemetría. Nunca se carga la tabla entera.
@@ -6,6 +6,9 @@ servida por los índices de `timestamp` y `event_type` de la migración de telem
 En PostgreSQL la consulta corre en una transacción de solo lectura (`postgresql_readonly` → `BEGIN READ ONLY`): la
 base rechazaría cualquier escritura aunque el código la intentara. Este módulo no contiene ninguna sentencia que
 escriba en `telemetry_events`.
+
+Los errores de la base salen como `ReportingStorageError` con `transient=True` si merece la pena reintentar (conexión
+caída, base reiniciando…): la task `extract-telemetry-events` de `pipeline.py` reintenta solo esos.
 """
 
 import logging
@@ -17,17 +20,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.reporting.tables import storage_error
 from app.reporting.weeks import WeekWindow
 from app.telemetry.storage import telemetry_engine, telemetry_events
+from data.process.weekly_performance.events import COLUMNS, SOURCE_EVENT_TYPES
 
 logger = logging.getLogger("trackflow.reporting.extract")
-
-INBOUND = "inbound_order_created"
-OUTBOUND = "outbound_order_created"
-STOCKOUT = "stock_threshold_triggered"
-DISCREPANCY = "inventory_discrepancy_detected"
-
-# Los cuatro eventos del BRIEFING (§3). Ninguno más.
-SOURCE_EVENT_TYPES = (INBOUND, OUTBOUND, STOCKOUT, DISCREPANCY)
-COLUMNS = ["id", "event_type", "timestamp", "tags"]
 
 
 def extract_events(window: WeekWindow, environment: str) -> pd.DataFrame:

@@ -20,7 +20,8 @@ JS es autónomo, con su propio `package.json` y `package-lock.json`, y se opera 
 | `packages/analisis-incidencias/` | Paquete Python (solo biblioteca estándar, `uv_build`, `src/`): carga, validación, métricas y exportación del CSV de incidencias de CX. Lo usan `scripts/analyze.py` y `services/api`. Contexto: `CONTEXT-incidencias.es.md`. Incluye `gestor.py`: valores, validación, transiciones y mapeos del gestor de incidencias (`CONTEXT-gestor-incidencias.es.md`), que usan la API y `scripts/seed_incidents.py`. |
 | `services/api/` | **FastAPI + Pydantic + TinyDB**, Python gestionado con **uv** (`pyproject.toml` + `uv.lock` propios), tests con `pytest`. Directorio de proveedores (`/suppliers`, contexto `CONTEXT-directorio.md`), analizador de incidencias (`/api/incidents`, contexto `CONTEXT-incidencias.es.md`), gestor de incidencias (también en `/api/incidents`; `docs/gestor-incidencias.md`) y autenticación JWT (`/auth`, `/users`, `/profiles`; `docs/autenticacion.md`), con recuperación y cambio de contraseña y emails por Resend (AUTH-03), e inventario del Hito 5 (`/inventory`, **SQLModel** sobre SQLite local; `docs/inventario.md`). |
 | `scripts/` | `analyze.py`: CLI del analizador de incidencias (+ `incidents-trackflow.csv` de prueba y `tests/`). `seed_incidents.py`: carga ese CSV en el gestor de incidencias (necesita el entorno de la API). |
-| `agents/`, `skills/`, `mcps/`, `workflows/`, `data/`, `infra/`, `internal/`, `shared/` | Solo README/plantillas (`agents/_template`, `skills/_template`). |
+| `agents/`, `skills/`, `mcps/`, `workflows/`, `infra/`, `internal/`, `shared/` | Solo README/plantillas (`agents/_template`, `skills/_template`). |
+| `data/` | Pipelines de datos con Prefect 3: `data/pipelines/pipeline.py` (punto de entrada) y `weekly_performance/`; transformaciones puras en `data/process/`; `data/raw/` y `data/eval/` solo con salidas de ejecución ignoradas en git. |
 | `docs/` | `hitos.md` (registro de hitos), `ARCHITECTURE_PROPOSAL.md` (propuesta de backend; no es un hito) + READMEs. |
 | `memory-bank/`, `AGENTS.md`, `.agents/` | Infraestructura para agentes (Hito 4). |
 
@@ -143,7 +144,7 @@ navegador se hacen fuera del repo (Edge + `playwright-core` en el scratchpad).
 | Cargar los SKUs y movimientos de ejemplo del inventario (idempotente; necesita un usuario en TinyDB: por defecto el primer admin) | `uv run seed-inventory` · `uv run seed-inventory <email>` |
 | Solo los tests del inventario (Hito 5) | `uv run pytest tests/test_inventory.py tests/test_seed_inventory.py tests/test_inventory_database.py` |
 | Cargar el CSV histórico en el gestor de incidencias (idempotente; **desde la raíz del repo**, con la API parada) | `uv run --project services/api python scripts/seed_incidents.py` |
-| Pipeline de desempeño semanal: 2 últimas semanas completas · otra ventana · sin escribir nada | `uv run --env-file .env python -m app.reporting` · `… --week-start 2026-11-02 --weeks 4` · `… --dry-run` |
+| Pipeline de desempeño semanal (Prefect 3), **desde la raíz**: 2 últimas semanas completas · otra ventana · sin escribir nada | `uv run --project services/api --env-file services/api/.env python data/pipelines/pipeline.py` · `… --week-start 2026-11-02 --weeks 4` · `… --dry-run` (o `python data/pipelines/pipeline.py` con el venv de la API activado) |
 | Tests del pipeline · contra un PostgreSQL local desechable con las dos migraciones | `uv run pytest tests/reporting` · `$env:REPORTING_TEST_DATABASE_URL = "postgresql+psycopg://…@127.0.0.1:…"` y `uv run pytest tests/reporting/test_postgres.py` |
 | Regenerar `services/requirements.txt` (Docker) tras cambiar dependencias | `uv export --frozen --format requirements.txt --no-dev --no-emit-project --no-emit-package analisis-incidencias --output-file ../requirements.txt` |
 
@@ -551,8 +552,9 @@ Práctica sin hito, rama `feature/telemetry-report` (2026-11-11). Detalle en `do
 
 ## Decisiones técnicas del pipeline de desempeño semanal
 
-Práctica sin hito, rama `feature/weekly-performance-pipeline` (2026-11-13). Diseño en `docs/reporting/PIPELINE_DESIGN.md`;
-operación y verificación en `docs/reporting/weekly-performance-pipeline.md`.
+Práctica sin hito, rama `feature/weekly-performance-pipeline` (2026-11-13). Diseño en `data/pipelines/PIPELINE_DESIGN.md`
+(movido desde `docs/reporting/` en la Parte 2); operación y verificación en `docs/reporting/weekly-performance-pipeline.md`.
+**Parte 2 (Prefect 3, rama `feature/prefect-performance-pipeline`):** ver la tabla siguiente a esta.
 
 | Decisión | Motivo |
 | --- | --- |
@@ -571,6 +573,20 @@ operación y verificación en `docs/reporting/weekly-performance-pipeline.md`.
 | Subflow `observe` no bloqueante: eventos/sesiones por día y órdenes del inventario (`stock_entries`, `stock_exits` `dispatch`) frente a eventos | Distinguir actividad cero, captura caída y mediciones perdidas o duplicadas |
 | Trazabilidad: `request_id` (X-Request-Id) en `pipeline_runs`, `run_id` en cada fila, `stats.changes` por semana | Reconstruir petición → corrida → filas y saber qué semanas publicadas corrigió cada corrida |
 | `GET` del reporte: 404 si ninguna corrida correcta cubre la semana; 200 con `entries: []` si se calculó sin actividad | No confundir «sin actividad» con «sin calcular» |
+
+### Parte 2 — orquestación con Prefect 3 (sustituye a «subflows como funciones, sin Prefect»)
+
+| Decisión | Motivo |
+| --- | --- |
+| `prefect>=3` (3.9.3) en `services/api`; sin servidor dedicado (servidor temporal) | Lo exige la Parte 2; el único entorno Python con acceso a la base |
+| ETL en `data/pipelines/` (flows, tasks, E/S) y `data/process/` (transformaciones puras); la API solo HTTP + lecturas + registro y **importa** el flow (`app/reporting/runner.py`, perezoso) | Sin lógica ETL duplicada en el backend; los `GET` funcionan aunque el pipeline no esté desplegado (503 solo en el `POST`) |
+| Paquete `data` importable desde la raíz: `sys.path` en `pipeline.py` y `runner.py`; `pythonpath = ["../.."]` en pytest | `python data/pipelines/pipeline.py` funciona desde la raíz con el venv de la API |
+| Reintentos solo ante `ReportingStorageError.transient` (SQLSTATE 08/53/57P/40001/40P01, conexión invalidada, timeout del pool, SQLite locked) | Un error permanente no se arregla esperando; extract 3 (2/10/30 s), load 2 (5/15 s), registro 2 (1/5 s) |
+| Caché solo en `transform-weekly-kpis`: clave = huella del contenido extraído + semanas + entorno + `CODE_VERSION`; 1 día; disco local `data/raw/prefect-results/` | Nunca sirve un KPI obsoleto; Prefect 3 no admite bloques de almacenamiento sin guardar |
+| Opcionales `observe-source` y `write-eval-snapshot` con `return_state=True` → `stats.outcome = partial`; `load-weekly-kpis` con `return_state=True` → `failed` | Distinguir éxito, parcial y fallo sin migrar el `check` de `pipeline_runs.status` (ya aplicado en Supabase); `outcome` en la API |
+| Id de la ejecución = id del flow run de Prefect | Un solo identificador en Prefect, registro, filas y snapshot |
+| Snapshots de evaluación en `data/eval/weekly_performance/` y caché en `data/raw/prefect-results/`, ignorados en git | Son salidas de ejecución, no código |
+| Docker sin tocar: la imagen de la API no incluye `data/` | Cambio de infraestructura pendiente de confirmación (PIPELINE_DESIGN §18.10) |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 

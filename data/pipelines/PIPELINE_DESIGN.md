@@ -3,12 +3,18 @@
 > Proyecto de data pipeline de TrackFlow (práctica sin número de hito). Fuente: el BRIEFING
 > [`CONTEXT-datapipelines.es.md`](../../CONTEXT-datapipelines.es.md), construido sobre las métricas obligatorias del
 > BRIEFING de telemetría ([`CONTEXT-telemetria.es.md`](../../CONTEXT-telemetria.es.md)) y sobre la tabla
-> `telemetry_events` ([`docs/telemetry/telemetry-storage.md`](../telemetry/telemetry-storage.md)).
+> `telemetry_events` ([`docs/telemetry/telemetry-storage.md`](../../docs/telemetry/telemetry-storage.md)).
 >
 > Este documento se escribió **antes** del código y es el contrato que sigue la implementación. La §17 (preguntas de
 > idempotencia, observabilidad, recuperabilidad y concurrencia) se añadió después, en una revisión que también
 > amplió §5, §9–§12 y §14. El funcionamiento, la operación y la verificación están en
-> [`weekly-performance-pipeline.md`](./weekly-performance-pipeline.md).
+> [`docs/reporting/weekly-performance-pipeline.md`](../../docs/reporting/weekly-performance-pipeline.md).
+>
+> **Parte 2 (2026-11-13): implementación con Prefect 3.** El documento se movió de `docs/reporting/` a
+> `data/pipelines/`, junto al pipeline. La §18 describe la implementación real: flows y tasks de Prefect en
+> [`pipeline.py`](./pipeline.py), transformaciones puras en [`data/process/`](../process/), reintentos, caché,
+> tareas opcionales y estados de ejecución. Las reglas de negocio (§2–§4, §6–§8) y el contrato de la API (§11) no
+> cambian; donde la Parte 2 sustituye una decisión de la Parte 1 (sin orquestador, §5 y §15) se indica.
 
 ## 1. Para qué existe este pipeline
 
@@ -101,8 +107,11 @@ flowchart LR
   F -.orquesta.-> E
   R --> G[GET /reporting/weekly-warehouse-client-performance]
   P --> H[GET /reporting/pipeline-runs/latest]
-  C[POST /reporting/pipeline-runs<br/>o cron → python -m app.reporting] --> F
+  C[POST /reporting/pipeline-runs<br/>o python data/pipelines/pipeline.py] --> F
 ```
+
+> Parte 2: cada caja es una **task** de Prefect y `F` es el **flow** `weekly-warehouse-client-performance`; `validate`
+> y `aggregate` van juntas en la task `transform-weekly-kpis` (cacheada). Detalle en la §18.
 
 Cada subflow es una función pura o casi pura con una entrada y una salida tipadas, que se prueba por separado:
 
@@ -117,15 +126,17 @@ Cada subflow es una función pura o casi pura con una entrada y una salida tipad
 El **flow** (`run_weekly_performance`) resuelve la ventana, abre el registro de la ejecución, encadena los subflows y
 cierra el registro con su resultado (éxito o fallo). Así una ejecución fallida también deja rastro auditable.
 
-**Sin orquestador externo.** Prefect, Airflow o Dagster añadirían un servidor y decenas de dependencias para un único
-pipeline semanal que procesa miles de filas. Los subflows se modelan como funciones Python (la misma separación que un
-`@flow`/`@task` de Prefect), de modo que migrar a un orquestador más adelante solo cambia el envoltorio, no la lógica.
+**Orquestador.** *Parte 1:* sin orquestador externo; los subflows se modelaron como funciones Python con la misma
+separación que un `@flow`/`@task` de Prefect, «de modo que migrar a un orquestador más adelante solo cambia el
+envoltorio, no la lógica». *Parte 2 (vigente):* esa migración se hizo con **Prefect 3** (lo pide el enunciado de la
+Parte 2): las funciones de cada etapa no cambiaron de lógica; se envolvieron en tasks con reintentos y caché, y la
+orquestación pasó a un flow con estados (§18).
 
 **Ubicación.** El BRIEFING pide un módulo `services/reporting/` separado de `services/telemetry/`. En este repositorio
 la telemetría vive en `services/api/app/telemetry/` (decisión de las prácticas anteriores: una sola API, una conexión,
 un despliegue), así que el equivalente es **`services/api/app/reporting/`**, con su propio router `/reporting`, sin
-importar nada de `analysis.py` ni de `report.py`. Lo único que comparte con la telemetría es la definición de la tabla
-de origen (`app/telemetry/storage.py`) y el motor de la base (`app/database.py`).
+importar nada de `analysis.py` ni de `report.py`. Desde la Parte 2 el ETL no vive ahí sino en `data/` (§18.1): el
+backend solo conserva las lecturas, el registro de ejecuciones y el contrato JSON, e **importa** el flow.
 
 ## 6. Reglas de cálculo
 
@@ -184,8 +195,8 @@ Dos consecuencias de la fórmula del BRIEFING, documentadas para quien lea el re
 ## 7. Ventana, frecuencia y frescura
 
 - **Programación:** lunes a las **06:00 UTC** (07:00/08:00 en Zaragoza; domingo por la noche en Los Ángeles), con
-  `cron` `0 6 * * 1` ejecutando `python -m app.reporting`. El lunes por la mañana, en los dos países, el reporte de
-  la semana anterior ya está calculado.
+  `cron` `0 6 * * 1` ejecutando `python data/pipelines/pipeline.py` (antes `python -m app.reporting`). El lunes por la
+  mañana, en los dos países, el reporte de la semana anterior ya está calculado.
 - **Ventana por defecto:** las **2 últimas semanas completas**. La semana en curso nunca se calcula (saldría
   incompleta y el endpoint la mostraría como «la más reciente»). Recalcular también la semana anterior:
   - recoge eventos que llegaron tarde (lotes del navegador reintentados, hilo de escritura del backend);
@@ -300,8 +311,8 @@ el mismo flow pasaría a una cola sin cambiar el contrato salvo el código de es
 
 | Decisión | Alternativa descartada | Motivo |
 | --- | --- | --- |
-| Subflows como funciones Python | Prefect / Airflow | Un pipeline semanal pequeño; sin servidor ni dependencias nuevas |
-| `services/api/app/reporting/` | `services/reporting/` como servicio aparte | Coherencia con `app/telemetry/`; una API, una conexión |
+| ~~Subflows como funciones Python~~ → **Prefect 3** (Parte 2) | Airflow / Dagster; seguir sin orquestador | La Parte 2 lo exige; Prefect es una librería (sin servidor dedicado: arranca uno temporal) y aporta reintentos, caché y estados sin código propio |
+| `services/api/app/reporting/` (HTTP) + `data/` (ETL) | `services/reporting/` como servicio aparte | Coherencia con `app/telemetry/`; una API, una conexión; el ETL, junto a los datos |
 | Recalcular semanas completas (upsert + reconciliación) | Carga incremental por marca de agua | `telemetry_events` no tiene columna de recepción; recalcular 2 semanas es barato y exacto |
 | `cron` del host → `python -m app.reporting` | Planificador dentro del proceso de la API | Un reinicio o varios workers no duplican ni pierden ejecuciones; se puede lanzar a mano igual |
 | `POST` síncrono | Tarea en segundo plano (202) | Segundos de cálculo; el resultado llega en la misma respuesta |
@@ -312,7 +323,8 @@ el mismo flow pasaría a una cola sin cambiar el contrato salvo el código de es
 - **Dos KPIs sin datos** hasta que negocio defina mínimos por cliente y un proceso de conteo (§4.1).
 - **Programación del `cron`** en el VPS: aplazada (2026-11-13) hasta desplegar el backend con imágenes nuevas y
   `DATABASE_URL` de producción; hoy calcularía reportes vacíos. Hasta entonces el pipeline se ejecuta con
-  `POST /reporting/pipeline-runs` o `python -m app.reporting`.
+  `POST /reporting/pipeline-runs` o `python data/pipelines/pipeline.py`. Con Prefect, además, la imagen Docker de la
+  API tendría que incluir `data/` (§18.10).
 - **Migración en Supabase:** aplicada por el desarrollador el 2026-11-13 (SQL Editor).
 - **Vista para Thomas** en el backoffice: siguiente paso natural, fuera del alcance del BRIEFING.
 - **Mismo `DATABASE_URL` para varios entornos**: la tabla de destino no distingue entorno (§4.2).
@@ -410,3 +422,183 @@ solo con red caída, 408, 429 o 5xx (503 = no se guardó nada); un 4xx distinto 
   la siguiente la marca `abandoned` y ocupa su lugar.
 - Aunque dos corridas llegaran a cargar (p. ej. una base sin la migración), el resultado sería el mismo: la carga es
   idempotente.
+
+## 18. Implementación con Prefect 3 (Parte 2)
+
+> Añadido el 2026-11-13 con la Parte 2 del proyecto («Pipeline de Desempeño de Negocio Resiliente»). Describe el código
+> real; las reglas de negocio de las secciones anteriores no cambian.
+
+### 18.1. Arquitectura implementada
+
+```text
+data/
+  pipelines/
+    pipeline.py                  flows y tasks de Prefect + línea de comandos (punto de entrada)
+    weekly_performance/          etapas con E/S: extract, observe, load, evaluation (snapshot)
+  process/
+    weekly_performance/          transformaciones puras: events, validate, aggregate, transform
+  raw/prefect-results/           caché de la transformación (generado, ignorado en git)
+  eval/weekly_performance/       snapshot JSON por ejecución (generado, ignorado en git)
+services/api/app/
+  reporting/                     lo que la API sirve y comparte: tables, runs, weeks, queries, models, runner
+  routes/reporting.py            3 endpoints /reporting; el POST importa el flow (runner.py)
+```
+
+- **Separación de responsabilidades.** El ETL (qué se lee, cómo se transforma, cómo se carga y en qué orden) vive solo
+  en `data/`. La API no tiene lógica ETL: valida parámetros, lee las tablas de `reporting` y, para el `POST`, importa
+  `data.pipelines.pipeline` y llama a `run_weekly_performance` (el mismo flow que la línea de comandos).
+- **Lo compartido** se queda en `services/api/app/reporting/` porque lo necesitan los dos lados y la API debe poder
+  servir lecturas aunque el pipeline no esté desplegado: declaración de las tablas de `reporting` (`tables.py`),
+  registro de ejecuciones (`runs.py`), semanas ISO (`weeks.py`). El pipeline también reutiliza el motor de la base
+  (`app.database`) y la declaración de `telemetry_events` (`app.telemetry.storage`): un solo `DATABASE_URL` y una sola
+  definición de cada tabla.
+- **Telemetría técnica intacta:** `app/telemetry/analysis.py`, `report.py`, `GET /telemetry/report` y
+  `telemetry_events` no se modifican; el pipeline solo lee la tabla en transacciones `READ ONLY`.
+- **Importación:** `pipeline.py` añade la raíz del monorepo y `services/api` a `sys.path` (para funcionar con
+  `python data/pipelines/pipeline.py`); `runner.py` añade la raíz e importa el módulo de forma perezosa; los tests
+  usan `pythonpath = ["../.."]` en `services/api/pyproject.toml`.
+
+### 18.2. Flows y tasks
+
+| Elemento | Tipo | Qué hace | Crítica | Reintentos | Caché |
+| --- | --- | --- | --- | --- | --- |
+| `weekly-warehouse-client-performance` | `@flow` | ETL completo + registro de la ejecución | — | No (§18.4) | No |
+| `weekly-warehouse-client-performance-preview` | `@flow` | `--dry-run`: extract → transform → observe, sin escribir | — | No | — |
+| `register-run` | `@task` | Fila `running` en `pipeline_runs` (id = id del flow run) | Sí | 2 (1/5 s) | No |
+| `extract-telemetry-events` | `@task` | Lee los 4 eventos del entorno y la ventana + huella | Sí | 3 (2/10/30 s) | No |
+| `transform-weekly-kpis` | `@task` | validate → aggregate → controles de coherencia | Sí | No (pura) | **Sí** (§18.5) |
+| `observe-source` | `@task` | Salud del origen y cobertura frente al inventario | **No** | 1 (2 s) | No |
+| `load-weekly-kpis` | `@task` | Reconciliación + upsert en una transacción | Sí | 2 (5/15 s) | No |
+| `write-eval-snapshot` | `@task` | JSON de la ejecución en `data/eval/` | **No** | No (local) | No |
+| `close-run` | `@task` | Cierra el registro con estado, tiempos y `stats` | Sí | 2 (1/5 s) | No |
+
+Orden de ejecución: secuencial por dependencia de datos (cada task recibe la salida de la anterior).
+`run_weekly_performance` valida la ventana (`WindowError` → 422 / código 2, **sin** crear un flow run) y toma un
+candado del proceso antes de llamar al flow.
+
+### 18.3. Transformación y validaciones
+
+`data/process/weekly_performance/transform.py` encadena `validate` (§6.3, reglas por fila: rechaza y cuenta, nunca
+corrige) y `aggregate` (§6.4) y añade **controles de coherencia** sobre el resultado:
+
+| Riesgo | Control |
+| --- | --- |
+| Datos nulos / campos ausentes | Reglas por fila de `validate` (`invalid_*`); columnas ausentes en la extracción → `SourceSchemaError` (falla la ejecución) |
+| Valores fuera de rango | Almacén fuera de `los_angeles`/`zaragoza`, cantidad < 1, contadores < 0 |
+| Duplicados en origen | `duplicate_order` en `validate`; `eventId` único en la tabla |
+| Errores de agregación | Una fila por clave; totales de las filas = totales de los eventos válidos de la ventana |
+| División por cero | `discrepancy_rate` = 0 sin pedidos (BRIEFING §4), comprobado fila a fila |
+| Ventanas incompletas | La semana en curso no se puede pedir (422); eventos fuera de la ventana se descartan |
+| Resultados inconsistentes | Cualquier incoherencia → `InconsistentResultError`: la ejecución falla y no se carga nada |
+
+### 18.4. Reintentos
+
+Solo ante fallos **transitorios** (`retry_condition_fn = retry_if_transient`): `ReportingStorageError.transient`,
+calculado en `app/reporting/tables.py` a partir del SQLSTATE (clases `08`, `53`, `57P`, `40001`, `40P01`), de la
+conexión invalidada o del timeout del pool; en SQLite, solo «database is locked/busy». Un error permanente (tabla
+inexistente `42P01`, contraseña, un bug) falla a la primera. Valores y motivos: comentario de `pipeline.py`
+(extract, 3 reintentos ≈ 42 s; load, 2 reintentos, seguro porque la carga es una transacción idempotente). El flow no
+tiene reintentos propios: la autorreparación es la ventana de 2 semanas de la siguiente ejecución (§7), y reintentar
+el flow entero duplicaría el registro.
+
+### 18.5. Caché
+
+`transform-weekly-kpis` usa `cache_key_fn=transform_cache_key` y `cache_expiration=1 día`. La clave es un SHA-256 de:
+
+1. la **huella del contenido** de los eventos extraídos (`fingerprint_events`: id, tipo, fecha y `tags` de cada uno,
+   independiente del orden);
+2. las **semanas** de la ventana;
+3. el **entorno**;
+4. la **versión del código** de `data/process/weekly_performance/` (`CODE_VERSION`, huella de sus ficheros).
+
+Mismos datos, semanas y código ⇒ mismo resultado: la caché no puede servir un KPI obsoleto, porque un evento nuevo o
+tardío cambia la huella. Almacenamiento: disco local, `data/raw/prefect-results/` (`PREFECT_RESULTS_LOCAL_STORAGE_PATH`),
+porque Prefect 3 exige bloques guardados en un servidor para cualquier otro destino. La extracción **no** se cachea:
+es la única forma de saber si los datos han cambiado. Cada ejecución registra `stats.prefect.transform_cache`
+(`hit`/`miss`), la huella y la versión del código.
+
+### 18.6. Tareas críticas, opcionales y estados
+
+| Situación | Decisión del flow | `status` | `stats.outcome` | Flow run en Prefect | `POST` | CLI |
+| --- | --- | --- | --- | --- | --- | --- |
+| Todo bien | — | `succeeded` | `succeeded` | Completed | 201 | 0 |
+| Falla `observe-source` | `return_state=True` → aviso `observability_unavailable`, sigue | `succeeded` | `partial` | Completed | 201 | 0 |
+| Falla `write-eval-snapshot` | `return_state=True` → sigue; el reporte ya está cargado | `succeeded` | `partial` | Completed | 201 | 0 |
+| Falla `load-weekly-kpis` | `return_state=True` → registra `failed` (fase `aggregated`) y lanza | `failed` | — | Failed | 503 | 1 |
+| Falla extract o transform | Excepción → registra `failed` con la última fase | `failed` | — | Failed | 503 | 1 |
+| No se puede registrar | Nada que cerrar | — | — | Failed | 503 / 409 | 1 / 2 |
+
+`stats.degraded` lista las etapas opcionales que fallaron. La API expone `outcome` (`running`, `succeeded`, `partial`,
+`failed`) calculado desde `status` y `stats.outcome`: el estado «parcial» **no** necesitó cambiar la restricción
+`check` de `pipeline_runs.status` (la migración ya aplicada en Supabase sigue valiendo). Nunca hay éxito sin una carga
+correcta: `outcome = partial` solo es posible después de completar `load-weekly-kpis`.
+
+### 18.7. Metadata de ejecución
+
+`reporting.pipeline_runs` (§9) con: inicio y fin (`started_at`, `finished_at`, `duration_ms`), registros procesados
+(`events_read`, `events_rejected`, `rows_upserted`, `rows_deleted`), estado (`status` + `stats.outcome`), errores
+(`error`: solo el tipo, nunca mensajes ni credenciales), ventana (`week_from`, `week_to`) e identificador (`id` = id
+del flow run de Prefect; su nombre en `stats.prefect.flow_run_name`). No hizo falta ninguna tabla nueva.
+
+### 18.8. Ejecución y configuración
+
+```powershell
+# desde la raíz del monorepo
+uv run --project services/api --env-file services/api/.env python data/pipelines/pipeline.py
+uv run --project services/api --env-file services/api/.env python data/pipelines/pipeline.py --week-start 2026-11-02 --weeks 4
+uv run --project services/api --env-file services/api/.env python data/pipelines/pipeline.py --dry-run
+# o, con services\api\.venv activado y DATABASE_URL en el entorno:
+python data/pipelines/pipeline.py
+```
+
+| Variable | Uso | Por defecto |
+| --- | --- | --- |
+| `DATABASE_URL` | Base de `telemetry_events` y `reporting` (la misma de la API) | SQLite local de la API |
+| `TELEMETRY_ENVIRONMENT` | Entorno de los eventos que se leen | `development` |
+| `PIPELINE_EVAL_DIR` | Carpeta de los snapshots de evaluación | `data/eval/weekly_performance/` |
+| `PREFECT_RESULTS_LOCAL_STORAGE_PATH` | Caché de la transformación | `data/raw/prefect-results/` |
+| `PREFECT_SERVER_ANALYTICS_ENABLED` | Analítica de uso del servidor temporal de Prefect | `false` (lo fija el pipeline) |
+| `PREFECT_API_URL` | Servidor de Prefect (opcional) | Sin definir: servidor temporal |
+
+No hace falta arrancar ninguna interfaz de Prefect: sin `PREFECT_API_URL`, Prefect levanta un servidor temporal en
+segundo plano (~10–20 s la primera vez en el proceso) y lo para al terminar. Con un servidor dedicado
+(`prefect server start` + `PREFECT_API_URL`) las ejecuciones quedarían visibles en su interfaz; una ejecución
+**programada** usaría un *deployment* de Prefect o el `cron` del host (§7), ambos aplazados.
+
+Frecuencia prevista del ciclo de reporting: semanal, lunes 06:00 UTC, ventana de las 2 últimas semanas completas (§7).
+
+### 18.9. API
+
+Contrato sin cambios (§11 y BRIEFING §6). Cambios: el `POST` ejecuta el flow importado de `data/pipelines/` (síncrono:
+la ejecución tarda menos de 1 s con los volúmenes actuales; la primera del proceso añade el arranque del servidor
+temporal), la respuesta de las ejecuciones añade `outcome`, y si el pipeline no está en el despliegue el `POST`
+responde 503 sin afectar a los `GET`.
+
+### 18.10. Limitaciones conocidas
+
+- **Docker:** la imagen de la API solo copia `services/api/` (no `data/`): el `POST` respondería 503 en el contenedor.
+  `services/requirements.txt` ya incluye Prefect (regenerado desde `uv.lock`), pero incluir `data/` en la imagen
+  (contexto de build, `PYTHONPATH`, `PREFECT_HOME` con permisos para el usuario sin privilegios) es un cambio de
+  infraestructura pendiente de confirmar, igual que el `cron`.
+- **Servidor temporal de Prefect:** añade ~10–20 s a la primera ejecución de cada proceso y guarda su base en
+  `~/.prefect/`. En producción conviene un servidor dedicado o Prefect Cloud.
+- **Caché local:** vive en el disco de la máquina que ejecuta; dos máquinas no comparten caché (no afecta a la
+  corrección, solo a la reutilización).
+- **Fase `validated`:** el flow valida y agrega en una sola task (la cacheada), así que pasa de `extracted` a
+  `aggregated`; `validated` solo aparece en ejecuciones anteriores a la Parte 2.
+- **Dependencias:** Prefect añade ~70 paquetes al entorno de la API y fuerza `python-dateutil` 2.9 (antes 4.0, que
+  Prefect aún no admite); Pandas es compatible con las dos.
+- **Datos reales:** en Supabase solo hay eventos de negocio en la semana en curso, que el pipeline no calcula hasta que
+  termina: las ejecuciones contra Supabase dan hoy 0 filas (con sus avisos). Los dos KPIs sin instrumentar siguen a 0
+  (§4.1).
+
+### 18.11. Discrepancias entre el enunciado de la Parte 2 y el repositorio
+
+| Enunciado | Repositorio | Decisión |
+| --- | --- | --- |
+| `services/telemetry/analysis.py` | `services/api/app/telemetry/analysis.py` | Es el mismo módulo; no se modifica |
+| `services/reporting/` | `services/api/app/reporting/` + `app/routes/reporting.py` | Se mantiene la decisión de la Parte 1 (§5): una API, una conexión |
+| `data/pipelines/PIPELINE_DESIGN.md` | Estaba en `docs/reporting/` | Movido aquí con `git mv` (historial conservado) |
+| `data/raw/`, `data/process/`, `data/eval/` | Carpetas de la raíz `data/` | Se usan esas: caché, transformaciones y snapshots |
+| Estado «parcial» | `pipeline_runs.status` solo admite `running/succeeded/failed` | `stats.outcome` + `outcome` en la API, sin migración |
+| Mensaje de commit `feat: …` | Convención del repo: `<Proyecto> — <cambio>`, commits escalonados | Se sigue la convención del repo |

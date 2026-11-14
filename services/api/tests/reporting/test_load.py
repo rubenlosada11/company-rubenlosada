@@ -1,4 +1,4 @@
-"""Subflow load: upsert, reconciliación y transacción única (`app/reporting/load.py`, PIPELINE_DESIGN.md §8).
+"""load: upsert, reconciliación y transacción única (`data/pipelines/weekly_performance/load.py`, §8).
 
 Ejecutar desde services/api: uv run pytest tests/reporting/test_load.py
 """
@@ -8,10 +8,10 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy import select
 
-from app.reporting import load
-from app.reporting.load import load_rows
 from app.reporting.tables import ReportingStorageError, reporting_engine, weekly_performance
 from app.reporting.weeks import WeekWindow
+from data.pipelines.weekly_performance import load
+from data.pipelines.weekly_performance.load import load_rows
 from tests.reporting.helpers import W0, W1, W2
 
 WINDOW = WeekWindow(first=W1, last=W2)

@@ -1,4 +1,4 @@
-"""Subflow 3 · aggregate: filas del reporte a partir de los eventos válidos (PIPELINE_DESIGN.md §6.4).
+"""aggregate: filas del reporte a partir de los eventos válidos (PIPELINE_DESIGN.md §6.4).
 
 Grano: una fila por `(warehouse, client_id, week_start)` con al menos un evento en la semana. Cada fila es de un
 único cliente; las combinaciones sin actividad no tienen fila.
@@ -11,14 +11,16 @@ Grano: una fila por `(warehouse, client_id, week_start)` con al menos un evento 
 | `discrepancy_events_count` | número de `inventory_discrepancy_detected` |
 | `discrepancy_rate` | `discrepancy_events_count / outbound_orders_count`, 4 decimales; 0 sin pedidos (puede ser > 1) |
 
-`week_start` es el lunes UTC de `timestamp`. Los eventos fuera de las semanas de la ventana se descartan (la extracción
-ya filtra por fechas: es una segunda barrera). Sin tocar la base.
+`week_start` es el lunes UTC de `timestamp`. Los eventos fuera de las semanas pedidas (`weeks`) se descartan (la
+extracción ya filtra por fechas: es una segunda barrera). Función pura: sin base de datos ni Prefect.
 """
+
+from collections.abc import Iterable
+from datetime import date
 
 import pandas as pd
 
-from app.reporting.extract import DISCREPANCY, INBOUND, OUTBOUND, STOCKOUT
-from app.reporting.weeks import WeekWindow
+from data.process.weekly_performance.events import DISCREPANCY, INBOUND, OUTBOUND, STOCKOUT
 
 KEYS = ["warehouse", "client_id", "week_start"]
 COUNT_COLUMNS = {
@@ -43,12 +45,12 @@ def week_start_series(timestamps: pd.Series) -> pd.Series:
     return (utc.dt.normalize() - pd.to_timedelta(utc.dt.day_of_week, unit="D")).dt.date
 
 
-def aggregate_rows(valid: pd.DataFrame, window: WeekWindow) -> list[dict]:
-    """Filas del reporte, ordenadas por semana, almacén y cliente, con tipos nativos de Python."""
+def aggregate_rows(valid: pd.DataFrame, weeks: Iterable[date]) -> list[dict]:
+    """Filas del reporte de las semanas `weeks` (lunes), ordenadas por semana, almacén y cliente, con tipos nativos."""
     if valid.empty:
         return []
     df = valid.assign(week_start=week_start_series(valid["timestamp"]))
-    df = df[df["week_start"].isin(window.weeks)]
+    df = df[df["week_start"].isin(list(weeks))]
     if df.empty:
         return []
 

@@ -1,4 +1,4 @@
-"""Subflow observe: actividad cero, captura caída y mediciones perdidas o duplicadas (`app/reporting/observe.py`).
+"""observe: actividad cero, captura caída y mediciones perdidas o duplicadas (`data/pipelines/weekly_performance/`).
 
 Ejecutar desde services/api: uv run pytest tests/reporting/test_observe.py
 """
@@ -6,10 +6,12 @@ Ejecutar desde services/api: uv run pytest tests/reporting/test_observe.py
 import uuid
 from datetime import timedelta
 
-from app.reporting import observe as observe_module
-from app.reporting.extract import extract_events
-from app.reporting.observe import capture_coverage, observe, source_health
+import pytest
+
 from app.reporting.weeks import WeekWindow
+from data.pipelines.weekly_performance import observe as observe_module
+from data.pipelines.weekly_performance.extract import extract_events
+from data.pipelines.weekly_performance.observe import capture_coverage, observe, source_health
 from tests.reporting.helpers import INBOUND, OUTBOUND, W1, W2, at, event, insert, record_orders
 
 WINDOW = WeekWindow(first=W2, last=W2)
@@ -86,9 +88,12 @@ def test_coverage_ignores_orders_outside_the_window():
     assert capture_coverage(WINDOW, extract_events(WINDOW, "development")) == []
 
 
-def test_observability_failure_never_breaks_the_run(monkeypatch):
+def test_a_failing_signal_raises_so_the_flow_can_decide(monkeypatch):
+    """observe no se traga el error: lo decide el flow (return_state=True), ver test_pipeline_prefect.py."""
+
     def broken(*args):
         raise ValueError("fallo de la señal")
 
     monkeypatch.setattr(observe_module, "source_health", broken)
-    assert observed() == {"warnings": ["observability_unavailable"]}
+    with pytest.raises(ValueError):
+        observed()

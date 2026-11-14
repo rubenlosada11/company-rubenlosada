@@ -1,7 +1,8 @@
-"""Subflow observe: señales para distinguir actividad cero, captura caída y pérdida de mediciones (PIPELINE_DESIGN §9).
+"""observe: señales para distinguir actividad cero, captura caída y pérdida de mediciones (PIPELINE_DESIGN §9).
 
-Solo lee (transacciones `READ ONLY`) y **nunca hace fallar la ejecución**: si una señal no se puede calcular, se
-registra el aviso `observability_unavailable` y el reporte se carga igual.
+Solo lee (transacciones `READ ONLY`). Es una etapa **no crítica**: si falla, lanza la excepción y el flow de
+`pipeline.py`, que la invoca con `return_state=True`, decide continuar con el aviso `observability_unavailable` y
+marcar la ejecución como parcial. El reporte se carga igual.
 
 - **Salud del origen** (`source_health`): eventos de *cualquier* tipo y sesiones distintas por día UTC del entorno, y
   días sin ningún evento. Si el sistema registra logins y navegación pero ninguna orden, la actividad de órdenes es
@@ -24,20 +25,24 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.database import get_engine
 from app.inventory_models import StockEntry, StockExit
-from app.reporting.aggregate import week_start_series
-from app.reporting.extract import INBOUND, OUTBOUND
+from app.reporting.tables import storage_error
 from app.reporting.weeks import WeekWindow
 from app.telemetry.identifiers import WAREHOUSES
 from app.telemetry.storage import telemetry_engine, telemetry_events
+from data.process.weekly_performance.aggregate import week_start_series
+from data.process.weekly_performance.events import INBOUND, OUTBOUND
 
 logger = logging.getLogger("trackflow.reporting.observe")
 
 
 def _read_only(engine, statement) -> list:
-    with engine.connect() as connection:
-        connection = connection.execution_options(postgresql_readonly=True)
-        with connection.begin():
-            return connection.execute(statement).all()
+    try:
+        with engine.connect() as connection:
+            connection = connection.execution_options(postgresql_readonly=True)
+            with connection.begin():
+                return connection.execute(statement).all()
+    except SQLAlchemyError as error:
+        raise storage_error(error) from None
 
 
 def _days(window: WeekWindow) -> list[str]:
@@ -117,16 +122,15 @@ def capture_coverage(window: WeekWindow, raw: pd.DataFrame) -> list[dict[str, An
     ]
 
 
+UNAVAILABLE = "observability_unavailable"
+
+
 def observe(window: WeekWindow, environment: str, raw: pd.DataFrame) -> dict[str, Any]:
-    """Señales del origen y avisos. Nunca lanza: un fallo deja `observability_unavailable`."""
+    """Señales del origen y avisos. Si una señal no se puede calcular, lanza la excepción (la gestiona el flow)."""
     warnings: list[str] = []
     result: dict[str, Any] = {}
-    try:
-        health = source_health(window, environment)
-        coverage = capture_coverage(window, raw)
-    except (SQLAlchemyError, KeyError, ValueError, TypeError) as error:
-        logger.warning("Pipeline semanal · observe: señales no disponibles (%s)", type(error).__name__)
-        return {"warnings": ["observability_unavailable"]}
+    health = source_health(window, environment)
+    coverage = capture_coverage(window, raw)
     if health["total_events"] == 0:
         warnings.append("no_events_in_window")
     elif health["silent_days"]:
