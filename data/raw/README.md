@@ -11,3 +11,6 @@ This folder is intended for **raw data** related to the company: dumps, exports,
 
 - `prefect-results/` — cached results of the weekly pipeline's `transform-weekly-kpis` task (1-day expiration; safe
   to delete).
+- `telemetry_YYYY-MM-DD.csv` — daily copy of `telemetry_events` (that UTC day's events) written by the nightly process
+  [`scripts/nightly_export.py`](../../scripts/nightly_export.py). Audit/recovery backup only: no pipeline reads it.
+  Never overwritten; contains user and session pseudonyms (not committed).

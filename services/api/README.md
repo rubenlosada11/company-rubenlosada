@@ -495,6 +495,18 @@ ejecución que la escribió, y nunca hay dos ejecuciones a la vez (índice únic
 - Diseño: [`data/pipelines/PIPELINE_DESIGN.md`](../../data/pipelines/PIPELINE_DESIGN.md). Operación y verificación:
   [`docs/reporting/weekly-performance-pipeline.md`](../../docs/reporting/weekly-performance-pipeline.md).
 
+## Procesos en segundo plano (job runner)
+
+[`app/jobs/job_runner.py`](./app/jobs/job_runner.py) registra las ejecuciones de los procesos en segundo plano en la
+tabla `job_runs` (máquina de estados `pending → processing → completed | failed` y candado atómico con un índice único
+parcial). Lo usa el proceso nocturno de telemetría [`scripts/nightly_export.py`](../../scripts/nightly_export.py)
+(DEV-53), que se ejecuta **fuera** de la API (cron); la API no importa este paquete.
+
+- Con `DATABASE_URL` (Supabase), aplica antes la migración
+  [`migrations/20261115120000_job_runs.sql`](./migrations/20261115120000_job_runs.sql); en SQLite la tabla se crea sola.
+- Tests: `uv run pytest tests/jobs` (los de PostgreSQL, con `JOBS_TEST_DATABASE_URL` apuntando a un PostgreSQL local).
+- Documentación: [`docs/telemetry/nightly-export.md`](../../docs/telemetry/nightly-export.md).
+
 ## Tests
 
 ```powershell
@@ -621,6 +633,7 @@ services/api/
 │   ├── seed_inventory.py # `uv run seed-inventory [email]`
 │   ├── telemetry/        # captura, almacenamiento y reporte técnico de la telemetría
 │   ├── reporting/        # pipeline de desempeño semanal: weeks, extract, validate, aggregate, load, runs, flow, CLI
+│   ├── jobs/             # job runner de los procesos en segundo plano (job_runs); la API no lo importa
 │   ├── services/         # users.py, profiles.py (CRUD en TinyDB), password_reset.py (enlaces), email.py (Resend),
 │   │                     # incidents.py (gestor de incidencias), inventory.py (stock y reglas del inventario)
 │   └── routes/
@@ -633,7 +646,7 @@ services/api/
 │       ├── inventory.py  # /inventory (SKUs y movimientos de stock)
 │       ├── telemetry.py  # /telemetry (recepción de eventos y reporte técnico)
 │       └── reporting.py  # /reporting (reporte semanal y ejecuciones del pipeline)
-├── migrations/           # SQL versionado para PostgreSQL/Supabase (telemetría y reporting)
+├── migrations/           # SQL versionado para PostgreSQL/Supabase (telemetría, reporting y job_runs)
 ├── tests/
 └── db/                   # base local (ignorada en git)
 ```

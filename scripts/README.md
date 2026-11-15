@@ -27,3 +27,12 @@ Full details in the Spanish version: [README.es.md](./README.es.md) and in
 idempotent and needs the API environment. From the repo root, with the API stopped:
 `uv run --project services/api python scripts/seed_incidents.py`. Details in the Spanish version and in
 [`docs/gestor-incidencias.md`](../docs/gestor-incidencias.md).
+
+## Nightly telemetry export
+
+[`nightly_export.py`](./nightly_export.py) (ticket DEV-53) is a process **independent of the API**, meant for a 02:00
+UTC `cron` job: it exports the previous UTC day's `telemetry_events` (or `TARGET_DATE=YYYY-MM-DD`) to
+`data/raw/telemetry_YYYY-MM-DD.csv` (audit copy, git-ignored), runs the Milestone 6 pipeline in a subprocess and records
+each run in the `job_runs` table (per-date idempotency and an atomic PostgreSQL lock). From the repo root:
+`uv run --project services/api --env-file services/api/.env python scripts/nightly_export.py`. Details in the Spanish
+version and in [`docs/telemetry/nightly-export.md`](../docs/telemetry/nightly-export.md).

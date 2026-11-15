@@ -61,3 +61,23 @@ uv run --project services/api python scripts/seed_incidents.py
 Sus tests están en [`services/api/tests/test_seed_incidents.py`](../services/api/tests/test_seed_incidents.py), porque
 necesitan TinyDB (`uv run pytest -q` desde `services\api`). Documentación completa:
 [`docs/gestor-incidencias.md`](../docs/gestor-incidencias.md).
+
+## Proceso nocturno de telemetría
+
+[`nightly_export.py`](./nightly_export.py) (ticket DEV-53) es un proceso **independiente de la API** pensado para el
+`cron` de las 02:00 UTC: exporta los eventos de `telemetry_events` del día anterior en UTC (o de
+`TARGET_DATE=YYYY-MM-DD`) a `data/raw/telemetry_YYYY-MM-DD.csv` (copia de auditoría, ignorada en git), lanza el pipeline
+del Hito 6 (`data/pipelines/pipeline.py`) en un subprocess y registra cada ejecución en la tabla `job_runs`, con
+idempotencia por fecha y un candado atómico en PostgreSQL. Necesita el entorno de la API y la migración
+`services/api/migrations/20261115120000_job_runs.sql`. Desde la **raíz del repo**:
+
+```powershell
+uv run --project services/api --env-file services/api/.env python scripts/nightly_export.py
+```
+
+- Códigos de salida: `0` completada u omitida por estar ya completada, `1` fallida, `2` `TARGET_DATE` no válida, `75`
+  omitida porque otra ejecución tiene el candado.
+- Logs en stderr, una línea por evento con fecha UTC, job, fecha objetivo, id de ejecución y estado.
+
+Sus tests están en [`services/api/tests/jobs/`](../services/api/tests/jobs/). Documentación completa (arquitectura,
+estados, candado, cron, limitaciones): [`docs/telemetry/nightly-export.md`](../docs/telemetry/nightly-export.md).
