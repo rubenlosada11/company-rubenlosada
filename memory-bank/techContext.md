@@ -19,9 +19,9 @@ JS es autónomo, con su propio `package.json` y `package-lock.json`, y se opera 
 | `packages/shared/` | `@repo/shared-types`: tipos de dominio (`Carrier`, `Shipment`, `ReturnRequest`, `Client`) y utilidades TS puras. `dist/` está versionado. |
 | `packages/analisis-incidencias/` | Paquete Python (solo biblioteca estándar, `uv_build`, `src/`): carga, validación, métricas y exportación del CSV de incidencias de CX. Lo usan `scripts/analyze.py` y `services/api`. Contexto: `CONTEXT-incidencias.es.md`. Incluye `gestor.py`: valores, validación, transiciones y mapeos del gestor de incidencias (`CONTEXT-gestor-incidencias.es.md`), que usan la API y `scripts/seed_incidents.py`. |
 | `services/api/` | **FastAPI + Pydantic + TinyDB**, Python gestionado con **uv** (`pyproject.toml` + `uv.lock` propios), tests con `pytest`. Directorio de proveedores (`/suppliers`, contexto `CONTEXT-directorio.md`), analizador de incidencias (`/api/incidents`, contexto `CONTEXT-incidencias.es.md`), gestor de incidencias (también en `/api/incidents`; `docs/gestor-incidencias.md`) y autenticación JWT (`/auth`, `/users`, `/profiles`; `docs/autenticacion.md`), con recuperación y cambio de contraseña y emails por Resend (AUTH-03), e inventario del Hito 5 (`/inventory`, **SQLModel** sobre SQLite local; `docs/inventario.md`). |
-| `scripts/` | `analyze.py`: CLI del analizador de incidencias (+ `incidents-trackflow.csv` de prueba y `tests/`). `seed_incidents.py`: carga ese CSV en el gestor de incidencias (necesita el entorno de la API). |
+| `scripts/` | `analyze.py`: CLI del analizador de incidencias (+ `incidents-trackflow.csv` de prueba y `tests/`). `seed_incidents.py`: carga ese CSV en el gestor de incidencias (necesita el entorno de la API). `nightly_export.py`: proceso nocturno de telemetría (DEV-53; entorno de la API, registro en `job_runs`). |
 | `agents/`, `skills/`, `mcps/`, `workflows/`, `infra/`, `internal/`, `shared/` | Solo README/plantillas (`agents/_template`, `skills/_template`). |
-| `data/` | Pipelines de datos con Prefect 3: `data/pipelines/pipeline.py` (punto de entrada) y `weekly_performance/`; transformaciones puras en `data/process/`; `data/raw/` y `data/eval/` solo con salidas de ejecución ignoradas en git. |
+| `data/` | Pipelines de datos con Prefect 3: `data/pipelines/pipeline.py` (punto de entrada) y `weekly_performance/`; transformaciones puras en `data/process/`; `data/raw/` y `data/eval/` solo con salidas de ejecución ignoradas en git (incluidos los `telemetry_YYYY-MM-DD.csv` del proceso nocturno). |
 | `tests/` | Tests transversales de la raíz: hoy solo `tests/pipelines/test_pipeline.py` (unitarios de las tasks de KPI del Hito 6; se ejecutan con el entorno de `services/api`). Sin `__init__.py`. |
 | `docs/` | `hitos.md` (registro de hitos), `ARCHITECTURE_PROPOSAL.md` (propuesta de backend; no es un hito) + READMEs. |
 | `memory-bank/`, `AGENTS.md`, `.agents/` | Infraestructura para agentes (Hito 4). |
@@ -148,6 +148,8 @@ navegador se hacen fuera del repo (Edge + `playwright-core` en el scratchpad).
 | Pipeline de desempeño semanal (Prefect 3), **desde la raíz**: 2 últimas semanas completas · otra ventana · sin escribir nada | `uv run --project services/api --env-file services/api/.env python data/pipelines/pipeline.py` · `… --week-start 2026-11-02 --weeks 4` · `… --dry-run` (o `python data/pipelines/pipeline.py` con el venv de la API activado) |
 | Tests unitarios de las tasks de KPI (Hito 6), **desde la raíz** | `uv run --project services/api python -m pytest tests/pipelines/test_pipeline.py -v` (o `python -m pytest …` con el venv de la API activado) |
 | Tests del pipeline · contra un PostgreSQL local desechable con las dos migraciones | `uv run pytest tests/reporting` · `$env:REPORTING_TEST_DATABASE_URL = "postgresql+psycopg://…@127.0.0.1:…"` y `uv run pytest tests/reporting/test_postgres.py` |
+| Proceso nocturno de telemetría (DEV-53), **desde la raíz**: día anterior en UTC · otro día (`$env:TARGET_DATE = "2026-11-14"` antes) | `uv run --project services/api --env-file services/api/.env python scripts/nightly_export.py` |
+| Tests del job runner y del proceso nocturno · contra un PostgreSQL local con la migración de `job_runs` | `uv run pytest tests/jobs` · `$env:JOBS_TEST_DATABASE_URL = "postgresql+psycopg://…@127.0.0.1:…"` y `uv run pytest tests/jobs/test_job_runner_postgres.py` |
 | Regenerar `services/requirements.txt` (Docker) tras cambiar dependencias | `uv export --frozen --format requirements.txt --no-dev --no-emit-project --no-emit-package analisis-incidencias --output-file ../requirements.txt` |
 
 Docker (desde la **raíz** del repo; detalle en `docs/docker.md`). Website `:3000`, backoffice `:3001`, API `:8000`
@@ -602,6 +604,24 @@ Práctica sin hito, rama `feature/weekly-performance-pipeline` (2026-11-13). Dis
 | Tests unitarios en `tests/pipelines/test_pipeline.py` (raíz, **sin** `__init__.py` ni `conftest.py`): llaman a `task.fn`, datos en memoria, fixture que bloquea red y E/S | Lo exige el enunciado; sin paquete `tests` en la raíz para no chocar con `services/api/tests` |
 | Dashboard `/reporting` en el backoffice (grupo `(panel)`): solo consume `GET /reporting/weekly-warehouse-client-performance` (+ `week_start`) y `GET /reporting/pipeline-runs/latest`; 404 = «sin calcular»; sin sumar KPIs entre clientes; evolución = una petición por semana; tarjetas por cliente en móvil | Contrato de la API sin cambios; el navegador no calcula KPIs |
 | Aviso de frescura (`weeksBehind`) en el dashboard; alerta por email solo como propuesta | Único riesgo nuevo del hito (cron aplazado); el email necesita servicio externo y secretos (confirmación) |
+
+## Decisiones técnicas de los procesos en segundo plano (DEV-53, proceso nocturno de telemetría)
+
+Práctica sin hito, rama `feature/nightly-telemetry-export` (2026-11-15). Detalle en `docs/telemetry/nightly-export.md`.
+
+| Decisión | Motivo |
+| --- | --- |
+| `scripts/nightly_export.py` (orquestación) + `services/api/app/jobs/job_runner.py` (persistencia); la API no importa ninguno (test) | Proceso independiente del ciclo de vida de FastAPI; reutiliza `get_engine` y `telemetry_events` sin otro cliente |
+| Tabla `public.job_runs` separada de `reporting.pipeline_runs` (sin tocarla) | Orquestación nocturna frente a ejecución interna del ETL |
+| Candado = índice único parcial `(job_name) where status in ('pending','processing')`; el `INSERT` del `pending` es la adquisición | Atómico en la base (23505 al perdedor, sin fila); sin tablas de locks, Redis ni ficheros; mismo patrón que `pipeline_runs` |
+| Índice `(job_name, target_date)` no único; idempotencia comprobada antes y dentro de la transacción de adquisición | Reintentos como filas nuevas; cierra la carrera «comprobé, el otro completó, adquirí» |
+| Transiciones *compare-and-set* (`UPDATE … WHERE status IN (orígenes)`); arista extra `pending → failed` | Un `pending` huérfano no puede bloquear para siempre; sin estado `cancelled` |
+| Activas de más de 2 h → `failed` (`abandoned`) al adquirir | Recupera `SIGKILL`/caídas, que ningún `finally` cubre; 2 h > timeout del pipeline (30 min) |
+| `TARGET_DATE` solo días terminados en UTC | Un día a medias marcado `completed` no se volvería a exportar |
+| CSV: `READ ONLY`, `yield_per` 1000, temporal + `fsync` + `os.link` (no sobrescribe), cabecera si hay 0 eventos | Copia de auditoría íntegra sin cargar el día en memoria; el pipeline no la lee |
+| Pipeline con `subprocess.run` (lista, sin shell, `sys.executable`, `--week-start` del lunes de la última semana completa), timeout 30 min, salidas a **ficheros temporales** | El servidor temporal de Prefect hereda los pipes: con `capture_output` el timeout no cortaba en Windows |
+| Códigos 0 (hecho u omitido por duplicado) / 1 / 2 / 75 (candado, `EX_TEMPFAIL`) / 130 / 143 | Distinguir omisiones de fallos en cron y monitorización |
+| Programación con `crontab` del host, `0 2 * * *` UTC (documentada, no instalada) | La imagen del backend no incluye `data/` ni `scripts/`; cambiar Docker requiere confirmación |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 

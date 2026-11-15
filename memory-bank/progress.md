@@ -6,8 +6,22 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/hito-6-pipeline-subflows` (desde `feature/prefect-performance-pipeline` @ `240eb47`,
-  PR #31 de la Parte 2 aún abierta: hay que fusionarla antes que la del Hito 6).
+- **Rama de trabajo:** `feature/nightly-telemetry-export` (desde `main` @ `b87e0a6`, tras fusionar la PR #32 del
+  Hito 6).
+- **Procesos en segundo plano — DEV-53, script nocturno de telemetría** (práctica sin número de hito):
+  [`scripts/nightly_export.py`](../scripts/nightly_export.py), proceso **independiente de la API** para el `cron` de las
+  02:00 UTC. Fecha objetivo = ayer en UTC o `TARGET_DATE`; exporta `telemetry_events` del día a
+  `data/raw/telemetry_YYYY-MM-DD.csv` (copia de auditoría, ignorada en git, nunca se sobrescribe, escritura atómica) y
+  lanza `data/pipelines/pipeline.py` con `subprocess.run` (timeout 30 min, salidas a ficheros temporales). Registro en
+  la tabla nueva `public.job_runs` con el job runner `services/api/app/jobs/job_runner.py` (la API no lo importa):
+  `pending → processing → completed | failed`, candado atómico = índice único parcial sobre los activos, idempotencia
+  por `(job_name, target_date)`, recuperación de activas de más de 2 h. Migración
+  `services/api/migrations/20261115120000_job_runs.sql` (**aplicada en Supabase** el 2026-11-15). Documentación:
+  [`docs/telemetry/nightly-export.md`](../docs/telemetry/nightly-export.md). **Verificado** (2026-11-15): API
+  1805 tests sin omitidos (con PostgreSQL local: 6 de reporting + 7 de jobs), `tests/jobs` 83 + 7, `tests/pipelines` 15,
+  scripts + analisis-incidencias 196; migración en PostgreSQL 16 local (27 comprobaciones); recorrido real con el pipeline real
+  (completado, duplicado, 3 instancias a la vez, fallo, reintento, timeout, base caída, fechas inválidas); API con
+  `/health` y telemetría guardando. Cron documentado, no instalado.
 - **Hito 6 — Mejora del Pipeline: Subflows, Tests y Dashboard de Negocio** (Parte 3 de 3 de data pipelines): el flow
   `weekly-warehouse-client-performance` coordina subflows de extracción, transformación (una task por KPI sobre
   `data/process/weekly_performance/kpis.py`) y carga, más `observe-source-health` y `export-eval-snapshot` opcionales
@@ -1631,10 +1645,43 @@ parar antes de crear la PR. Rama desde `feature/prefect-performance-pipeline` @ 
 - **Fallo intermitente previo** detectado en la suite: `test_telemetry_report.py::test_different_periods_are_computed_in_parallel`
   (`OperationalError` por la creación perezosa concurrente de la tabla SQLite de telemetría). Se reproduce en la
   Parte 2 (2/33) y no en `main` (0/100); no se toca (sistema de telemetría, fuera de alcance).
+- **Cierre (2026-11-14):** PR #32 fusionada en `main` (`b87e0a6`) y registrada en Notion.
+
+### 2026-11-15 — Procesos en segundo plano: DEV-53, script nocturno de telemetría (rama `feature/nightly-telemetry-export`)
+
+Práctica sin número de hito. El desarrollador pidió ejecutar todas las fases con mis recomendaciones y parar antes de
+crear la PR (y después, tras la fusión, la ficha de Notion).
+
+- **Discrepancias del prompt:** el pipeline del Hito 6 no es `data.pipelines.telemetry_kpi_daily.run --no-prefect`
+  (no existe) sino `data/pipelines/pipeline.py` (Prefect 3, semanal): se lanza con `--week-start` = lunes de la última
+  semana completa al final de la fecha objetivo. `pipeline_runs` es `reporting.pipeline_runs` (sin cambios). El job
+  runner va en `services/api/app/jobs/` (estructura existente; la API no lo importa) y sus tests en
+  `services/api/tests/jobs/` (`scripts/tests` se ejecuta con el Python del sistema, sin SQLAlchemy).
+- **Diseño:** `public.job_runs` (8 columnas, 6 `CHECK`, índice de consulta `(job_name, target_date)` no único, índice
+  único parcial `(job_name) where status in ('pending','processing')` = candado; RLS como el resto). Arista extra
+  `pending → failed` (fallo o abandono antes de empezar). Recuperación automática de activas de más de 2 h
+  (`abandoned`), como `pipeline_runs`. Doble comprobación de idempotencia (antes y dentro de la transacción de
+  adquisición). Códigos de salida 0/1/2/75/130/143. `TARGET_DATE` solo días terminados en UTC.
+- **Hallazgos:** (1) Prefect arranca su servidor temporal con `Popen` heredando stdout/stderr: con
+  `capture_output=True`, tras un timeout `subprocess.run` esperaba al nieto (medido: timeout de 3 s → 25 s) → salidas
+  a ficheros temporales (test de regresión). (2) Tras un timeout real el servidor de Prefect queda huérfano
+  (limitación documentada; mitigación: servidor dedicado). (3) stderr redirigido en Windows usa cp1252 → el script lo
+  fija a UTF-8. (4) La causa del fallo del pipeline es su línea `La ejecución ha fallado: …`, no la última de stderr.
+- **Verificación real** en PostgreSQL 16 local (pgserver, scratchpad de la sesión, 130 eventos de prueba): 27
+  comprobaciones de la migración; ejecución completa (18 s), duplicado (0,25 s, CSV idéntico), 3 instancias a la vez
+  (1 completa, 2 con código 75), fallo real del pipeline (`UndefinedTable`) y reintento correcto, timeout real (6 s),
+  base inalcanzable (sin contraseña en el log), fechas inválidas (código 2); API: `/health` 200 y telemetría guardada.
+  Los CSV de prueba de `data/raw/` se borraron al terminar.
+- **Supabase (2026-11-15, con autorización del desarrollador):** migración aplicada desde la sesión y verificada
+  (columnas, 6 `CHECK`, índices, RLS, solo `SELECT` para `service_role`). Ejecuciones reales: por defecto (día 14, 0
+  eventos, CSV con cabecera) `completed`; 2 instancias del 11 a la vez → una `completed` (47 eventos) y otra 75;
+  repetición → `skipped_duplicate`. `job_runs` = 2 filas `completed`; `pipeline_runs` pasa de 4 a 6 `succeeded`.
 
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
+
+- DEV-53: instalar el `cron` (`docs/telemetry/nightly-export.md` §10) cuando el backend se despliegue.
 
 - Opcional: rehacer la captura del website (`uis/website/screenshots/screenshot website.png`), que se hizo con 4
   datos y hoy el hero muestra 5.
@@ -1738,8 +1785,11 @@ parar antes de crear la PR. Rama desde `feature/prefect-performance-pipeline` @ 
     lunes cuando se redespliegue el backend (`docs/reporting/weekly-performance-pipeline.md` §3.3); revisar la orden
     de entrada de Los Ángeles sin evento (¿creada sin `TELEMETRY_PSEUDONYM_KEY`?). La vista del reporte para Thomas y Ana se hizo en el
     Hito 6 (`/reporting`).
-15. Hito 6: PR pendiente (después de fusionar la #31), entrega y ficha de Notion. Pendientes que nacen del hito:
+15. Hito 6: PR #32 fusionada (`b87e0a6`) y registrada en Notion. Pendientes que nacen del hito:
     candado alrededor del `create_all` perezoso de `app/telemetry/storage.py` (fallo intermitente de
     `test_different_periods_are_computed_in_parallel`, requiere confirmación: sistema de telemetría); alerta por
     email de ausencia de ejecuciones (PIPELINE_DESIGN §19.9); servidor de Prefect dedicado si los ~2 s por subflow
     molestan.
+16. DEV-53 (proceso nocturno, `feature/nightly-telemetry-export`): PR, fusión y ficha de Notion. Después: instalar el `cron` al desplegar el backend, servidor de Prefect dedicado
+    (`PREFECT_API_URL`: evita el servidor temporal huérfano tras un timeout) y alerta por email de ejecuciones
+    `failed` o ausentes (`docs/telemetry/nightly-export.md` §13).

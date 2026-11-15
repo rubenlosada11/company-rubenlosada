@@ -36,6 +36,9 @@ This folder holds **cross-cutting documentation** for the monorepo: architecture
   performance pipeline (in Spanish): design (KPI → event traceability, ISO week, idempotency, run log and the Prefect 3
   implementation: flows, tasks, retries, caching and partial failures) and operations (commands, cron, `/reporting`
   endpoints, verification).
+- [`telemetry/nightly-export.md`](./telemetry/nightly-export.md) — nightly telemetry process (DEV-53, in Spanish):
+  standalone script that exports the day to CSV and runs the pipeline in a subprocess, `job_runs` table (state
+  machine, atomic lock via a partial unique index, per-date idempotency), cron, logs, tests and limitations.
 - [`docker.md`](./docker.md) — Docker setup of the monorepo (in Spanish): `interfaces` (website + backoffice) and
   `backend` (API) containers, development Compose with hot reload, production Compose, environment variables and
   deployment to the VPS without public access.

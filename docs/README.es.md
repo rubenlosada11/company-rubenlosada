@@ -34,6 +34,9 @@ Esta carpeta contiene la **documentación transversal** del monorepo: guías de 
   Semanal de Desempeño por Almacén y Cliente: diseño (trazabilidad KPI → evento, semana ISO, idempotencia, registro
   de ejecuciones e implementación con Prefect 3: flows, tasks, reintentos, caché y fallos parciales) y operación
   (comandos, `cron`, endpoints `/reporting`, verificación).
+- [`telemetry/nightly-export.md`](./telemetry/nightly-export.md) — proceso nocturno de telemetría (DEV-53): script
+  independiente de la API que exporta el día a CSV y lanza el pipeline en un subprocess, tabla `job_runs` (máquina de
+  estados, candado atómico con índice único parcial, idempotencia por fecha), `cron`, logs, pruebas y limitaciones.
 - [`docker.md`](./docker.md) — Docker del monorepo: contenedores `interfaces` (website + backoffice) y `backend`
   (API), Compose de desarrollo con hot reload y de producción, variables, despliegue en el VPS sin acceso público,
   actualización, vuelta atrás y problemas habituales.

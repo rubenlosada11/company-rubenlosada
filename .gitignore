@@ -17,3 +17,8 @@ scripts/results.csv
 # ejecución. Son salidas de ejecución, no código (ver data/pipelines/PIPELINE_DESIGN.md §18).
 data/raw/prefect-results/
 data/eval/weekly_performance/
+
+# Proceso nocturno de telemetría (scripts/nightly_export.py): copia diaria de telemetry_events en CSV (contiene
+# seudónimos de usuario y de sesión) y sus temporales de escritura. Backup de auditoría, no código.
+data/raw/telemetry_*.csv
+data/raw/.telemetry_*.tmp
