@@ -306,6 +306,7 @@ tres migraciones (130 eventos de inventario de prueba del 2 al 14 de noviembre):
 | Base inalcanzable con contraseña en la URL | `connection_error`, código 1, la contraseña no aparece, sin CSV |
 | `TARGET_DATE` `2026-02-30`, `15/11/2026`, hoy | Código 2 con mensaje claro, sin tocar la base |
 | API (`uvicorn`) | `/health` 200; `POST /telemetry/events` guarda (130 → 131); `job_runs` intacta |
+| **Supabase** (migración aplicada el 2026-11-15; misma verificación de estructura) | Por defecto (día 14, sin eventos): `completed`, CSV con solo la cabecera · 2 instancias a la vez con `TARGET_DATE=2026-11-11`: una `completed` (47 eventos, pipeline en 18 s) y otra `skipped_locked` (código 75) · repetición del 11: `skipped_duplicate` |
 | Regresiones | Suite de la API: 1805 tests (con los de PostgreSQL); `tests/pipelines` 15; scripts + analisis-incidencias 196 |
 
 ## 13. Limitaciones y recuperación

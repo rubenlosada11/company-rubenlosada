@@ -16,7 +16,7 @@
   la tabla nueva `public.job_runs` con el job runner `services/api/app/jobs/job_runner.py` (la API no lo importa):
   `pending → processing → completed | failed`, candado atómico = índice único parcial sobre los activos, idempotencia
   por `(job_name, target_date)`, recuperación de activas de más de 2 h. Migración
-  `services/api/migrations/20261115120000_job_runs.sql` (**pendiente de aplicar en Supabase**). Documentación:
+  `services/api/migrations/20261115120000_job_runs.sql` (**aplicada en Supabase** el 2026-11-15). Documentación:
   [`docs/telemetry/nightly-export.md`](../docs/telemetry/nightly-export.md). **Verificado** (2026-11-15): API
   1805 tests sin omitidos (con PostgreSQL local: 6 de reporting + 7 de jobs), `tests/jobs` 83 + 7, `tests/pipelines` 15,
   scripts + analisis-incidencias 196; migración en PostgreSQL 16 local (27 comprobaciones); recorrido real con el pipeline real
@@ -1672,13 +1672,16 @@ crear la PR (y después, tras la fusión, la ficha de Notion).
   (1 completa, 2 con código 75), fallo real del pipeline (`UndefinedTable`) y reintento correcto, timeout real (6 s),
   base inalcanzable (sin contraseña en el log), fechas inválidas (código 2); API: `/health` 200 y telemetría guardada.
   Los CSV de prueba de `data/raw/` se borraron al terminar.
+- **Supabase (2026-11-15, con autorización del desarrollador):** migración aplicada desde la sesión y verificada
+  (columnas, 6 `CHECK`, índices, RLS, solo `SELECT` para `service_role`). Ejecuciones reales: por defecto (día 14, 0
+  eventos, CSV con cabecera) `completed`; 2 instancias del 11 a la vez → una `completed` (47 eventos) y otra 75;
+  repetición → `skipped_duplicate`. `job_runs` = 2 filas `completed`; `pipeline_runs` pasa de 4 a 6 `succeeded`.
 
 ## Trabajo pendiente
 
 **Manual del desarrollador (no se puede automatizar ni simular)**
 
-- DEV-53: aplicar `services/api/migrations/20261115120000_job_runs.sql` en el SQL Editor de Supabase (después de las de
-  telemetría y reporting). Instalar el `cron` (`docs/telemetry/nightly-export.md` §10) cuando el backend se despliegue.
+- DEV-53: instalar el `cron` (`docs/telemetry/nightly-export.md` §10) cuando el backend se despliegue.
 
 - Opcional: rehacer la captura del website (`uis/website/screenshots/screenshot website.png`), que se hizo con 4
   datos y hoy el hero muestra 5.
@@ -1787,7 +1790,6 @@ crear la PR (y después, tras la fusión, la ficha de Notion).
     `test_different_periods_are_computed_in_parallel`, requiere confirmación: sistema de telemetría); alerta por
     email de ausencia de ejecuciones (PIPELINE_DESIGN §19.9); servidor de Prefect dedicado si los ~2 s por subflow
     molestan.
-16. DEV-53 (proceso nocturno, `feature/nightly-telemetry-export`): PR, fusión y ficha de Notion. Después: aplicar la
-    migración de `job_runs` en Supabase, instalar el `cron` al desplegar el backend, servidor de Prefect dedicado
+16. DEV-53 (proceso nocturno, `feature/nightly-telemetry-export`): PR, fusión y ficha de Notion. Después: instalar el `cron` al desplegar el backend, servidor de Prefect dedicado
     (`PREFECT_API_URL`: evita el servidor temporal huérfano tras un timeout) y alerta por email de ejecuciones
     `failed` o ausentes (`docs/telemetry/nightly-export.md` §13).
