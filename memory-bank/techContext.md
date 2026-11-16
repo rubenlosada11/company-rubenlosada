@@ -30,6 +30,8 @@ JS es autónomo, con su propio `package.json` y `package-lock.json`, y se opera 
 `interfaces`: website + backoffice), `services/Dockerfile` + `services/requirements.txt` (contenedor `backend`),
 `docker-compose.yml` (desarrollo) y `docker-compose.prod.yml` (producción), `.env.example`/`env.prod.example` en la
 raíz. Guía: [`docs/docker.md`](../docs/docker.md); decisiones abajo («Decisiones técnicas de la contenedorización»).
+Desde DEV-55 (2026-11-16) el Compose de desarrollo añade `redis`, `worker` (Celery) y `flower`: ver
+[`docs/async-tasks.md`](../docs/async-tasks.md); producción aún no los tiene.
 
 No existen: CI/CD (`.github/`), base de datos de servidor (el inventario usa SQLite
 local; Supabase/PostgreSQL con `DATABASE_URL` y driver psycopg, preparado y probado contra PostgreSQL 16 local). Tests automatizados:
@@ -50,7 +52,8 @@ El `.gitignore` raíz contiene `node_modules/`, los cachés de Python (`__pycach
   TinyDB 4.9, uvicorn, `python-multipart` (subida de ficheros), `python-jose[cryptography]` 3.5 (JWT),
   `libpass[bcrypt]` 1.9.3 (módulo `passlib`, bcrypt 5.0), **SQLModel 0.0.48** (SQLAlchemy 2.1.6; inventario, Hito 5),
   **psycopg[binary] 3.3.6** (driver de PostgreSQL/Supabase), **pandas 3.1.1** (+ numpy 2.5; reporte de telemetría)
-  y el paquete local `analisis-incidencias` (editable,
+  **Celery 5.7.0** (kombu 5.7.0) + **redis-py 8.1.0** + **Flower 2.2.0** (tareas asíncronas, DEV-55; Redis 8.10.3 en
+  Docker) y el paquete local `analisis-incidencias` (editable,
   `[tool.uv.sources]`); desarrollo: pytest 9 + `httpx2` (Starlette 1.7 marca obsoleto `httpx` en `TestClient`) +
   `pytest-cov` 7.1 (cobertura; `[tool.coverage.run] source = ["app"]`).
 - **Tests JS:** solo en `uis/backoffice`: Jest 30 + `@types/jest` (dev), `jest.config.mjs` con `next/jest` (SWC y alias
@@ -150,6 +153,8 @@ navegador se hacen fuera del repo (Edge + `playwright-core` en el scratchpad).
 | Tests del pipeline · contra un PostgreSQL local desechable con las dos migraciones | `uv run pytest tests/reporting` · `$env:REPORTING_TEST_DATABASE_URL = "postgresql+psycopg://…@127.0.0.1:…"` y `uv run pytest tests/reporting/test_postgres.py` |
 | Proceso nocturno de telemetría (DEV-53), **desde la raíz**: día anterior en UTC · otro día (`$env:TARGET_DATE = "2026-11-14"` antes) | `uv run --project services/api --env-file services/api/.env python scripts/nightly_export.py` |
 | Tests del job runner y del proceso nocturno · contra un PostgreSQL local con la migración de `job_runs` | `uv run pytest tests/jobs` · `$env:JOBS_TEST_DATABASE_URL = "postgresql+psycopg://…@127.0.0.1:…"` y `uv run pytest tests/jobs/test_job_runner_postgres.py` |
+| Tareas asíncronas (DEV-55): worker sin Docker (Windows; Redis en `127.0.0.1:6379`, p. ej. `docker compose up -d redis`) | `uv run --env-file .env celery -A app.celery_app worker --pool=solo --loglevel=INFO` |
+| Tests de las tareas asíncronas · DLQ contra PostgreSQL local · E2E con el stack Docker | `uv run pytest tests/tasks` · `$env:TASKS_TEST_DATABASE_URL = "postgresql+psycopg://…@127.0.0.1:…"` · `ASYNC_E2E_API_URL`, `ASYNC_E2E_DATABASE_URL` y `ASYNC_E2E_MANAGER_TOKEN`/`OTHER`/`ADMIN`, y `uv run pytest tests/tasks/test_e2e_docker.py` |
 | Regenerar `services/requirements.txt` (Docker) tras cambiar dependencias | `uv export --frozen --format requirements.txt --no-dev --no-emit-project --no-emit-package analisis-incidencias --output-file ../requirements.txt` |
 
 Docker (desde la **raíz** del repo; detalle en `docs/docker.md`). Website `:3000`, backoffice `:3001`, API `:8000`
@@ -622,6 +627,27 @@ Práctica sin hito, rama `feature/nightly-telemetry-export` (2026-11-15). Detall
 | Pipeline con `subprocess.run` (lista, sin shell, `sys.executable`, `--week-start` del lunes de la última semana completa), timeout 30 min, salidas a **ficheros temporales** | El servidor temporal de Prefect hereda los pipes: con `capture_output` el timeout no cortaba en Windows |
 | Códigos 0 (hecho u omitido por duplicado) / 1 / 2 / 75 (candado, `EX_TEMPFAIL`) / 130 / 143 | Distinguir omisiones de fallos en cron y monitorización |
 | Programación con `crontab` del host, `0 2 * * *` UTC (documentada, no instalada) | La imagen del backend no incluye `data/` ni `scripts/`; cambiar Docker requiere confirmación |
+
+## Decisiones técnicas de las tareas asíncronas (DEV-55, Celery + Redis)
+
+Práctica sin hito, rama `feature/async-tasks-celery` (2026-11-16). Detalle y evidencias en `docs/async-tasks.md`.
+
+| Decisión | Motivo |
+| --- | --- |
+| Operación asíncrona = `POST /reporting/pipeline-runs` (flow de Prefect), ahora 202 `{task_id}` + `Location`; la ejecución, en `GET /tasks/{id}` → `result` | La más lenta (70,6 s en frío, 3,7–6,4 s después); parámetros ligeros, idempotente, con candado y errores clasificados; el backoffice no usa ese POST |
+| `app/celery_app.py` + paquete `app/tasks/`; worker `celery -A app.celery_app worker` | Dentro del paquete existente de la API (mismo entorno uv y misma imagen), sin proyecto paralelo |
+| `REDIS_URL` única para broker, result backend y registro; Docker `redis://redis:6379/0` (fijada en Compose), local `redis://127.0.0.1:6379/0` | En Windows `localhost` prueba antes `::1` y cada conexión perdía ~2 s (medido) |
+| JSON, `track_started`, `acks_late` + `reject_on_worker_lost`, prefetch 1, límites 300/360 s, `expires` 1 h, `visibility_timeout` 1 h, `result_expires` 1 día, conexión 2 s | Entrega al menos una vez y sin pérdidas al caer el worker; fallar pronto con Redis caído (503) |
+| Ventana resuelta en la API al encolar; la tarea recibe la semana final explícita | Reintentos deterministas aunque cambie la semana |
+| Reintentos solo transitorios (`ReportingStorageError.transient`, `PipelineAlreadyRunning`, `ConnectionError`/`TimeoutError`): 1 + 3 con 2/4/8 s; límites de tiempo y permanentes sin reintento | No retrasar errores que no se arreglan solos |
+| El reintento viaja con `TransientTaskError` (nunca la excepción original) | Con el worker real, `PipelineAlreadyRunning` (de `data.pipelines`) tumbaba el proceso padre con `ModuleNotFoundError` |
+| Cadena de errores con la regla de Python (`raise … from None` corta) | `ReportingStorageError` oculta a propósito la excepción del driver (cadena de conexión, SQL) |
+| DLQ = tabla `public.task_dead_letters` en la base de `DATABASE_URL` (migración `20261116120000`, RLS); `task_id` único + `ON CONFLICT DO NOTHING RETURNING id`; motivos `retries_exhausted`/`permanent_error`/`time_limit`/`expired`; desde `on_failure` y `task_revoked(expired)` | Registro duradero e idempotente sin una segunda base; `rowcount` no distinguía insertado/ignorado con psycopg 3 |
+| Registro de dueños en Redis (`trackflow:tasks:<id>`, TTL = resultados) | Distinguir desconocido de `pending` y no enseñar tareas de otro usuario (404) sin tablas nuevas |
+| Estado `retrying` (Celery `RETRY`) además de pending/started/success/failure | Es un estado real de Celery; el cliente ve que la tarea no está parada |
+| Redis `redis:8.10.3-alpine`, `noeviction` + `maxmemory 256mb`, AOF en volumen, solo 127.0.0.1 | Nunca descartar mensajes en silencio; los pendientes sobreviven a reinicios |
+| Worker con la imagen del backend, `data/` montado, `PREFECT_HOME=/tmp/prefect`, `concurrency 1`, `restart: unless-stopped`; Flower con la misma imagen y `FLOWER_BASIC_AUTH` obligatoria | La imagen no incluye `data/`; el contenedor no tiene HOME; el pipeline admite una ejecución a la vez |
+| Tests: modo eager + backend `cache+memory://` + Redis simulado solo en `tests/conftest.py`; suites opcionales con PostgreSQL y con el stack Docker real | Suite rápida sin servicios; integración real verificable |
 
 ## Restricciones y cosas que el agente NO debe cambiar unilateralmente
 

@@ -266,12 +266,12 @@ con el mismo `MetaData` traducido (`schema_translate_map`).
 | --- | --- | --- |
 | `GET /reporting/weekly-warehouse-client-performance?week_start=` | Usuario autenticado | Filas de la semana pedida (un lunes; 422 si no lo es). Sin parámetro: la semana más reciente calculada por una corrida correcta. 200 con `entries: []` si se calculó sin actividad; 404 si ninguna corrida correcta la ha calculado. Orden: almacén, cliente |
 | `GET /reporting/pipeline-runs/latest` | Usuario autenticado | Última ejecución (cualquier estado) con su metadata. 404 si nunca se ha ejecutado |
-| `POST /reporting/pipeline-runs` | `admin` o `manager` | Ejecuta el pipeline de forma síncrona (`{week_start?, weeks?}`) y devuelve la ejecución: 201 si termina bien; 503 si falla (queda registrada como `failed`); 409 si ya hay una en curso (en cualquier proceso); 422 si la semana no es un lunes o aún no ha terminado |
+| `POST /reporting/pipeline-runs` | `admin` o `manager` | Desde DEV-55, **encola** el pipeline en Celery (`{week_start?, weeks?}`) y responde 202 con `{"task_id"}`; la ejecución (antes, el cuerpo del 201) se lee en `GET /tasks/{task_id}` → `result`. 422 si la semana no es un lunes o aún no ha terminado; 503 si la cola (Redis) no responde. Una ejecución en curso (antes 409) se reintenta con backoff y, si persiste, la tarea termina en `failure`; un fallo (antes 503) queda `failed` en el registro y en la DLQ. Ver [`docs/async-tasks.md`](../../docs/async-tasks.md) |
 
 La respuesta del primero sigue el JSON del BRIEFING (`week_start` + `entries` con los cinco campos calculados, más
 `warehouse` y `client_id`); añade `computed_at` (cuándo terminó la corrida que calculó la semana) y `run_id` (cuál
-fue), para que el lector sepa lo fresco que está el dato y se pueda seguir su rastro. Ejecución síncrona: con el volumen actual (miles de eventos por semana) tarda segundos; si creciera,
-el mismo flow pasaría a una cola sin cambiar el contrato salvo el código de estado.
+fue), para que el lector sepa lo fresco que está el dato y se pueda seguir su rastro. La ejecución era síncrona; desde DEV-55 el mismo flow lo ejecuta un worker de Celery
+(`services/api/app/tasks/reporting.py`) y el `POST` responde 202 al momento ([`docs/async-tasks.md`](../../docs/async-tasks.md)).
 
 ## 12. Errores y recuperación
 

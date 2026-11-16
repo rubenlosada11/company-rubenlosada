@@ -472,18 +472,20 @@ Pipeline que consolida cada semana ISO (UTC), por almacén y cliente, el volumen
 los quiebres de stock y la tasa de discrepancia a partir de `telemetry_events` (solo lectura) en la tabla
 `reporting.weekly_warehouse_client_performance`. Es un flow de **Prefect 3** que vive fuera de la API, en
 [`data/pipelines/pipeline.py`](../../data/pipelines/pipeline.py) (tasks extract → transform → observe → load →
-snapshot; transformaciones puras en [`data/process/`](../../data/process/)); la API solo lo importa para el `POST`
-([`app/reporting/runner.py`](./app/reporting/runner.py)) y sirve las lecturas. Idempotente (upsert + reconciliación),
+snapshot; transformaciones puras en [`data/process/`](../../data/process/)); lo ejecuta un worker de Celery
+([`app/tasks/reporting.py`](./app/tasks/reporting.py), que lo importa con [`app/reporting/runner.py`](./app/reporting/runner.py))
+y la API sirve las lecturas y encola las ejecuciones. Idempotente (upsert + reconciliación),
 con reintentos ante fallos transitorios, caché de la transformación y registro de cada ejecución en
 `reporting.pipeline_runs`: fase completada (checkpoint), `X-Request-Id`, cambios por semana y avisos de
 observabilidad (captura en silencio, órdenes del inventario sin evento). Cada fila del reporte guarda el `run_id` de la
-ejecución que la escribió, y nunca hay dos ejecuciones a la vez (índice único parcial: 409).
+ejecución que la escribió, y nunca hay dos ejecuciones a la vez (índice único parcial).
 
 - `GET /reporting/weekly-warehouse-client-performance?week_start=…` (autenticado): filas de la semana; por defecto, la
   calculada más reciente.
 - `GET /reporting/pipeline-runs/latest` (autenticado): estado y metadata de la última ejecución.
-- `POST /reporting/pipeline-runs` (`admin` o `manager`): ejecución manual de las 2 últimas semanas completas, o de
-  `{"week_start": "2026-11-02", "weeks": 4}`.
+- `POST /reporting/pipeline-runs` (`admin` o `manager`): **encola** una ejecución manual de las 2 últimas semanas
+  completas, o de `{"week_start": "2026-11-02", "weeks": 4}`, y responde 202 con `{"task_id"}`. El resultado se
+  consulta en `GET /tasks/{task_id}` (ver [Tareas asíncronas](#tareas-asíncronas-celery--redis)).
 - Línea de comandos (la del `cron` de los lunes), desde la raíz del monorepo:
   `uv run --project services/api --env-file services/api/.env python data/pipelines/pipeline.py` (`--week-start`,
   `--weeks`, `--dry-run`). `outcome` = `partial` si falló una etapa opcional (el reporte se cargó igual).
@@ -494,6 +496,36 @@ ejecución que la escribió, y nunca hay dos ejecuciones a la vez (índice únic
   en SQLite las tablas se crean solas.
 - Diseño: [`data/pipelines/PIPELINE_DESIGN.md`](../../data/pipelines/PIPELINE_DESIGN.md). Operación y verificación:
   [`docs/reporting/weekly-performance-pipeline.md`](../../docs/reporting/weekly-performance-pipeline.md).
+
+## Tareas asíncronas (Celery + Redis)
+
+DEV-55. Documentación completa: [`docs/async-tasks.md`](../../docs/async-tasks.md). El pipeline semanal ya no se
+ejecuta dentro de la petición: la API lo encola en **Redis** y lo ejecuta un **worker de Celery** (proceso aparte).
+
+```text
+Cliente → POST /reporting/pipeline-runs → 202 {"task_id"} → Redis (broker) → worker (pipeline real) → Redis (resultado)
+Cliente → GET /tasks/{task_id} → pending | started | retrying | success (result) | failure (error)
+```
+
+- **Instancia de Celery:** [`app/celery_app.py`](./app/celery_app.py). Broker y result backend en `REDIS_URL` (por
+  defecto `redis://127.0.0.1:6379/0`; en Docker, `redis://redis:6379/0`). JSON, `STARTED`, ACK tardío, límites de
+  300/360 s, mensajes que caducan a la hora.
+- **Tareas:** [`app/tasks/`](./app/tasks/): `reporting.run_weekly_performance` (negocio) y `diagnostics.ping`
+  (comprobación). Reintentos solo ante fallos transitorios: 1 intento + 3 reintentos con backoff de 2, 4 y 8 s.
+- **DLQ:** tabla `task_dead_letters` (migración
+  [`20261116120000_task_dead_letters.sql`](./migrations/20261116120000_task_dead_letters.sql); en SQLite se crea sola)
+  con los fallos definitivos, idempotente por `task_id`. `GET /tasks/dead-letters` (solo `admin`).
+- **`GET /tasks/{task_id}`:** solo el usuario que la encoló (otro usuario o un id desconocido: 404).
+- **Arranque:** `docker compose up -d redis backend worker flower` (Flower en http://localhost:5555 con
+  `FLOWER_BASIC_AUTH`). Sin Docker, desde `servicespi` y con Redis en marcha:
+
+```powershell
+uv run --env-file .env celery -A app.celery_app worker --pool=solo --loglevel=INFO
+```
+
+- **Tests:** `uv run pytest tests/tasks` (unitarios; Celery en modo eager y Redis simulado solo en los tests). Contra
+  PostgreSQL real: `TASKS_TEST_DATABASE_URL`. Extremo a extremo con Docker: `ASYNC_E2E_*` (ver
+  `tests/tasks/test_e2e_docker.py`).
 
 ## Procesos en segundo plano (job runner)
 
@@ -544,7 +576,8 @@ funcionando con un token válido.
 | [`tests/test_inventory_database.py`](./tests/test_inventory_database.py) | Inventario: `DATABASE_URL`, creación de tablas, cambio de motor y claves foráneas en SQLite |
 | [`tests/auth/`](./tests/auth/) | AUTH-088: un módulo por endpoint de autenticación y autorización (registro, login, `/auth/token`, validación del token, `/me`, recuperación, reset, cambio de contraseña y los cuatro de `/users`), con reloj congelado y red bloqueada |
 | [`tests/backoffice/`](./tests/backoffice/) | API-042: un módulo por endpoint de proveedores (6) y del gestor de incidencias (5), llamando a las funciones del router |
-| [`tests/reporting/`](./tests/reporting/) | Pipeline de desempeño semanal: semanas ISO, cada subflow por separado (extract, validate, aggregate, load), flow (idempotencia, autorreparación, ejecuciones fallidas y abandonadas, concurrencia, origen sin cambios), línea de comandos y endpoints; `test_postgres.py`, opcional, contra un PostgreSQL local (`REPORTING_TEST_DATABASE_URL`) |
+| [`tests/reporting/`](./tests/reporting/) | Pipeline de desempeño semanal: semanas ISO, cada subflow por separado (extract, validate, aggregate, load), flow (idempotencia, autorreparación, ejecuciones fallidas y abandonadas, concurrencia, origen sin cambios), línea de comandos y endpoints (el `POST` encola: 202 y resultado en `GET /tasks/{id}`); `test_postgres.py`, opcional, contra un PostgreSQL local (`REPORTING_TEST_DATABASE_URL`) |
+| [`tests/tasks/`](./tests/tasks/) | DEV-55, tareas asíncronas: configuración de Celery y backoff, ciclo de vida (reintentos, fallos definitivos, límites de tiempo, expiración, logs JSON), DLQ (idempotencia, censura de secretos) y `GET /tasks`. Opcionales: `test_dead_letters_postgres.py` (`TASKS_TEST_DATABASE_URL`) y `test_e2e_docker.py` (API, Redis, worker y PostgreSQL reales; `ASYNC_E2E_*`) |
 
 ## Gestión de errores
 
