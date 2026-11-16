@@ -11,7 +11,19 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.errors import UnexpectedErrorMiddleware, unexpected_error, validation_error
-from app.routes import auth, incident_manager, incidents, inventory, profiles, reporting, suppliers, telemetry, users
+from app.routes import (
+    auth,
+    incident_manager,
+    incidents,
+    inventory,
+    profiles,
+    reporting,
+    suppliers,
+    tasks,
+    telemetry,
+    users,
+)
+from app.celery_app import log_task_queue_config
 from app.security import ConfigError, check_auth_config
 from app.services.email import check_email_config
 from app.telemetry.config import log_telemetry_config
@@ -48,6 +60,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         raise
     # La telemetría nunca impide arrancar: solo avisa de lo que falta (p. ej. la clave de los seudónimos).
     log_telemetry_config()
+    # La cola de tareas (Redis) tampoco: sin Redis la API arranca y solo el productor responde 503.
+    log_task_queue_config()
     yield
 
 
@@ -56,7 +70,8 @@ app = FastAPI(
     description=(
         "Directorio de proveedores de TrackFlow (USA + Spain), analizador de incidencias de CX, gestor de "
         "incidencias, inventario unificado de los almacenes de Los Ángeles y Zaragoza (`/inventory`), telemetría "
-        "(`/telemetry`) y reporte semanal de desempeño por almacén y cliente (`/reporting`). "
+        "(`/telemetry`) y reporte semanal de desempeño por almacén y cliente (`/reporting`), cuyo cálculo se encola "
+        "en un worker de Celery y se consulta en `/tasks`. "
         "Autenticación con Bearer JWT: `POST /auth/login` (o el botón «Authorize»)."
     ),
     version="0.1.0",
@@ -103,6 +118,7 @@ app.include_router(incident_manager.router)
 app.include_router(inventory.router)
 app.include_router(telemetry.router)
 app.include_router(reporting.router)
+app.include_router(tasks.router)
 
 
 # Errores que no gestiona ningún router (ver `app/errors.py`): 422 sin los valores recibidos y, como último recurso

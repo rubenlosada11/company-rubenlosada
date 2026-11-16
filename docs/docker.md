@@ -104,9 +104,17 @@ docker compose down
 | http://localhost:3000 | Website |
 | http://localhost:3001 | Backoffice (`/login`) |
 | http://localhost:8000 | API (`/health`, `/docs`) |
+| http://localhost:5555 | Flower (monitorización de Celery; usuario y contraseña de `FLOWER_BASIC_AUTH`) |
+| `127.0.0.1:6379` | Redis (broker y resultados de Celery) |
 
 Solo escuchan en `127.0.0.1`: no se exponen a tu red local. Para cambiarlos, edita `WEBSITE_PORT`,
-`BACKOFFICE_PORT` o `API_PORT` en `.env`; CORS y la URL de la API se recalculan solos.
+`BACKOFFICE_PORT`, `API_PORT`, `FLOWER_PORT` o `REDIS_PORT` en `.env`; CORS y la URL de la API se recalculan solos.
+
+**Tareas asíncronas (DEV-55).** El Compose de desarrollo incluye además `redis` (`redis:8.10.3-alpine`, `noeviction`,
+AOF en el volumen `redis-data`), `worker` (Celery, misma imagen que `backend`, monta `data/` para el pipeline) y
+`flower`. La API y el worker usan `REDIS_URL=redis://redis:6379/0`, fijado en `docker-compose.yml`. Flower no arranca
+sin `FLOWER_BASIC_AUTH` en `.env`. Producción (`docker-compose.prod.yml`) todavía no los tiene. Detalle, operación y
+pruebas: [`async-tasks.md`](./async-tasks.md).
 
 ## 7. Arquitectura Docker
 

@@ -1,13 +1,30 @@
 import pytest
+from celery.backends import cache as celery_cache
 from fastapi.testclient import TestClient
 
 from app.auth_models import Role, UserCreate
+from app.celery_app import celery_app
 from app.cache import reset_all as reset_api_caches
 from app.database import dispose_engine, suppliers_table
 from app.main import app
 from app.security import create_access_token
 from app.seed import seed
 from app.services.users import create_user
+from app.tasks import registry as task_registry
+
+# --- Celery en los tests unitarios (DEV-55) -------------------------------------------------------------------------
+# Sin Redis ni worker: las tareas se ejecutan en el mismo proceso al encolarlas («eager»), con sus reintentos seguidos
+# (sin esperar el backoff), y su estado se guarda en una caché en memoria para que `GET /tasks/{id}` lo lea igual que
+# del result backend real. Se configura aquí, antes de que nada use `celery_app.backend`. SOLO en los tests: la
+# configuración real (`app/celery_app.py`) no tiene modo eager, así que sin worker la API nunca ejecuta tareas.
+# La integración con Redis y un worker reales está en tests/tasks/test_e2e_docker.py (opcional, con Docker).
+celery_app.conf.update(
+    broker_url="memory://",
+    result_backend="cache+memory://",
+    task_always_eager=True,
+    task_eager_propagates=False,
+    task_store_eager_result=True,
+)
 
 TEST_SECRET_KEY = "clave-de-pruebas-que-no-es-secreta-0123456789"
 PASSWORD = "contraseña-segura"
@@ -61,6 +78,35 @@ def telemetry_writes_inline(monkeypatch):
     """Los eventos de telemetría del backend se guardan en el momento, no en el hilo de escritura: así cada test
     termina con sus eventos ya en la base temporal y ninguno escribe después de que se borre."""
     monkeypatch.setattr("app.telemetry.collector.run_in_background", lambda job: job())
+
+
+class FakeRedis:
+    """Lo que usa `app/tasks/registry.py` de redis-py (`set`, `get`, `delete`), en memoria."""
+
+    def __init__(self) -> None:
+        self.data: dict[str, str] = {}
+        self.ttl: dict[str, int | None] = {}
+
+    def set(self, name: str, value: str, ex: int | None = None) -> bool:
+        self.data[name] = value
+        self.ttl[name] = ex
+        return True
+
+    def get(self, name: str) -> str | None:
+        return self.data.get(name)
+
+    def delete(self, *names: str) -> int:
+        return sum(self.data.pop(name, None) is not None for name in names)
+
+
+@pytest.fixture(autouse=True)
+def fake_task_redis(monkeypatch):
+    """Registro de tareas en memoria y resultados de Celery vacíos en cada test (nunca toca un Redis real)."""
+    fake = FakeRedis()
+    monkeypatch.setattr(task_registry, "get_client", lambda: fake)
+    celery_cache._DUMMY_CLIENT_CACHE.clear()
+    yield fake
+    celery_cache._DUMMY_CLIENT_CACHE.clear()
 
 
 @pytest.fixture

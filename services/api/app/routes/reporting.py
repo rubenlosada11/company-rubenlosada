@@ -1,30 +1,33 @@
 """Reporte Semanal de Desempeño por Almacén y Cliente: resultado y ejecuciones del pipeline (`/reporting`).
 
 Módulo separado de `/telemetry` (BRIEFING de pipelines §6). El cálculo es el flow de Prefect de
-`data/pipelines/pipeline.py`, que este router importa (`app/reporting/runner.py`) sin duplicar su lógica: aquí solo se
-validan parámetros, se leen las tablas de `reporting` y se lanzan ejecuciones. Diseño:
-`data/pipelines/PIPELINE_DESIGN.md`.
+`data/pipelines/pipeline.py`, que ejecuta un **worker de Celery** (`app/tasks/reporting.py`, DEV-55) sin duplicar su
+lógica: aquí solo se validan parámetros, se leen las tablas de `reporting` y se encolan ejecuciones.
+Diseño: `data/pipelines/PIPELINE_DESIGN.md` y `docs/async-tasks.md`.
 
 - `GET /reporting/weekly-warehouse-client-performance`: filas de una semana (por defecto, la calculada más reciente).
 - `GET /reporting/pipeline-runs/latest`: última ejecución del pipeline y su metadata.
-- `POST /reporting/pipeline-runs`: ejecución manual síncrona del flow (solo `admin` o `manager`).
+- `POST /reporting/pipeline-runs`: encola una ejecución manual (solo `admin` o `manager`) y responde 202 con el
+  `task_id`; el estado y el resultado, en `GET /tasks/{task_id}`.
 
 Las lecturas exigen un usuario autenticado. Un fallo de la base es un 503 sin detalles (nunca la cadena de conexión).
 """
 
-import uuid
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
 from fastapi.exceptions import RequestValidationError
 
 from app.auth_models import Role
 from app.dependencies import CurrentUser, get_current_user
-from app.reporting import queries, runner, runs
+from app.reporting import queries, runs
 from app.reporting.models import PipelineRun, PipelineRunRequest, WeeklyPerformanceEntry, WeeklyPerformanceReport
 from app.reporting.tables import ReportingStorageError
-from app.reporting.weeks import WindowError, is_monday
+from app.reporting.weeks import WindowError, is_monday, resolve_window
+from app.tasks.models import TaskAccepted
+from app.tasks.queue import TaskQueueUnavailable
+from app.tasks.reporting import enqueue_weekly_performance
 from app.telemetry.context import current_context
 
 router = APIRouter(prefix="/reporting", tags=["reporting"])
@@ -37,12 +40,7 @@ NO_WEEKS_YET = "Aún no hay ninguna semana calculada: ejecuta el pipeline (POST 
 WEEK_NOT_COMPUTED = "Esa semana no la ha calculado ninguna ejecución correcta del pipeline."
 NO_RUNS_YET = "El pipeline semanal todavía no se ha ejecutado nunca."
 RUN_FORBIDDEN = "Solo un administrador o un manager puede ejecutar el pipeline."
-RUN_IN_PROGRESS = "Ya hay una ejecución del pipeline semanal en curso. Espera a que termine."
-PIPELINE_UNAVAILABLE = "El pipeline no está disponible en este despliegue (falta data/pipelines o Prefect)."
-RUN_FAILED = (
-    "La ejecución del pipeline ha fallado y ha quedado registrada (GET /reporting/pipeline-runs/latest). "
-    "El reporte no ha cambiado."
-)
+QUEUE_UNAVAILABLE = "La cola de tareas no está disponible en este momento: no se ha encolado la ejecución."
 
 
 def _query_error(field: str, message: str) -> RequestValidationError:
@@ -112,60 +110,54 @@ def latest_pipeline_run() -> PipelineRun:
     return PipelineRun.model_validate(run)
 
 
+
+
 @router.post(
     "/pipeline-runs",
-    response_model=PipelineRun,
-    status_code=status.HTTP_201_CREATED,
-    summary="Ejecuta el pipeline semanal (manual)",
+    response_model=TaskAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Encola una ejecución del pipeline semanal (asíncrona)",
     description=(
-        "Ejecuta de forma síncrona el flow de Prefect `weekly-warehouse-client-performance` "
-        "(data/pipelines/pipeline.py): "
-        "recalcula de forma idempotente las `weeks` semanas que terminan en `week_start` (por defecto, las 2 últimas "
-        "semanas completas) y devuelve la ejecución. `outcome` = `partial` si falló una etapa opcional (el reporte se "
-        "cargó igual). Solo `admin` o `manager`. La semana en curso no se puede calcular."
+        "Valida los parámetros y **encola** el flow de Prefect `weekly-warehouse-client-performance` "
+        "(data/pipelines/pipeline.py) para que lo ejecute un worker de Celery; responde al momento con el `task_id`, "
+        "sin esperar al cálculo. El estado y el resultado (la ejecución registrada, con `outcome`) se consultan en "
+        "`GET /tasks/{task_id}` (cabecera `Location`). Recalcula de forma idempotente las `weeks` semanas que terminan "
+        "en `week_start` (por defecto, las 2 últimas semanas completas). Solo `admin` o `manager`. La semana en curso "
+        "no se puede calcular. Si ya hay otra ejecución en curso, la tarea se reintenta con backoff (2, 4 y 8 s)."
     ),
     responses={
+        202: {"description": "Encolada: `{\"task_id\": …}`"},
         401: {"description": "Sin token o token no válido"},
         403: {"description": "El usuario no es administrador ni manager"},
-        409: {"description": "Ya hay una ejecución en curso"},
         422: {"description": "`week_start` no es un lunes, su semana no ha terminado o `weeks` fuera de 1–53"},
-        503: {
-            "description": (
-                "La ejecución ha fallado (queda registrada como `failed`), la base no está disponible o el pipeline no "
-                "está en este despliegue"
-            )
-        },
+        503: {"description": "La cola de tareas (Redis) no está disponible: no se ha encolado nada"},
     },
 )
 def create_pipeline_run(
     current_user: CurrentUser,
+    response: Response,
     request: Annotated[PipelineRunRequest | None, Body()] = None,
-) -> PipelineRun:
+) -> TaskAccepted:
     if current_user.role not in RUNNER_ROLES:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail=RUN_FORBIDDEN)
     params = request or PipelineRunRequest()
-    context = current_context()
     try:
-        pipeline = runner.load_pipeline()
-    except runner.PipelineUnavailable:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=PIPELINE_UNAVAILABLE) from None
-    try:
-        run = pipeline.run_weekly_performance(
-            week_start=params.week_start,
-            weeks=params.weeks,
-            trigger="api",
-            triggered_by=current_user.id,
-            # Mismo X-Request-Id que la respuesta: une la petición, sus logs y la ejecución.
-            request_id=uuid.UUID(context.request_id) if context else None,
-        )
+        # La ventana se fija AHORA: el worker (y cada reintento) calcula exactamente estas semanas.
+        window = resolve_window(params.week_start, params.weeks)
     except WindowError as error:
         raise RequestValidationError(
             [{"type": "value_error", "loc": ("body", error.field), "msg": str(error)}]
         ) from None
-    except pipeline.PipelineAlreadyRunning:
-        raise HTTPException(status.HTTP_409_CONFLICT, detail=RUN_IN_PROGRESS) from None
-    except pipeline.PipelineRunFailed:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=RUN_FAILED) from None
-    except ReportingStorageError:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=REPORTING_UNAVAILABLE) from None
-    return PipelineRun.model_validate(run)
+    context = current_context()
+    try:
+        task_id = enqueue_weekly_performance(
+            week_start=window.last,
+            weeks=params.weeks,
+            owner_id=current_user.id,
+            # Mismo X-Request-Id que la respuesta: une la petición, la tarea, sus logs y la ejecución.
+            request_id=context.request_id if context else None,
+        )
+    except TaskQueueUnavailable:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=QUEUE_UNAVAILABLE) from None
+    response.headers["Location"] = f"/tasks/{task_id}"
+    return TaskAccepted(task_id=task_id)

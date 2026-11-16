@@ -6,8 +6,17 @@
 
 ## Estado actual (resumen)
 
-- **Rama de trabajo:** `feature/nightly-telemetry-export` (desde `main` @ `b87e0a6`, tras fusionar la PR #32 del
-  Hito 6).
+- **Rama de trabajo:** `feature/async-tasks-celery` (desde `main` @ `dc694f8`, tras fusionar la PR #33 de DEV-53).
+- **Colas de mensajes y tareas asíncronas — DEV-55** (práctica sin número de hito): `POST /reporting/pipeline-runs`
+  deja de ejecutar el flow de Prefect dentro de la petición y lo **encola** en Redis: 202 `{"task_id"}` en ~5 ms
+  (servidor) frente a 3,7–70,6 s antes. Un worker de Celery ([`services/api/app/celery_app.py`](../services/api/app/celery_app.py),
+  [`app/tasks/`](../services/api/app/tasks/)) ejecuta el mismo flow; `GET /tasks/{task_id}` da `pending`, `started`,
+  `retrying`, `success` (con la ejecución) o `failure` (error controlado), solo al dueño (404 si no). Reintentos solo
+  transitorios, 1 + 3 con 2/4/8 s; fallos definitivos en la DLQ `public.task_dead_letters` (migración
+  `20261116120000_task_dead_letters.sql`, **sin aplicar en Supabase**), idempotente por `task_id`;
+  `GET /tasks/dead-letters` (admin). Redis 8.10.3 (`noeviction`, AOF), worker y Flower (autenticación básica) en
+  `docker-compose.yml`. Documentación: [`docs/async-tasks.md`](../docs/async-tasks.md). **Verificado** (2026-11-16):
+  ver la entrada del historial.
 - **Procesos en segundo plano — DEV-53, script nocturno de telemetría** (práctica sin número de hito):
   [`scripts/nightly_export.py`](../scripts/nightly_export.py), proceso **independiente de la API** para el `cron` de las
   02:00 UTC. Fecha objetivo = ayer en UTC o `TARGET_DATE`; exporta `telemetry_events` del día a
@@ -1649,6 +1658,8 @@ parar antes de crear la PR. Rama desde `feature/prefect-performance-pipeline` @ 
 
 ### 2026-11-15 — Procesos en segundo plano: DEV-53, script nocturno de telemetría (rama `feature/nightly-telemetry-export`)
 
+> Cierre (2026-11-15): PR #33 fusionada (`dc694f8`) y ficha creada en Notion («Prácticas — Bootcamp»).
+
 Práctica sin número de hito. El desarrollador pidió ejecutar todas las fases con mis recomendaciones y parar antes de
 crear la PR (y después, tras la fusión, la ficha de Notion).
 
@@ -1676,6 +1687,31 @@ crear la PR (y después, tras la fusión, la ficha de Notion).
   (columnas, 6 `CHECK`, índices, RLS, solo `SELECT` para `service_role`). Ejecuciones reales: por defecto (día 14, 0
   eventos, CSV con cabecera) `completed`; 2 instancias del 11 a la vez → una `completed` (47 eventos) y otra 75;
   repetición → `skipped_duplicate`. `job_runs` = 2 filas `completed`; `pipeline_runs` pasa de 4 a 6 `succeeded`.
+
+### 2026-11-16 — Colas de mensajes y tareas asíncronas: DEV-55 (rama `feature/async-tasks-celery`)
+
+Práctica sin número de hito. El desarrollador pidió avanzar por todas las fases con mis recomendaciones (commit, push,
+PR con etiqueta `async-tasks` y ficha de Notion incluidos).
+
+- **Auditoría y diseño:** operación elegida `POST /reporting/pipeline-runs`. Medido en `main` @ `dc694f8` sobre la
+  misma base: 70,6 s la primera petición, 3,7–6,4 s después.
+- **Hecho:** `celery`, `redis`, `flower` con `uv add` (lock y `services/requirements.txt` regenerados);
+  `app/celery_app.py`, `app/tasks/` (base con reintentos y DLQ, tarea de negocio, `diagnostics.ping`, productor,
+  registro de dueños, logs JSON), `app/routes/tasks.py`, migración de la DLQ, `redis`/`worker`/`flower` en
+  `docker-compose.yml`, `.env.example` (raíz y API), documentación (`docs/async-tasks.md`, README de la API,
+  `docs/docker.md`, `PIPELINE_DESIGN.md`, `weekly-performance-pipeline.md`).
+- **Hallazgos con servicios reales** (corregidos, con test): la excepción original del reintento tumbaba el proceso
+  padre del worker (`ModuleNotFoundError: data`) → `TransientTaskError`; la cadena de errores ignoraba `from None` y
+  guardaba la excepción del driver → regla de Python; `rowcount` de `ON CONFLICT` no fiable con psycopg 3 →
+  `RETURNING`; `localhost` en Windows (8,3 s en frío, 503 en 4 s) → `127.0.0.1` (245 ms, 2 s); el límite duro solo
+  actúa si la tarea ignora el suave (pool de Celery) → `ping(simulate_hang=True)`.
+- **Verificado (2026-11-16):** `tests/tasks` y endpoints de reporting en verde; DLQ contra PostgreSQL 16 6/6 (8
+  escrituras concurrentes → 1 fila); E2E con Docker (API, Redis, worker, PostgreSQL) 6/6; escenarios con Docker: API
+  parada, worker parado, reinicio en caliente, SIGKILL + reentrega, caducidad, límites suave y duro, Redis caído (503
+  y reconexión), persistencia AOF, entorno local sin Docker (`--pool=solo`), `noeviction` (OOM sin desalojar).
+  Duplicado real observado tras una caída (entrega al menos una vez): inocuo por idempotencia.
+- **Pendiente:** aplicar la migración en Supabase (desarrollador); Redis/worker/Flower en `docker-compose.prod.yml`
+  (decisión de infraestructura); capturas de Flower para la PR (las hace el desarrollador).
 
 ## Trabajo pendiente
 
@@ -1790,6 +1826,6 @@ crear la PR (y después, tras la fusión, la ficha de Notion).
     `test_different_periods_are_computed_in_parallel`, requiere confirmación: sistema de telemetría); alerta por
     email de ausencia de ejecuciones (PIPELINE_DESIGN §19.9); servidor de Prefect dedicado si los ~2 s por subflow
     molestan.
-16. DEV-53 (proceso nocturno, `feature/nightly-telemetry-export`): PR, fusión y ficha de Notion. Después: instalar el `cron` al desplegar el backend, servidor de Prefect dedicado
+16. DEV-53 (proceso nocturno): PR #33 fusionada (`dc694f8`) y ficha de Notion creada. Pendiente: instalar el `cron` al desplegar el backend, servidor de Prefect dedicado
     (`PREFECT_API_URL`: evita el servidor temporal huérfano tras un timeout) y alerta por email de ejecuciones
     `failed` o ausentes (`docs/telemetry/nightly-export.md` §13).

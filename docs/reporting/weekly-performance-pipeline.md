@@ -131,7 +131,7 @@ ventana es de 2 semanas, una semana olvidada se recupera en la siguiente ejecuci
 | --- | --- | --- |
 | `GET /reporting/weekly-warehouse-client-performance?week_start=YYYY-MM-DD` | Autenticado | 200 (también con `entries: []` si la semana se calculó sin actividad) · 401 · 404 (semana que ninguna corrida correcta ha calculado) · 422 (no es un lunes) · 503 |
 | `GET /reporting/pipeline-runs/latest` | Autenticado | 200 · 401 · 404 (nunca ejecutado) · 503 |
-| `POST /reporting/pipeline-runs` con `{"week_start"?, "weeks"?}` o sin cuerpo | `admin` o `manager` | 201 · 401 · 403 · 409 (otra en curso, de cualquier proceso) · 422 · 503 (falló; queda `failed`) |
+| `POST /reporting/pipeline-runs` con `{"week_start"?, "weeks"?}` o sin cuerpo | `admin` o `manager` | Desde DEV-55: 202 `{"task_id"}` (la ejecución, en `GET /tasks/{task_id}`) · 401 · 403 · 422 · 503 (cola no disponible). Antes: 201 · 409 · 503. Ver [`docs/async-tasks.md`](../async-tasks.md) |
 
 Respuesta real del reporte (API local con una base desechable, 2026-11-13; desde la revisión lleva también `run_id`,
 el de la corrida que calculó la semana):
