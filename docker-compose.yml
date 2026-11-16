@@ -1,20 +1,30 @@
-# Docker Compose de DESARROLLO: website + backoffice (contenedor "interfaces") y API FastAPI ("backend").
+# Docker Compose de DESARROLLO: website + backoffice (contenedor "interfaces"), API FastAPI ("backend") y tareas
+# asíncronas (DEV-55): Redis (broker y resultados), worker de Celery y Flower (monitorización).
 #
-#   Copy-Item .env.example .env      (la primera vez; rellena SECRET_KEY)
+#   Copy-Item .env.example .env      (la primera vez; rellena SECRET_KEY y FLOWER_BASIC_AUTH)
 #   docker compose up --build
 #
-# Website http://localhost:3000 · Backoffice http://localhost:3001 · API http://localhost:8000 (puertos en .env).
-# Producción: docker-compose.prod.yml. Guía completa: docs/docker.md.
+# Website http://localhost:3000 · Backoffice http://localhost:3001 · API http://localhost:8000 · Flower
+# http://localhost:5555 · Redis localhost:6379 (puertos en .env; todo publicado solo en 127.0.0.1).
+# Producción: docker-compose.prod.yml (sin tareas asíncronas todavía). Guía completa: docs/docker.md y
+# docs/async-tasks.md.
 name: trackflow
+
+# Imagen de services/Dockerfile: la usan la API, el worker y Flower (mismo código y mismas versiones de Celery).
+x-backend-build: &backend-build
+  context: ./services
+  dockerfile: Dockerfile
+  target: dev
+  additional_contexts:
+    packages: ./packages/analisis-incidencias
+
+# Dirección de Redis DENTRO de la red de Docker (nombre del servicio). Se fija aquí y no en .env: el .env de la raíz
+# lo comparten los contenedores, y fuera de Docker la API usa REDIS_URL=redis://127.0.0.1:6379/0 (services/api/.env).
+x-redis-url: &redis-url redis://redis:6379/0
 
 services:
   backend:
-    build:
-      context: ./services
-      dockerfile: Dockerfile
-      target: dev
-      additional_contexts:
-        packages: ./packages/analisis-incidencias
+    build: *backend-build
     image: trackflow-backend:dev
     # Variables de la API (SECRET_KEY, REGISTRATION_CODE, RESEND_*, DATABASE_URL…). El frontend no las recibe.
     env_file: .env
@@ -22,6 +32,8 @@ services:
       # Origen del backoffice tal como lo ve el navegador. Se deriva del puerto publicado; .env puede sobrescribirlo.
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:${BACKOFFICE_PORT:-3001},http://127.0.0.1:${BACKOFFICE_PORT:-3001}}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:${BACKOFFICE_PORT:-3001}}
+      # Productor: encola en el mismo Redis que lee el worker.
+      REDIS_URL: *redis-url
     ports:
       # Solo en 127.0.0.1: la API no queda expuesta a la red local.
       - "127.0.0.1:${API_PORT:-8000}:8000"
@@ -29,6 +41,9 @@ services:
       # Código y datos locales (services/api/db) del host: los mismos que sin Docker.
       - ./services/api:/app/services/api
       - ./packages/analisis-incidencias:/app/packages/analisis-incidencias:ro
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - trackflow-net
     healthcheck:
@@ -77,6 +92,116 @@ services:
       retries: 3
       start_period: 90s
 
+  # --- Tareas asíncronas (DEV-55, docs/async-tasks.md) ---------------------------------------------------------------
+  redis:
+    # Imagen oficial, versión fijada. Broker (cola de mensajes) y result backend (estado y resultado de cada tarea).
+    image: redis:8.10.3-alpine
+    # noeviction: con la memoria llena, Redis RECHAZA escrituras nuevas (el productor responde 503) en lugar de borrar
+    # claves en silencio, que podrían ser mensajes de la cola. appendonly: los mensajes pendientes sobreviven a un
+    # reinicio de Redis (fichero AOF en el volumen redis-data).
+    command:
+      - redis-server
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-256mb}
+      - --maxmemory-policy
+      - noeviction
+      - --appendonly
+      - "yes"
+    ports:
+      # Solo en 127.0.0.1: para la API o el worker arrancados fuera de Docker (REDIS_URL=redis://127.0.0.1:6379/0).
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - trackflow-net
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  worker:
+    # Consumidor: proceso independiente de la API. Parar uno no para el otro; los mensajes esperan en Redis.
+    build: *backend-build
+    image: trackflow-backend:dev
+    # Nombre estable (worker@worker): sin él, cada contenedor nuevo aparece en Flower como otro worker.
+    hostname: worker
+    # Una tarea a la vez (el pipeline semanal admite una sola ejecución); súbelo con CELERY_WORKER_CONCURRENCY.
+    # Sin recarga automática: tras cambiar el código de las tareas, `docker compose restart worker`.
+    command:
+      - celery
+      - -A
+      - app.celery_app
+      - worker
+      - --loglevel=INFO
+      - --concurrency=${CELERY_WORKER_CONCURRENCY:-1}
+      - --hostname=worker@%h
+    env_file: .env
+    environment:
+      REDIS_URL: *redis-url
+      # Prefect (el pipeline) guarda su servidor temporal aquí: el usuario del contenedor no tiene HOME.
+      PREFECT_HOME: /tmp/prefect
+    volumes:
+      - ./services/api:/app/services/api
+      - ./packages/analisis-incidencias:/app/packages/analisis-incidencias:ro
+      # El pipeline (data/pipelines) no está en la imagen; también escribe su caché y snapshots en data/raw y data/eval.
+      - ./data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - trackflow-net
+    # Parada en caliente: Celery deja de aceptar mensajes y espera a la tarea en curso. Si no termina a tiempo, Docker
+    # mata el proceso y, con ACK tardío, el mensaje vuelve a la cola.
+    stop_grace_period: 60s
+    # Si el proceso principal del worker cae, Docker lo levanta otra vez (y recoge los mensajes pendientes).
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery_app inspect ping --destination worker@$$HOSTNAME --timeout 5 | grep -q pong"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
+
+  flower:
+    # Monitorización de Celery (workers, tareas pendientes, activas, completadas y fallidas). No es la DLQ: los fallos
+    # definitivos están en la tabla task_dead_letters.
+    image: trackflow-backend:dev
+    pull_policy: never
+    # Sin usuario y contraseña no arranca: el panel permite ver argumentos de las tareas y apagar workers.
+    command:
+      - sh
+      - -c
+      - >-
+        test -n "$$FLOWER_BASIC_AUTH" || { echo "Define FLOWER_BASIC_AUTH=usuario:clave en .env"; exit 1; };
+        exec celery -A app.celery_app flower --address=0.0.0.0 --port=5555
+    environment:
+      REDIS_URL: *redis-url
+      # Autenticación básica (usuario:contraseña) desde .env. Solo para desarrollo, siempre en 127.0.0.1.
+      FLOWER_BASIC_AUTH: ${FLOWER_BASIC_AUTH:-}
+    ports:
+      - "127.0.0.1:${FLOWER_PORT:-5555}:5555"
+    volumes:
+      - ./services/api:/app/services/api
+      - ./packages/analisis-incidencias:/app/packages/analisis-incidencias:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    networks:
+      - trackflow-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5555/healthcheck', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
 networks:
   trackflow-net:
     name: trackflow-net
+
+volumes:
+  # Persistencia de Redis (AOF): mensajes pendientes y resultados sobreviven a `docker compose restart redis`.
+  redis-data:
